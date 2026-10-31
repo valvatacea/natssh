@@ -199,7 +199,7 @@ Script ini berfungsi sebagai jembatan antara port eksternal (Cloudflare) dan por
    import threading
 
    WS_PORT = 20865     # GANTI dengan Port NAT kosong untuk Cloudflare
-   SSH_PORT = 20861    # GANTI dengan Port SSH lokal Anda
+   SSH_PORT = 22    # GANTI dengan Port SSH lokal Anda
 
    def forward(src, dst):
        try:
@@ -294,7 +294,7 @@ Untuk menyambungkan aplikasi VPN di HP, gunakan konfigurasi berikut:
 - **Username & Password:** Gunakan akun SSH yang sudah dibuat (contoh: `vpnuser`)
 - **Payload WebSocket:**
   ```text
-  GET / HTTP/1.1[crlf]Host: ssh.domainanda.com[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf][crlf]
+  GET / HTTP/1.1[crlf]Host: ssh.kkkumanami.web.id[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf][crlf]
   ```
 - **SNI (Server Name Indication):** `ssh.domainanda.com`
 - Aktifkan fitur **Enable DNS** dan **Use Payload**.
