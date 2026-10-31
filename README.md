@@ -280,7 +280,7 @@ Agar nama domain bisa digunakan, arahkan lalu lintas ke port WebSocket (Python) 
 1. Buka dashboard Cloudflare -> **Rules** -> **Origin Rules**.
 2. Buat aturan baru: 
    - **Field:** Hostname | **Operator:** equals | **Value:** `ssh.domainanda.com`
-   - **Action:** Rewrite to port `20864` (Sesuaikan dengan `WS_PORT` di file `ws.py`).
+   - **Action:** Rewrite to port `20865` (Sesuaikan dengan `WS_PORT` di file `ws.py`).
 3. Pastikan DNS `ssh.domainanda.com` berstatus **Proxied (Awan Oranye)**.
 
 ---
