@@ -198,7 +198,7 @@ Script ini berfungsi sebagai jembatan antara port eksternal (Cloudflare) dan por
    import socket
    import threading
 
-   WS_PORT = 20864     # GANTI dengan Port NAT kosong untuk Cloudflare
+   WS_PORT = 20865     # GANTI dengan Port NAT kosong untuk Cloudflare
    SSH_PORT = 20861    # GANTI dengan Port SSH lokal Anda
 
    def forward(src, dst):
