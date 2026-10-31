@@ -253,7 +253,7 @@ Meskipun Menu no. 9 memiliki fitur Autokill manual, script ini berjalan otomatis
 2. Salin dan tempel kode berikut:
    ```bash
    #!/bin/bash
-   MAX_LOGIN=1 # Batas maksimal perangkat
+   MAX_LOGIN=5 # Batas maksimal perangkat
 
    ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
        if id "$user" &>/dev/null; then
