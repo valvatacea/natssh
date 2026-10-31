@@ -294,7 +294,7 @@ Untuk menyambungkan aplikasi VPN di HP, gunakan konfigurasi berikut:
 - **Username & Password:** Gunakan akun SSH yang sudah dibuat (contoh: `vpnuser`)
 - **Payload WebSocket:**
   ```text
-  GET / HTTP/1.1[crlf]Host: ssh.kkkumanami.web.id[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf][crlf]
+  GET / HTTP/1.1[crlf]Host: ssh.domainanda.web.id[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf][crlf]
   ```
 - **SNI (Server Name Indication):** `ssh.domainanda.com`
 - Aktifkan fitur **Enable DNS** dan **Use Payload**.
