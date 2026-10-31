@@ -27,19 +27,25 @@ else
     echo -e "${GREEN}Python3 sudah terinstal.${NC}"
 fi
 
-# Download file utama jika belum ada (berguna jika di-run standalone)
+# Tanya port interaktif
+read -p "Masukkan Port NAT kosong untuk WebSocket (default: 20864): " ws_port
+ws_port=${ws_port:-20864}
+
+# Download file utama
 echo -e "
-[*] Memastikan file skrip tersedia..."
-if [ ! -f "menu.sh" ] || [ ! -f "ws.py" ] || [ ! -f "autokill.sh" ]; then
-    echo -e "${YELLOW}Mengunduh file dari repositori...${NC}"
-    wget -qO menu.sh https://raw.githubusercontent.com/valvatacea/natssh/main/menu.sh
-    wget -qO ws.py https://raw.githubusercontent.com/valvatacea/natssh/main/ws.py
-    wget -qO autokill.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autokill.sh
-fi
+[*] Mengunduh file dari repositori..."
+wget -qO menu.sh https://raw.githubusercontent.com/valvatacea/natssh/main/menu.sh
+wget -qO ws.py https://raw.githubusercontent.com/valvatacea/natssh/main/ws.py
+wget -qO autokill.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autokill.sh
+wget -qO uninstall.sh https://raw.githubusercontent.com/valvatacea/natssh/main/uninstall.sh
+
+echo -e "
+[*] Mengatur port di ws.py..."
+sed -i "s/WS_PORT = 20864/WS_PORT = ${ws_port}/g" ws.py
 
 echo -e "
 [*] Mengatur izin eksekusi..."
-chmod +x menu.sh autokill.sh
+chmod +x menu.sh autokill.sh uninstall.sh
 
 echo -e "
 [*] Mengatur Service Systemd untuk WebSocket Proxy (ws.py)..."
@@ -76,9 +82,28 @@ else
 fi
 
 echo -e "
+[*] Mengatur Banner Pesan SSH..."
+cat > /etc/issue.net <<EOF
+<br>
+<font color="green"><b>======================================</b></font><br>
+<font color="yellow"><b>       SELAMAT DATANG DI PREMIUM VPN  </b></font><br>
+<font color="green"><b>======================================</b></font><br>
+<font color="red"><b> PERINGATAN: </b></font><br>
+<font color="white"> - Dilarang Torrent </font><br>
+<font color="white"> - Dilarang DDOS / Hacking </font><br>
+<font color="white"> - Max Login 1 Perangkat (Auto-Kill) </font><br>
+<font color="green"><b>======================================</b></font><br>
+EOF
+
+# Aktifkan banner di sshd_config
+sed -i 's/#Banner none/Banner \/etc\/issue.net/g' /etc/ssh/sshd_config
+sed -i 's/#Banner \/etc\/issue.net/Banner \/etc\/issue.net/g' /etc/ssh/sshd_config
+systemctl restart sshd
+
+echo -e "
 ${CYAN}================================================${NC}"
 echo -e "${GREEN} INSTALASI SELESAI!                             ${NC}"
 echo -e "${CYAN}================================================${NC}"
 echo -e "1. Untuk mengelola akun, jalankan: ${YELLOW}./menu.sh${NC}"
 echo -e "2. Untuk mengecek status WebSocket: ${YELLOW}systemctl status natssh-ws${NC}"
-echo -e "3. Pastikan Anda sudah mengatur WS_PORT di ws.py sesuai port NAT Anda."
+echo -e "3. Port WebSocket Anda saat ini: ${YELLOW}${ws_port}${NC}"
