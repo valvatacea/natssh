@@ -1,14 +1,14 @@
 #!/bin/bash
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+RED='[0;31m'
+GREEN='[0;32m'
+YELLOW='[0;33m'
+CYAN='[0;36m'
+NC='[0m'
 
 while true; do
     clear
     echo -e "${GREEN}======================================${NC}"
-    echo -e "${YELLOW}   MENU MANAJEMEN SSH VPN (v2.0)      ${NC}"
+    echo -e "${YELLOW}   MENU MANAJEMEN SSH VPN (v3.0)      ${NC}"
     echo -e "${GREEN}======================================${NC}"
     echo -e "${CYAN}[ MANAJEMEN AKUN ]${NC}"
     echo "1. Buat Akun SSH Baru"
@@ -19,13 +19,16 @@ while true; do
     echo "5. Kunci Akun Sementara (Suspend)"
     echo "6. Buka Kunci Akun (Unsuspend)"
     echo "7. Bersihkan Semua Akun Kedaluwarsa (Auto-Clean)"
-    echo -e "${CYAN}[ MONITORING & SISTEM ]${NC}"
+    echo -e "${CYAN}[ MONITORING & LOG ]${NC}"
     echo "8. Cek User Yang Sedang Login"
     echo "9. Autokill (Tendang Multi-Login)"
-    echo "10. Info RAM & CPU VPS"
-    echo -e "${RED}11. Keluar${NC}"
+    echo "10. Cek Riwayat Autokill (Log File)"
+    echo "11. Info RAM & CPU VPS"
+    echo -e "${CYAN}[ DATABASE ]${NC}"
+    echo "12. Backup Data Akun (Ekspor Portabel)"
+    echo -e "${RED}13. Keluar${NC}"
     echo -e "${GREEN}======================================${NC}"
-    read -p "Pilih menu (1-11): " menu
+    read -p "Pilih menu (1-13): " menu
     echo ""
 
     case $menu in
@@ -132,11 +135,56 @@ while true; do
             echo -e "${GREEN}Autokill selesai!${NC}"
             ;;
         10)
+            echo -e "${YELLOW}--- 20 RIWAYAT AUTOKILL TERAKHIR ---${NC}"
+            if [ -f "/root/autokill.log" ]; then
+                tail -n 20 /root/autokill.log
+            else
+                echo -e "${RED}Belum ada riwayat autokill saat ini.${NC}"
+            fi
+            ;;
+        11)
             echo -e "${YELLOW}--- STATUS SISTEM ---${NC}"
             free -m | awk 'NR==2{printf "RAM Usage : %s / %s MB (%.2f%%)\n", $3,$2,$3*100/$2 }'
             top -bn1 | grep load | awk '{printf "CPU Load  : %.2f\n", $(NF-2)}'
             ;;
-        11)
+        12)
+            echo -e "${YELLOW}Membuat cadangan (Backup) data akun SSH...${NC}"
+            backup_file="/root/backup_akun_ssh.sh"
+            
+            echo "#!/bin/bash" > $backup_file
+            echo "# SCRIPT RESTORE AKUN SSH VPN" >> $backup_file
+            echo "# Tanggal Backup: $(date)" >> $backup_file
+            echo "" >> $backup_file
+            
+            awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd | while read user; do
+                # Ambil hash password asli yang sudah terenkripsi dari shadow
+                hash=$(grep "^${user}:" /etc/shadow | cut -d: -f2)
+                
+                # Ambil tanggal kedaluwarsa dari shadow (dalam hitungan hari sejak 1 Jan 1970)
+                exp_days=$(grep "^${user}:" /etc/shadow | cut -d: -f8)
+                
+                if [ -n "$exp_days" ]; then
+                    # Konversi hitungan hari ke format YYYY-MM-DD
+                    exp_date=$(date -d "1970-01-01 + $exp_days days" +"%Y-%m-%d" 2>/dev/null)
+                    if [ $? -eq 0 ]; then
+                        echo "useradd -e "$exp_date" -m -s /bin/false "$user"" >> $backup_file
+                    else
+                        echo "useradd -m -s /bin/false "$user"" >> $backup_file
+                    fi
+                else
+                    echo "useradd -m -s /bin/false "$user"" >> $backup_file
+                fi
+                
+                # Terapkan hash password kembali menggunakan usermod
+                echo "usermod -p '$hash' "$user"" >> $backup_file
+            done
+            
+            chmod +x $backup_file
+            echo -e "${GREEN}SUKSES! Data seluruh akun dan kata sandi berhasil diekstrak.${NC}"
+            echo -e "File cadangan tersimpan di: ${CYAN}$backup_file${NC}"
+            echo -e "💡 ${YELLOW}Cara Pakai:${NC} Pindahkan file ini ke VPS baru Anda, lalu jalankan perintah ${CYAN}./backup_akun_ssh.sh${NC} untuk memulihkan semua akun beserta masa aktifnya."
+            ;;
+        13)
             echo "Keluar dari menu."
             break
             ;;
