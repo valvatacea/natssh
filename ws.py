@@ -2,7 +2,7 @@ import socket
 import threading
 
 WS_PORT = 20865     # GANTI dengan Port NAT kosong untuk Cloudflare
-SSH_PORT = 20861    # GANTI dengan Port SSH lokal Anda
+SSH_PORT = 22    # GANTI dengan Port SSH lokal Anda
 
 def forward(src, dst):
     try:
