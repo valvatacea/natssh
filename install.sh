@@ -30,6 +30,9 @@ fi
 # Tanya port interaktif
 read -p "Masukkan Port NAT kosong untuk WebSocket (default: 20864): " ws_port
 ws_port=${ws_port:-20864}
+if ! [[ "$ws_port" =~ ^[0-9]+$ ]] || [ "$ws_port" -lt 1 ] || [ "$ws_port" -gt 65535 ]; then
+    echo "Port tidak valid!"; exit 1
+fi
 
 # Download file utama
 echo -e "
@@ -39,9 +42,12 @@ wget -qO ws.py https://raw.githubusercontent.com/valvatacea/natssh/main/ws.py
 wget -qO autokill.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autokill.sh
 wget -qO uninstall.sh https://raw.githubusercontent.com/valvatacea/natssh/main/uninstall.sh
 
+# Unduhan gagal = file kosong -> service crash-loop; cek ukuran
+for f in menu.sh ws.py autokill.sh uninstall.sh; do
+    [ -s "$f" ] || { echo "Gagal mengunduh $f (repo privat/offline?)"; exit 1; }
+done
 echo -e "
-[*] Mengatur port di ws.py..."
-sed -i "s/WS_PORT = 20864/WS_PORT = ${ws_port}/g" ws.py
+[*] Port WebSocket akan disetel via Environment systemd (ws.py v2): ${ws_port}"
 
 echo -e "
 [*] Mengatur izin eksekusi..."
@@ -58,6 +64,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=$(pwd)
+Environment=NATSSH_WS_PORT=${ws_port}
 ExecStart=/usr/bin/python3 $(pwd)/ws.py
 Restart=always
 RestartSec=3
@@ -91,13 +98,16 @@ cat > /etc/issue.net <<EOF
 <font color="red"><b> PERINGATAN: </b></font><br>
 <font color="white"> - Dilarang Torrent </font><br>
 <font color="white"> - Dilarang DDOS / Hacking </font><br>
-<font color="white"> - Max Login 1 Perangkat (Auto-Kill) </font><br>
+<font color="white"> - Maksimal 5 Perangkat per Akun (Auto-Kill) </font><br>
 <font color="green"><b>======================================</b></font><br>
 EOF
 
-# Aktifkan banner di sshd_config
-sed -i 's/#Banner none/Banner \/etc\/issue.net/g' /etc/ssh/sshd_config
-sed -i 's/#Banner \/etc\/issue.net/Banner \/etc\/issue.net/g' /etc/ssh/sshd_config
+# Aktifkan banner di sshd_config (aman diulang: bila 'Banner' sudah ada, cukup pastikan arahnya benar)
+if grep -qE "^#?\s*Banner" /etc/ssh/sshd_config; then
+    sed -i 's/^#\s*Banner.*/Banner \/etc\/issue.net/' /etc/ssh/sshd_config
+else
+    echo "Banner /etc/issue.net" >> /etc/ssh/sshd_config
+fi
 systemctl restart sshd
 
 echo -e "
