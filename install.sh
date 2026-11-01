@@ -28,8 +28,13 @@ else
 fi
 
 # Tanya port interaktif
-read -p "Masukkan Port NAT kosong untuk WebSocket (default: 20864): " ws_port
-ws_port=${ws_port:-20864}
+read -p "Masukkan Port NAT kosong untuk WebSocket (default: 20865): " ws_port
+ws_port=${ws_port:-20865}
+read -p "Maksimal perangkat per akun / batas autokill (default: 5): " max_login
+max_login=${max_login:-5}
+if ! [[ "$max_login" =~ ^[0-9]+$ ]] || [ "$max_login" -lt 1 ] || [ "$max_login" -gt 20 ]; then
+    echo "Batas perangkat tidak valid!"; exit 1
+fi
 if ! [[ "$ws_port" =~ ^[0-9]+$ ]] || [ "$ws_port" -lt 1 ] || [ "$ws_port" -gt 65535 ]; then
     echo "Port tidak valid!"; exit 1
 fi
@@ -82,7 +87,7 @@ echo -e "
 [*] Mengatur Cronjob untuk Autokill..."
 # Cek apakah cronjob sudah ada agar tidak duplikat
 if ! crontab -l | grep -q "autokill.sh"; then
-    (crontab -l 2>/dev/null; echo "*/2 * * * * $(pwd)/autokill.sh") | crontab -
+    (crontab -l 2>/dev/null; echo "*/2 * * * * MAX_LOGIN=$max_login $(pwd)/autokill.sh") | crontab -
     echo -e "${GREEN}Cronjob Autokill berhasil ditambahkan (berjalan setiap 2 menit).${NC}"
 else
     echo -e "${GREEN}Cronjob Autokill sudah ada.${NC}"
@@ -98,7 +103,7 @@ cat > /etc/issue.net <<EOF
 <font color="red"><b> PERINGATAN: </b></font><br>
 <font color="white"> - Dilarang Torrent </font><br>
 <font color="white"> - Dilarang DDOS / Hacking </font><br>
-<font color="white"> - Maksimal 5 Perangkat per Akun (Auto-Kill) </font><br>
+<font color="white"> - Maksimal ${max_login} Perangkat per Akun (Auto-Kill) </font><br>
 <font color="green"><b>======================================</b></font><br>
 EOF
 
@@ -117,3 +122,4 @@ echo -e "${CYAN}================================================${NC}"
 echo -e "1. Untuk mengelola akun, jalankan: ${YELLOW}./menu.sh${NC}"
 echo -e "2. Untuk mengecek status WebSocket: ${YELLOW}systemctl status natssh-ws${NC}"
 echo -e "3. Port WebSocket Anda saat ini: ${YELLOW}${ws_port}${NC}"
+echo -e "4. Batas perangkat per akun (autokill): ${YELLOW}${max_login}${NC}"

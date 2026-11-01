@@ -1,5 +1,5 @@
 #!/bin/bash
-MAX_LOGIN=5 # Batas maksimal perangkat
+MAX_LOGIN="${MAX_LOGIN:-5}" # batas perangkat; env MAX_LOGIN dari cron/installer (hitungan sesi/2)
 
 LOG_FILE="/root/autokill.log"
 MAX_LOG_SIZE=512000 # 500KB
