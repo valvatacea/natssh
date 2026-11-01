@@ -27,15 +27,21 @@ akun_baru() {
             useradd -e "$exp" -m -s /bin/false "$user"
             echo "$user:$pass" | chpasswd
             # Detail siap-salin untuk dikirim ke pelanggan
+            # host.conf  = domain Cloudflare (recommended) / IP utk koneksi langsung
+            # port.conf  = port Cloudflare yg dipakai klien (default 2086); asal via Origin Rule ke port NAT
             host=$(cat /root/natssh/host.conf 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
             host=${host:-$(hostname -I | awk '{print $1}')}
             wsport=$(ss -tlnp 2>/dev/null | grep ws.py | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
+            cfport=$(cat /root/natssh/port.conf 2>/dev/null)
+            cfport=${cfport:-2086}
             maxlog=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
             echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC}"
             echo ""
             echo "================ DETAIL AKUN ================"
             echo "Host      : $host"
-            echo "Port WS   : ${wsport:-20865} (SSH over WebSocket)"
+            echo "Port WS   : $cfport (via Cloudflare)"
+            echo "            port CF support: 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
+            echo "Port NAT  : ${wsport:-20865} (cadangan, koneksi langsung tanpa Cloudflare)"
             echo "Username  : $user"
             echo "Password  : $pass"
             echo "Expired   : $exp ($aktif hari)"
