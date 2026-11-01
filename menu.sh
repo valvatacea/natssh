@@ -54,12 +54,49 @@ akun_baru() {
 }
 
 akun_hapus() {
-    read -p "Masukkan Username yg dihapus: " user
-    if id "$user" &>/dev/null; then
+    # daftar akun jualan bernomor -> pilih nomor urut ATAU ketik username
+    local users=()
+    while read u; do users+=("$u"); done < <(awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd)
+    if [ ${#users[@]} -eq 0 ]; then
+        echo -e "${RED}Tidak ada akun untuk dihapus.${NC}"
+        return
+    fi
+    echo -e "${YELLOW}--- DAFTAR AKUN (pilih nomor, atau ketik username) ---${NC}"
+    for i in "${!users[@]}"; do
+        u=${users[$i]}
+        exp=$(chage -l "$u" | grep "Account expires" | awk -F": " '{print $2}')
+        status=$(passwd -S "$u" | awk '{print $2}')
+        st=""; [ "$status" == "L" ] && st=" ${RED}[LOCKED]${NC}"
+        echo -e "$((i+1)). ${CYAN}$u${NC} | Exp: ${YELLOW}$exp${NC}$st"
+    done
+    read -p "Hapus nomor urut / username (0 = batal): " pilih
+    [ -z "$pilih" ] && return
+    [ "$pilih" == "0" ] && return
+    user=""
+    if [[ "$pilih" =~ ^[0-9]+$ ]]; then
+        if [ "$pilih" -ge 1 ] && [ "$pilih" -le ${#users[@]} ]; then
+            user=${users[$((pilih-1))]}
+        else
+            echo -e "${RED}Gagal: nomor $pilih di luar daftar!${NC}"
+            return
+        fi
+    else
+        user="$pilih"
+    fi
+    if ! id "$user" &>/dev/null; then
+        echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
+        return
+    fi
+    exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
+    online=$(ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | grep -c "^$user$")
+    echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: $((online/2)) perangkat)"
+    read -p "Yakin hapus? (y/N): " yakin
+    if [[ "$yakin" =~ ^[Yy]$ ]]; then
         userdel -r "$user"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - HAPUS manual: $user (expired: $exp)" >> /root/autokill.log
         echo -e "${GREEN}SUKSES! Akun $user telah dihapus beserta datanya.${NC}"
     else
-        echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
+        echo -e "${YELLOW}Dibatalkan — akun tidak dihapus.${NC}"
     fi
 }
 
