@@ -37,12 +37,16 @@ while true; do
             if id "$user" &>/dev/null; then
                 echo -e "${RED}Gagal: Username sudah ada!${NC}"
             else
-                read -p "Masukkan Password : " pass
+                read -s -p "Masukkan Password : " pass; echo ""
                 read -p "Masa Aktif (Hari) : " aktif
-                exp=$(date -d "$aktif days" +"%Y-%m-%d")
-                useradd -e "$exp" -m -s /bin/false "$user"
-                echo "$user:$pass" | chpasswd
-                echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC} Expired: $exp"
+                if [ -z "$pass" ] || [ ${#pass} -lt 6 ] || ! [[ "$aktif" =~ ^[0-9]+$ ]]; then
+                    echo -e "${RED}Gagal: password minimal 6 karakter & hari harus angka!${NC}"
+                else
+                    exp=$(date -d "$aktif days" +"%Y-%m-%d")
+                    useradd -e "$exp" -m -s /bin/false "$user"
+                    echo "$user:$pass" | chpasswd
+                    echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC} Expired: $exp"
+                fi
             fi
             ;;
         2)
@@ -58,9 +62,19 @@ while true; do
             read -p "Masukkan Username : " user
             if id "$user" &>/dev/null; then
                 read -p "Tambah Masa Aktif (Hari) : " aktif
-                exp=$(date -d "$aktif days" +"%Y-%m-%d")
-                chage -E "$exp" "$user"
-                echo -e "${GREEN}SUKSES! Masa aktif $user diperpanjang hingga $exp.${NC}"
+                if ! [[ "$aktif" =~ ^[0-9]+$ ]]; then
+                    echo -e "${RED}Gagal: jumlah hari harus angka!${NC}"
+                else
+                    cur_exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
+                    base=$(date +%s)
+                    if [ "$cur_exp" != "never" ] && [ -n "$cur_exp" ]; then
+                        exp_sec=$(date -d "$cur_exp" +%s 2>/dev/null || echo 0)
+                        [ "$exp_sec" -gt "$base" ] && base=$exp_sec
+                    fi
+                    exp=$(date -d "@$(( base + aktif * 86400 ))" +"%Y-%m-%d")
+                    chage -E "$exp" "$user"
+                    echo -e "${GREEN}SUKSES! Masa aktif $user diperpanjang hingga $exp.${NC}"
+                fi
             else
                 echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
             fi
@@ -96,18 +110,19 @@ while true; do
             echo -e "${YELLOW}Memindai akun kedaluwarsa...${NC}"
             today=$(date +%s)
             count=0
-            awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd | while read user; do
-                exp_date=$(chage -l $user | grep "Account expires" | awk -F": " '{print $2}')
-                if [ "$exp_date" != "never" ] && [ "$exp_date" != "never" ]; then
-                    exp_sec=$(date -d "$exp_date" +%s)
-                    if [ $today -ge $exp_sec ]; then
+            while read user; do
+                exp_date=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
+                if [ -n "$exp_date" ] && [ "$exp_date" != "never" ]; then
+                    exp_sec=$(date -d "$exp_date" +%s 2>/dev/null) || continue
+                    if [ "$today" -ge "$exp_sec" ]; then
                         userdel -r "$user"
                         echo -e "Menghapus akun ${RED}$user${NC} (Kedaluwarsa: $exp_date)"
+                        echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO-CLEAN hapus $user (kedaluwarsa: $exp_date)" >> /root/autokill.log
                         ((count++))
                     fi
                 fi
-            done
-            echo -e "${GREEN}Selesai! Sistem bersih dari akun kedaluwarsa.${NC}"
+            done < <(awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd)
+            echo -e "${GREEN}Selesai! $count akun kedaluwarsa dihapus (tercatat di /root/autokill.log).${NC}"
             ;;
         8)
             echo -e "${YELLOW}--- USER YANG SEDANG LOGIN ---${NC}"
@@ -179,7 +194,7 @@ while true; do
                 echo "usermod -p '$hash' "$user"" >> $backup_file
             done
             
-            chmod +x $backup_file
+            chmod 700 $backup_file   # hash password klien di dalamnya — jangan world-readable
             echo -e "${GREEN}SUKSES! Data seluruh akun dan kata sandi berhasil diekstrak.${NC}"
             echo -e "File cadangan tersimpan di: ${CYAN}$backup_file${NC}"
             echo -e "💡 ${YELLOW}Cara Pakai:${NC} Pindahkan file ini ke VPS baru Anda, lalu jalankan perintah ${CYAN}./backup_akun_ssh.sh${NC} untuk memulihkan semua akun beserta masa aktifnya."
