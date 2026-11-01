@@ -26,9 +26,12 @@ while true; do
     echo "11. Info RAM & CPU VPS"
     echo -e "${CYAN}[ DATABASE ]${NC}"
     echo "12. Backup Data Akun (Ekspor Portabel)"
-    echo -e "${RED}13. Keluar${NC}"
+    echo -e "${CYAN}[ KONFIGURASI SISTEM ]${NC}"
+    echo "13. Atur Batas Login per Akun (Max Login)"
+    echo "14. Ubah Port WebSocket"
+    echo -e "${RED}15. Keluar${NC}"
     echo -e "${GREEN}======================================${NC}"
-    read -p "Pilih menu (1-13): " menu
+    read -p "Pilih menu (1-15): " menu
     echo ""
 
     case $menu in
@@ -200,6 +203,51 @@ while true; do
             echo -e "💡 ${YELLOW}Cara Pakai:${NC} Pindahkan file ini ke VPS baru Anda, lalu jalankan perintah ${CYAN}./backup_akun_ssh.sh${NC} untuk memulihkan semua akun beserta masa aktifnya."
             ;;
         13)
+            cur=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+            cur=${cur:-5}
+            echo -e "Batas saat ini: ${YELLOW}${cur} perangkat/akun${NC} (cron + banner pelanggan)"
+            read -p "Batas perangkat baru (1-20): " max_login
+            if ! [[ "$max_login" =~ ^[0-9]+$ ]] || [ "$max_login" -lt 1 ] || [ "$max_login" -gt 20 ]; then
+                echo -e "${RED}Gagal: harus angka 1-20!${NC}"
+            else
+                if crontab -l | grep -q "MAX_LOGIN="; then
+                    (crontab -l | sed "s/MAX_LOGIN=[0-9]*/MAX_LOGIN=$max_login/") | crontab -
+                else
+                    (crontab -l | sed "s|\(.*autokill.sh\)|MAX_LOGIN=$max_login \1|") | crontab -
+                fi
+                sed -i "s/Maksimal [0-9]* Perangkat/Maksimal $max_login Perangkat/g" /etc/issue.net
+                echo -e "${GREEN}SUKSES! Batas menjadi ${max_login} perangkat (cron autokill + banner diperbarui).${NC}"
+            fi
+            ;;
+        14)
+            cur_port=$(ss -tlnp 2>/dev/null | grep ws.py | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
+            echo -e "Port WebSocket saat ini: ${YELLOW}${cur_port:-tidak dikenal}${NC}"
+            read -p "Port WebSocket baru: " new_port
+            if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
+                echo -e "${RED}Gagal: port harus angka 1-65535!${NC}"
+            elif ss -tln | grep -q ":$new_port "; then
+                echo -e "${RED}Gagal: port $new_port sedang dipakai proses lain!${NC}"
+            else
+                unit=/etc/systemd/system/natssh-ws.service
+                if [ -f "$unit" ]; then
+                    if grep -q "Environment=NATSSH_WS_PORT" "$unit"; then
+                        sed -i "s/Environment=NATSSH_WS_PORT=[0-9]*/Environment=NATSSH_WS_PORT=$new_port/" "$unit"
+                    else
+                        sed -i "/^\[Service\]/a Environment=NATSSH_WS_PORT=$new_port" "$unit"
+                    fi
+                    systemctl daemon-reload
+                    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+                    systemctl restart natssh-ws
+                    sleep 1
+                    systemctl is-active --quiet natssh-ws && \
+                        echo -e "${GREEN}SUKSES! WebSocket kini di port $new_port (ingat: update forwarding Cloudflare/NAT!).${NC}" || \
+                        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+                else
+                    echo -e "${RED}Gagal: unit natssh-ws.service tidak ditemukan (install dulu).${NC}"
+                fi
+            fi
+            ;;
+        15)
             echo "Keluar dari menu."
             break
             ;;
