@@ -1,260 +1,359 @@
 #!/bin/bash
-RED='[0;31m'
-GREEN='[0;32m'
-YELLOW='[0;33m'
-CYAN='[0;36m'
-NC='[0m'
+# NATSSH Menu v4.0 — utama 4 kategori + submenu
+# Konvensi: akun jualan = shell /bin/false; 1 sesi tunnel = 2 proses sshd (hitungan /2)
+
+RED='\u001b[0;31m'
+GREEN='\u001b[0;32m'
+YELLOW='\u001b[0;33m'
+CYAN='\u001b[0;36m'
+NC='\u001b[0m'
+
+garis() { echo -e "${GREEN}======================================${NC}"; }
+pause()  { echo ""; read -n 1 -s -r -p "Tekan Enter untuk kembali..."; }
+
+# ══════════ AKUN ══════════
+
+akun_baru() {
+    read -p "Masukkan Username : " user
+    if id "$user" &>/dev/null; then
+        echo -e "${RED}Gagal: Username sudah ada!${NC}"
+    else
+        read -s -p "Masukkan Password : " pass; echo ""
+        read -p "Masa Aktif (Hari) : " aktif
+        if [ -z "$pass" ] || [ ${#pass} -lt 6 ] || ! [[ "$aktif" =~ ^[0-9]+$ ]]; then
+            echo -e "${RED}Gagal: password minimal 6 karakter & hari harus angka!${NC}"
+        else
+            exp=$(date -d "$aktif days" +"%Y-%m-%d")
+            useradd -e "$exp" -m -s /bin/false "$user"
+            echo "$user:$pass" | chpasswd
+            echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC} Expired: $exp"
+        fi
+    fi
+}
+
+akun_hapus() {
+    read -p "Masukkan Username yg dihapus: " user
+    if id "$user" &>/dev/null; then
+        userdel -r "$user"
+        echo -e "${GREEN}SUKSES! Akun $user telah dihapus beserta datanya.${NC}"
+    else
+        echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
+    fi
+}
+
+akun_perpanjang() {
+    # Dihitung dari tanggal expired AKUN (bukan hari ini) — sisa pelanggan tak hangus
+    read -p "Masukkan Username : " user
+    if id "$user" &>/dev/null; then
+        read -p "Tambah Masa Aktif (Hari) : " aktif
+        if ! [[ "$aktif" =~ ^[0-9]+$ ]]; then
+            echo -e "${RED}Gagal: jumlah hari harus angka!${NC}"
+        else
+            cur_exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
+            base=$(date +%s)
+            if [ "$cur_exp" != "never" ] && [ -n "$cur_exp" ]; then
+                exp_sec=$(date -d "$cur_exp" +%s 2>/dev/null || echo 0)
+                [ "$exp_sec" -gt "$base" ] && base=$exp_sec
+            fi
+            exp=$(date -d "@$(( base + aktif * 86400 ))" +"%Y-%m-%d")
+            chage -E "$exp" "$user"
+            echo -e "${GREEN}SUKSES! Masa aktif $user diperpanjang hingga $exp.${NC}"
+        fi
+    else
+        echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
+    fi
+}
+
+akun_daftar() {
+    echo -e "${YELLOW}--- DAFTAR AKUN SSH & EXPIRED ---${NC}"
+    awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd | while read user; do
+        exp=$(chage -l $user | grep "Account expires" | awk -F": " '{print $2}')
+        status=$(passwd -S $user | awk '{print $2}')
+        if [ "$status" == "L" ]; then state="${RED}[LOCKED]${NC}"; else state="${GREEN}[AKTIF]${NC}"; fi
+        echo -e "User: ${CYAN}$user${NC} | Exp: ${YELLOW}$exp${NC} $state"
+    done
+}
+
+akun_suspend() {
+    read -p "Masukkan Username yang akan dikunci: " user
+    if id "$user" &>/dev/null; then
+        usermod -L "$user"
+        echo -e "${GREEN}SUKSES! Akun $user telah dikunci sementara.${NC}"
+    else
+        echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
+    fi
+}
+
+akun_unsuspend() {
+    read -p "Masukkan Username yang akan dibuka kuncinya: " user
+    if id "$user" &>/dev/null; then
+        usermod -U "$user"
+        echo -e "${GREEN}SUKSES! Akun $user telah dibuka kuncinya dan bisa login kembali.${NC}"
+    else
+        echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
+    fi
+}
+
+akun_autoclean() {
+    echo -e "${YELLOW}Memindai akun kedaluwarsa...${NC}"
+    today=$(date +%s)
+    count=0
+    while read user; do
+        exp_date=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
+        if [ -n "$exp_date" ] && [ "$exp_date" != "never" ]; then
+            exp_sec=$(date -d "$exp_date" +%s 2>/dev/null) || continue
+            if [ "$today" -ge "$exp_sec" ]; then
+                userdel -r "$user"
+                echo -e "Menghapus akun ${RED}$user${NC} (Kedaluwarsa: $exp_date)"
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO-CLEAN hapus $user (kedaluwarsa: $exp_date)" >> /root/autokill.log
+                ((count++))
+            fi
+        fi
+    done < <(awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd)
+    echo -e "${GREEN}Selesai! $count akun kedaluwarsa dihapus (tercatat di /root/autokill.log).${NC}"
+}
+
+menu_akun() {
+    while true; do
+        clear
+        garis
+        echo -e "${YELLOW}   MANAJEMEN AKUN SSH${NC}"
+        garis
+        echo "1. Buat Akun SSH Baru"
+        echo "2. Hapus Akun SSH"
+        echo "3. Perpanjang Masa Aktif"
+        echo "4. Daftar Semua Akun & Kedaluwarsa"
+        echo "5. Suspend Akun"
+        echo "6. Unsuspend Akun"
+        echo "7. Bersihkan Akun Kedaluwarsa (Auto-Clean)"
+        echo -e "${RED}0. Kembali ke Menu Utama${NC}"
+        read -p "Pilih (0-7): " p || exit 0
+        case $p in
+            1) akun_baru ;;
+            2) akun_hapus ;;
+            3) akun_perpanjang ;;
+            4) akun_daftar ;;
+            5) akun_suspend ;;
+            6) akun_unsuspend ;;
+            7) akun_autoclean ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+        esac
+        [ "$p" != "0" ] && pause
+    done
+}
+
+# ══════════ MONITORING ══════════
+
+sessi_online() {
+    echo -e "${YELLOW}--- USER YANG SEDANG LOGIN ---${NC}"
+    ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
+        if id "$user" &>/dev/null; then
+            shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
+            if [ "$shell" == "/bin/false" ]; then
+                echo -e "User: ${GREEN}$user${NC} | Online: ${RED}$((count / 2))${NC} perangkat"
+            fi
+        fi
+    done
+}
+
+autokill_manual() {
+    read -p "Batas maksimal perangkat untuk eksekusi ini (contoh: 1 atau 2): " max_login
+    echo -e "${YELLOW}Mengeksekusi pemutusan paksa (Autokill)...${NC}"
+    ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
+        if id "$user" &>/dev/null; then
+            shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
+            devices=$(( count / 2 ))
+            if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$max_login" ]; then
+                echo -e "Menendang user ${RED}$user${NC} ($devices perangkat)..."
+                pkill -u "$user" sshd
+            fi
+        fi
+    done
+    echo -e "${GREEN}Autokill selesai!${NC}"
+}
+
+autokill_riwayat() {
+    echo -e "${YELLOW}--- 20 RIWAYAT AUTOKILL TERAKHIR ---${NC}"
+    if [ -f "/root/autokill.log" ]; then
+        tail -n 20 /root/autokill.log
+    else
+        echo -e "${RED}Belum ada riwayat autokill saat ini.${NC}"
+    fi
+}
+
+status_sistem() {
+    echo -e "${YELLOW}--- STATUS SISTEM ---${NC}"
+    free -m | awk 'NR==2{printf "RAM Usage : %s / %s MB (%.2f%%)\n", $3,$2,$3*100/$2 }'
+    top -bn1 | grep load | awk '{printf "CPU Load  : %.2f\n", $(NF-2)}'
+    echo -e "Disk      : $(df -h / | awk 'NR==2{print $3 " / " $2 " (" $5 ")"}')"
+}
+
+menu_monitor() {
+    while true; do
+        clear
+        garis
+        echo -e "${YELLOW}   MONITORING & LOG${NC}"
+        garis
+        echo "1. User Sedang Login"
+        echo "2. Autokill Manual (Tendang Multi-Login)"
+        echo "3. Riwayat Autokill"
+        echo "4. Status RAM / CPU / Disk"
+        echo -e "${RED}0. Kembali ke Menu Utama${NC}"
+        read -p "Pilih (0-4): " p || exit 0
+        case $p in
+            1) sessi_online ;;
+            2) autokill_manual ;;
+            3) autokill_riwayat ;;
+            4) status_sistem ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+        esac
+        [ "$p" != "0" ] && pause
+    done
+}
+
+# ══════════ BACKUP ══════════
+
+backup_ekspor() {
+    echo -e "${YELLOW}Membuat cadangan (Backup) data akun SSH...${NC}"
+    backup_file="/root/backup_akun_ssh.sh"
+
+    echo "#!/bin/bash" > $backup_file
+    echo "# SCRIPT RESTORE AKUN SSH VPN" >> $backup_file
+    echo "# Tanggal Backup: $(date)" >> $backup_file
+    echo "" >> $backup_file
+
+    awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd | while read user; do
+        hash=$(grep "^${user}:" /etc/shadow | cut -d: -f2)
+        exp_days=$(grep "^${user}:" /etc/shadow | cut -d: -f8)
+        if [ -n "$exp_days" ]; then
+            exp_date=$(date -d "1970-01-01 + $exp_days days" +"%Y-%m-%d" 2>/dev/null)
+            if [ $? -eq 0 ]; then
+                echo "useradd -e \"$exp_date\" -m -s /bin/false \"$user\"" >> $backup_file
+            else
+                echo "useradd -m -s /bin/false \"$user\"" >> $backup_file
+            fi
+        else
+            echo "useradd -m -s /bin/false \"$user\"" >> $backup_file
+        fi
+        echo "usermod -p '$hash' \"$user\"" >> $backup_file
+    done
+
+    chmod 700 $backup_file   # hash password klien di dalamnya — jangan world-readable
+    echo -e "${GREEN}SUKSES! Data seluruh akun dan kata sandi berhasil diekstrak.${NC}"
+    echo -e "File cadangan tersimpan di: ${CYAN}$backup_file${NC} (mode 700)"
+    echo -e "Cara Pakai: pindahkan ke VPS baru lalu jalankan ${CYAN}./backup_akun_ssh.sh${NC}"
+}
+
+menu_backup() {
+    while true; do
+        clear
+        garis
+        echo -e "${YELLOW}   BACKUP & RESTORE${NC}"
+        garis
+        echo "1. Backup Data Akun (Ekspor Portabel)"
+        [ -f /root/backup_akun_ssh.sh ] && echo -e "   (backup terakhir: $(stat -c '%y' /root/backup_akun_ssh.sh | cut -d. -f1))"
+        echo -e "${RED}0. Kembali ke Menu Utama${NC}"
+        read -p "Pilih (0-1): " p || exit 0
+        case $p in
+            1) backup_ekspor ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+        esac
+        [ "$p" != "0" ] && pause
+    done
+}
+
+# ══════════ KONFIGURASI ══════════
+
+conf_maxlogin() {
+    cur=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+    cur=${cur:-5}
+    echo -e "Batas saat ini: ${YELLOW}${cur} perangkat/akun${NC} (cron + banner pelanggan)"
+    read -p "Batas perangkat baru (1-20): " max_login
+    if ! [[ "$max_login" =~ ^[0-9]+$ ]] || [ "$max_login" -lt 1 ] || [ "$max_login" -gt 20 ]; then
+        echo -e "${RED}Gagal: harus angka 1-20!${NC}"
+    else
+        if crontab -l | grep -q "MAX_LOGIN="; then
+            (crontab -l | sed "s/MAX_LOGIN=[0-9]*/MAX_LOGIN=$max_login/") | crontab -
+        else
+            (crontab -l | sed "s|\(.*autokill.sh\)|MAX_LOGIN=$max_login \1|") | crontab -
+        fi
+        sed -i "s/Maksimal [0-9]* Perangkat/Maksimal $max_login Perangkat/g" /etc/issue.net
+        echo -e "${GREEN}SUKSES! Batas menjadi ${max_login} perangkat (cron autokill + banner diperbarui).${NC}"
+    fi
+}
+
+conf_port() {
+    cur_port=$(ss -tlnp 2>/dev/null | grep ws.py | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
+    echo -e "Port WebSocket saat ini: ${YELLOW}${cur_port:-tidak dikenal}${NC}"
+    read -p "Port WebSocket baru: " new_port
+    if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
+        echo -e "${RED}Gagal: port harus angka 1-65535!${NC}"
+    elif ss -tln | grep -q ":$new_port "; then
+        echo -e "${RED}Gagal: port $new_port sedang dipakai proses lain!${NC}"
+    else
+        unit=/etc/systemd/system/natssh-ws.service
+        if [ -f "$unit" ]; then
+            if grep -q "Environment=NATSSH_WS_PORT" "$unit"; then
+                sed -i "s/Environment=NATSSH_WS_PORT=[0-9]*/Environment=NATSSH_WS_PORT=$new_port/" "$unit"
+            else
+                sed -i "/^\[Service\]/a Environment=NATSSH_WS_PORT=$new_port" "$unit"
+            fi
+            systemctl daemon-reload
+            echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+            systemctl restart natssh-ws
+            sleep 1
+            systemctl is-active --quiet natssh-ws && \
+                echo -e "${GREEN}SUKSES! WebSocket kini di port $new_port (ingat: update forwarding Cloudflare/NAT!).${NC}" || \
+                echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+        else
+            echo -e "${RED}Gagal: unit natssh-ws.service tidak ditemukan (install dulu).${NC}"
+        fi
+    fi
+}
+
+menu_conf() {
+    while true; do
+        clear
+        garis
+        echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
+        garis
+        echo "1. Atur Batas Login per Akun (Max Login)"
+        echo "2. Ubah Port WebSocket"
+        echo -e "${RED}0. Kembali ke Menu Utama${NC}"
+        read -p "Pilih (0-2): " p || exit 0
+        case $p in
+            1) conf_maxlogin ;;
+            2) conf_port ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+        esac
+        [ "$p" != "0" ] && pause
+    done
+}
+
+# ══════════ MENU UTAMA ══════════
 
 while true; do
     clear
-    echo -e "${GREEN}======================================${NC}"
-    echo -e "${YELLOW}   MENU MANAJEMEN SSH VPN (v3.0)      ${NC}"
-    echo -e "${GREEN}======================================${NC}"
-    echo -e "${CYAN}[ MANAJEMEN AKUN ]${NC}"
-    echo "1. Buat Akun SSH Baru"
-    echo "2. Hapus Akun SSH"
-    echo "3. Perpanjang Masa Aktif Akun"
-    echo "4. Cek Daftar Semua Akun SSH & Kedaluwarsa"
-    echo -e "${CYAN}[ FITUR LANJUTAN ]${NC}"
-    echo "5. Kunci Akun Sementara (Suspend)"
-    echo "6. Buka Kunci Akun (Unsuspend)"
-    echo "7. Bersihkan Semua Akun Kedaluwarsa (Auto-Clean)"
-    echo -e "${CYAN}[ MONITORING & LOG ]${NC}"
-    echo "8. Cek User Yang Sedang Login"
-    echo "9. Autokill (Tendang Multi-Login)"
-    echo "10. Cek Riwayat Autokill (Log File)"
-    echo "11. Info RAM & CPU VPS"
-    echo -e "${CYAN}[ DATABASE ]${NC}"
-    echo "12. Backup Data Akun (Ekspor Portabel)"
-    echo -e "${CYAN}[ KONFIGURASI SISTEM ]${NC}"
-    echo "13. Atur Batas Login per Akun (Max Login)"
-    echo "14. Ubah Port WebSocket"
-    echo -e "${RED}15. Keluar${NC}"
-    echo -e "${GREEN}======================================${NC}"
-    read -p "Pilih menu (1-15): " menu
-    echo ""
-
+    garis
+    echo -e "${YELLOW}   MENU MANAJEMEN SSH VPN (v4.0)      ${NC}"
+    garis
+    echo "1. Manajemen Akun           (buat/hapus/perpanjang/suspend)"
+    echo "2. Monitoring & Log         (online/autokill/sistem)"
+    echo "3. Backup & Restore"
+    echo "4. Konfigurasi Sistem       (batas login/port)"
+    echo -e "${RED}0. Keluar${NC}"
+    garis
+    read -p "Pilih menu (0-4): " menu || exit 0
     case $menu in
-        1)
-            read -p "Masukkan Username : " user
-            if id "$user" &>/dev/null; then
-                echo -e "${RED}Gagal: Username sudah ada!${NC}"
-            else
-                read -s -p "Masukkan Password : " pass; echo ""
-                read -p "Masa Aktif (Hari) : " aktif
-                if [ -z "$pass" ] || [ ${#pass} -lt 6 ] || ! [[ "$aktif" =~ ^[0-9]+$ ]]; then
-                    echo -e "${RED}Gagal: password minimal 6 karakter & hari harus angka!${NC}"
-                else
-                    exp=$(date -d "$aktif days" +"%Y-%m-%d")
-                    useradd -e "$exp" -m -s /bin/false "$user"
-                    echo "$user:$pass" | chpasswd
-                    echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC} Expired: $exp"
-                fi
-            fi
-            ;;
-        2)
-            read -p "Masukkan Username yg dihapus: " user
-            if id "$user" &>/dev/null; then
-                userdel -r "$user"
-                echo -e "${GREEN}SUKSES! Akun $user telah dihapus beserta datanya.${NC}"
-            else
-                echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
-            fi
-            ;;
-        3)
-            read -p "Masukkan Username : " user
-            if id "$user" &>/dev/null; then
-                read -p "Tambah Masa Aktif (Hari) : " aktif
-                if ! [[ "$aktif" =~ ^[0-9]+$ ]]; then
-                    echo -e "${RED}Gagal: jumlah hari harus angka!${NC}"
-                else
-                    cur_exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
-                    base=$(date +%s)
-                    if [ "$cur_exp" != "never" ] && [ -n "$cur_exp" ]; then
-                        exp_sec=$(date -d "$cur_exp" +%s 2>/dev/null || echo 0)
-                        [ "$exp_sec" -gt "$base" ] && base=$exp_sec
-                    fi
-                    exp=$(date -d "@$(( base + aktif * 86400 ))" +"%Y-%m-%d")
-                    chage -E "$exp" "$user"
-                    echo -e "${GREEN}SUKSES! Masa aktif $user diperpanjang hingga $exp.${NC}"
-                fi
-            else
-                echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
-            fi
-            ;;
-        4)
-            echo -e "${YELLOW}--- DAFTAR AKUN SSH & EXPIRED ---${NC}"
-            awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd | while read user; do
-                exp=$(chage -l $user | grep "Account expires" | awk -F": " '{print $2}')
-                status=$(passwd -S $user | awk '{print $2}')
-                if [ "$status" == "L" ]; then state="${RED}[LOCKED]${NC}"; else state="${GREEN}[AKTIF]${NC}"; fi
-                echo -e "User: ${CYAN}$user${NC} | Exp: ${YELLOW}$exp${NC} $state"
-            done
-            ;;
-        5)
-            read -p "Masukkan Username yang akan dikunci: " user
-            if id "$user" &>/dev/null; then
-                usermod -L "$user"
-                echo -e "${GREEN}SUKSES! Akun $user telah dikunci sementara.${NC}"
-            else
-                echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
-            fi
-            ;;
-        6)
-            read -p "Masukkan Username yang akan dibuka kuncinya: " user
-            if id "$user" &>/dev/null; then
-                usermod -U "$user"
-                echo -e "${GREEN}SUKSES! Akun $user telah dibuka kuncinya dan bisa login kembali.${NC}"
-            else
-                echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
-            fi
-            ;;
-        7)
-            echo -e "${YELLOW}Memindai akun kedaluwarsa...${NC}"
-            today=$(date +%s)
-            count=0
-            while read user; do
-                exp_date=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
-                if [ -n "$exp_date" ] && [ "$exp_date" != "never" ]; then
-                    exp_sec=$(date -d "$exp_date" +%s 2>/dev/null) || continue
-                    if [ "$today" -ge "$exp_sec" ]; then
-                        userdel -r "$user"
-                        echo -e "Menghapus akun ${RED}$user${NC} (Kedaluwarsa: $exp_date)"
-                        echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO-CLEAN hapus $user (kedaluwarsa: $exp_date)" >> /root/autokill.log
-                        ((count++))
-                    fi
-                fi
-            done < <(awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd)
-            echo -e "${GREEN}Selesai! $count akun kedaluwarsa dihapus (tercatat di /root/autokill.log).${NC}"
-            ;;
-        8)
-            echo -e "${YELLOW}--- USER YANG SEDANG LOGIN ---${NC}"
-            ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
-                if id "$user" &>/dev/null; then
-                     shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
-                     if [ "$shell" == "/bin/false" ]; then
-                         echo -e "User: ${GREEN}$user${NC} | Online di: ${RED}$count${NC} perangkat"
-                     fi
-                fi
-            done
-            ;;
-        9)
-            read -p "Masukkan batas maksimal login (contoh: 1 atau 2): " max_login
-            echo -e "${YELLOW}Mengeksekusi pemutusan paksa (Autokill)...${NC}"
-            ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
-                if id "$user" &>/dev/null; then
-                    shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
-                    if [ "$shell" == "/bin/false" ] && [ "$count" -gt "$max_login" ]; then
-                        echo -e "Menendang user ${RED}$user${NC} (login $count sesi)..."
-                        pkill -u "$user" sshd
-                    fi
-                fi
-            done
-            echo -e "${GREEN}Autokill selesai!${NC}"
-            ;;
-        10)
-            echo -e "${YELLOW}--- 20 RIWAYAT AUTOKILL TERAKHIR ---${NC}"
-            if [ -f "/root/autokill.log" ]; then
-                tail -n 20 /root/autokill.log
-            else
-                echo -e "${RED}Belum ada riwayat autokill saat ini.${NC}"
-            fi
-            ;;
-        11)
-            echo -e "${YELLOW}--- STATUS SISTEM ---${NC}"
-            free -m | awk 'NR==2{printf "RAM Usage : %s / %s MB (%.2f%%)\n", $3,$2,$3*100/$2 }'
-            top -bn1 | grep load | awk '{printf "CPU Load  : %.2f\n", $(NF-2)}'
-            ;;
-        12)
-            echo -e "${YELLOW}Membuat cadangan (Backup) data akun SSH...${NC}"
-            backup_file="/root/backup_akun_ssh.sh"
-            
-            echo "#!/bin/bash" > $backup_file
-            echo "# SCRIPT RESTORE AKUN SSH VPN" >> $backup_file
-            echo "# Tanggal Backup: $(date)" >> $backup_file
-            echo "" >> $backup_file
-            
-            awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd | while read user; do
-                # Ambil hash password asli yang sudah terenkripsi dari shadow
-                hash=$(grep "^${user}:" /etc/shadow | cut -d: -f2)
-                
-                # Ambil tanggal kedaluwarsa dari shadow (dalam hitungan hari sejak 1 Jan 1970)
-                exp_days=$(grep "^${user}:" /etc/shadow | cut -d: -f8)
-                
-                if [ -n "$exp_days" ]; then
-                    # Konversi hitungan hari ke format YYYY-MM-DD
-                    exp_date=$(date -d "1970-01-01 + $exp_days days" +"%Y-%m-%d" 2>/dev/null)
-                    if [ $? -eq 0 ]; then
-                        echo "useradd -e "$exp_date" -m -s /bin/false "$user"" >> $backup_file
-                    else
-                        echo "useradd -m -s /bin/false "$user"" >> $backup_file
-                    fi
-                else
-                    echo "useradd -m -s /bin/false "$user"" >> $backup_file
-                fi
-                
-                # Terapkan hash password kembali menggunakan usermod
-                echo "usermod -p '$hash' "$user"" >> $backup_file
-            done
-            
-            chmod 700 $backup_file   # hash password klien di dalamnya — jangan world-readable
-            echo -e "${GREEN}SUKSES! Data seluruh akun dan kata sandi berhasil diekstrak.${NC}"
-            echo -e "File cadangan tersimpan di: ${CYAN}$backup_file${NC}"
-            echo -e "💡 ${YELLOW}Cara Pakai:${NC} Pindahkan file ini ke VPS baru Anda, lalu jalankan perintah ${CYAN}./backup_akun_ssh.sh${NC} untuk memulihkan semua akun beserta masa aktifnya."
-            ;;
-        13)
-            cur=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
-            cur=${cur:-5}
-            echo -e "Batas saat ini: ${YELLOW}${cur} perangkat/akun${NC} (cron + banner pelanggan)"
-            read -p "Batas perangkat baru (1-20): " max_login
-            if ! [[ "$max_login" =~ ^[0-9]+$ ]] || [ "$max_login" -lt 1 ] || [ "$max_login" -gt 20 ]; then
-                echo -e "${RED}Gagal: harus angka 1-20!${NC}"
-            else
-                if crontab -l | grep -q "MAX_LOGIN="; then
-                    (crontab -l | sed "s/MAX_LOGIN=[0-9]*/MAX_LOGIN=$max_login/") | crontab -
-                else
-                    (crontab -l | sed "s|\(.*autokill.sh\)|MAX_LOGIN=$max_login \1|") | crontab -
-                fi
-                sed -i "s/Maksimal [0-9]* Perangkat/Maksimal $max_login Perangkat/g" /etc/issue.net
-                echo -e "${GREEN}SUKSES! Batas menjadi ${max_login} perangkat (cron autokill + banner diperbarui).${NC}"
-            fi
-            ;;
-        14)
-            cur_port=$(ss -tlnp 2>/dev/null | grep ws.py | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
-            echo -e "Port WebSocket saat ini: ${YELLOW}${cur_port:-tidak dikenal}${NC}"
-            read -p "Port WebSocket baru: " new_port
-            if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
-                echo -e "${RED}Gagal: port harus angka 1-65535!${NC}"
-            elif ss -tln | grep -q ":$new_port "; then
-                echo -e "${RED}Gagal: port $new_port sedang dipakai proses lain!${NC}"
-            else
-                unit=/etc/systemd/system/natssh-ws.service
-                if [ -f "$unit" ]; then
-                    if grep -q "Environment=NATSSH_WS_PORT" "$unit"; then
-                        sed -i "s/Environment=NATSSH_WS_PORT=[0-9]*/Environment=NATSSH_WS_PORT=$new_port/" "$unit"
-                    else
-                        sed -i "/^\[Service\]/a Environment=NATSSH_WS_PORT=$new_port" "$unit"
-                    fi
-                    systemctl daemon-reload
-                    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
-                    systemctl restart natssh-ws
-                    sleep 1
-                    systemctl is-active --quiet natssh-ws && \
-                        echo -e "${GREEN}SUKSES! WebSocket kini di port $new_port (ingat: update forwarding Cloudflare/NAT!).${NC}" || \
-                        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
-                else
-                    echo -e "${RED}Gagal: unit natssh-ws.service tidak ditemukan (install dulu).${NC}"
-                fi
-            fi
-            ;;
-        15)
-            echo "Keluar dari menu."
-            break
-            ;;
-        *)
-            echo -e "${RED}Pilihan tidak valid!${NC}"
-            ;;
+        1) menu_akun ;;
+        2) menu_monitor ;;
+        3) menu_backup ;;
+        4) menu_conf ;;
+        0) echo "Keluar dari menu."; break ;;
+        *) echo -e "${RED}Pilihan tidak valid!${NC}"; pause ;;
     esac
-    echo ""
-    read -n 1 -s -r -p "Tekan Enter untuk kembali ke menu..."
 done
