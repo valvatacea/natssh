@@ -14,12 +14,15 @@ pause()  { echo ""; read -n 1 -s -r -p "Tekan Enter untuk kembali..."; }
 # ══════════ AKUN ══════════
 
 akun_baru() {
-    read -p "Masukkan Username : " user
+    read -p "Masukkan Username (0 = batal): " user
+    if [ "$user" == "0" ]; then echo -e "${YELLOW}Dibatalkan.${NC}"; return; fi
     if id "$user" &>/dev/null; then
         echo -e "${RED}Gagal: Username sudah ada!${NC}"
     else
-        read -s -p "Masukkan Password : " pass; echo ""
-        read -p "Masa Aktif (Hari) : " aktif
+        read -s -p "Masukkan Password (0 = batal): " pass; echo ""
+        if [ "$pass" == "0" ]; then echo -e "${YELLOW}Dibatalkan.${NC}"; return; fi
+        read -p "Masa Aktif (Hari) (0 = batal): " aktif
+        if [ "$aktif" == "0" ]; then echo -e "${YELLOW}Dibatalkan.${NC}"; return; fi
         if [ -z "$pass" ] || [ ${#pass} -lt 6 ] || ! [[ "$aktif" =~ ^[0-9]+$ ]]; then
             echo -e "${RED}Gagal: password minimal 6 karakter & hari harus angka!${NC}"
         else
