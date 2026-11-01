@@ -26,7 +26,22 @@ akun_baru() {
             exp=$(date -d "$aktif days" +"%Y-%m-%d")
             useradd -e "$exp" -m -s /bin/false "$user"
             echo "$user:$pass" | chpasswd
-            echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC} Expired: $exp"
+            # Detail siap-salin untuk dikirim ke pelanggan
+            host=$(cat /root/natssh/host.conf 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
+            host=${host:-$(hostname -I | awk '{print $1}')}
+            wsport=$(ss -tlnp 2>/dev/null | grep ws.py | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
+            maxlog=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+            echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC}"
+            echo ""
+            echo "================ DETAIL AKUN ================"
+            echo "Host      : $host"
+            echo "Port WS   : ${wsport:-20865} (SSH over WebSocket)"
+            echo "Username  : $user"
+            echo "Password  : $pass"
+            echo "Expired   : $exp ($aktif hari)"
+            echo "Limit     : ${maxlog:-5} perangkat"
+            echo "============================================"
+            echo "(blok di atas siap disalin & dikirim ke pelanggan)"
         fi
     fi
 }
