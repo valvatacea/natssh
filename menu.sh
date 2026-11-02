@@ -56,9 +56,8 @@ akun_baru() {
     fi
 }
 
-akun_hapus() {
-    pilih_akun "Hapus akun" || return
-    local user="$AKUN"
+do_hapus() {
+    local user="$1"
     local exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
     local online=$(ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | grep -c "^$user$")
     echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: $((online/2)) perangkat)"
@@ -70,6 +69,11 @@ akun_hapus() {
     else
         echo -e "${YELLOW}Dibatalkan — akun tidak dihapus.${NC}"
     fi
+}
+
+akun_hapus() {
+    pilih_akun "Hapus akun" || return
+    do_hapus "$AKUN"
 }
 
 pilih_akun() {
@@ -110,10 +114,9 @@ pilih_akun() {
     return 0
 }
 
-akun_perpanjang() {
+do_perpanjang() {
     # Dihitung dari tanggal expired AKUN (bukan hari ini) — sisa pelanggan tak hangus
-    pilih_akun "Perpanjang akun" || return
-    local user="$AKUN"
+    local user="$1"
     read -p "Tambah Masa Aktif (Hari) (0 = batal): " aktif
     [ "$aktif" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if ! [[ "$aktif" =~ ^[0-9]+$ ]]; then
@@ -131,28 +134,58 @@ akun_perpanjang() {
     echo -e "${GREEN}SUKSES! Masa aktif $user diperpanjang hingga $exp.${NC}"
 }
 
-akun_daftar() {
-    echo -e "${YELLOW}--- DAFTAR AKUN SSH & EXPIRED ---${NC}"
-    awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd | while read user; do
-        exp=$(chage -l $user | grep "Account expires" | awk -F": " '{print $2}')
-        status=$(passwd -S $user | awk '{print $2}')
-        if [ "$status" == "L" ]; then state="${RED}[LOCKED]${NC}"; else state="${GREEN}[AKTIF]${NC}"; fi
-        echo -e "User: ${CYAN}$user${NC} | Exp: ${YELLOW}$exp${NC} $state"
-    done
+akun_perpanjang() {
+    pilih_akun "Perpanjang akun" || return
+    do_perpanjang "$AKUN"
 }
 
 akun_suspend() {
     pilih_akun "Suspend akun" || return
-    local user="$AKUN"
-    usermod -L "$user"
-    echo -e "${GREEN}SUKSES! Akun $user dikunci (suspend) — pelanggan tak bisa login.${NC}"
+    do_suspend "$AKUN"
 }
 
 akun_unsuspend() {
     pilih_akun "Unsuspend akun" || return
-    local user="$AKUN"
-    usermod -U "$user"
-    echo -e "${GREEN}SUKSES! Akun $user dibuka kuncinya — bisa login kembali.${NC}"
+    do_unsuspend "$AKUN"
+}
+
+akun_daftar() {
+    # Pusat kelola: daftar bernomor -> pilih akun -> aksi suspend/unsuspend/perpanjang/hapus
+    while true; do
+        pilih_akun "Kelola akun" || return
+        local user="$AKUN"
+        local exp status
+        exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
+        status=$(passwd -S "$user" | awk '{print $2}')
+        [ "$status" == "L" ] && st="${RED}LOCKED${NC}" || st="${GREEN}AKTIF${NC}"
+        echo -e ""
+        echo -e "Akun: ${CYAN}$user${NC} | Exp: ${YELLOW}$exp${NC} | Status: $st"
+        echo -e "${CYAN}--- AKSI ---${NC}"
+        echo "1. Suspend"
+        echo "2. Unsuspend"
+        echo "3. Perpanjang"
+        echo "4. Hapus"
+        echo -e "${RED}0. Kembali ke daftar${NC}"
+        read -p "Aksi (0-4): " a || exit 0
+        case $a in
+            1) do_suspend "$user"; break ;;
+            2) do_unsuspend "$user"; break ;;
+            3) do_perpanjang "$user"; break ;;
+            4) do_hapus "$user"; break ;;
+            0) break ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+        esac
+    done
+}
+
+do_suspend() {
+    usermod -L "$1"
+    echo -e "${GREEN}SUKSES! Akun $1 dikunci (suspend) — pelanggan tak bisa login.${NC}"
+}
+
+do_unsuspend() {
+    usermod -U "$1"
+    echo -e "${GREEN}SUKSES! Akun $1 dibuka kuncinya — bisa login kembali.${NC}"
 }
 
 akun_autoclean() {
@@ -183,7 +216,7 @@ menu_akun() {
         echo "1. Buat Akun SSH Baru"
         echo "2. Hapus Akun SSH"
         echo "3. Perpanjang Masa Aktif"
-        echo "4. Daftar Semua Akun & Kedaluwarsa"
+        echo "4. Daftar Akun — kelola: suspend/unsuspend/perpanjang/hapus"
         echo "5. Suspend Akun"
         echo "6. Unsuspend Akun"
         echo "7. Bersihkan Akun Kedaluwarsa (Auto-Clean)"
