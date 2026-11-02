@@ -472,7 +472,7 @@ conf_maxlogin() {
     fi
 }
 
-conf_domain_cf() {
+conf_domain_cf_edit() {
     # domain CloudFront (jalur AWS) utk kartu akun; host_cf.conf — opsional
     local cur=$(cat /root/natssh/host_cf.conf 2>/dev/null)
     echo -e "Domain CloudFront saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
@@ -523,7 +523,28 @@ conf_port() {
 }
 
 conf_domain() {
-    # host/domain di kartu akun; file host.conf dipakai akun_baru (fallback: IP publik)
+    # satu pintu domain: Cloudflare (biasa) + CloudFront — dua-duanya ke kartu akun
+    local cur curcf
+    while true; do
+        cur=$(cat /root/natssh/host.conf 2>/dev/null)
+        curcf=$(cat /root/natssh/host_cf.conf 2>/dev/null)
+        echo -e "${YELLOW}---- UBAH DOMAIN ----${NC}"
+        echo -e "1. Domain (Cloudflare) : ${GREEN}${cur:-OTOMATIS (IP publik)}${NC}"
+        echo -e "2. Domain CloudFront   : ${GREEN}${curcf:-BELUM DIATUR}${NC}"
+        echo -e "${RED}0. Kembali${NC}"
+        read -p "Pilih (0-2): " p || exit 0
+        case $p in
+            1) conf_domain_edit ;;
+            2) conf_domain_cf_edit ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+        esac
+        pause
+    done
+}
+
+conf_domain_edit() {
+    # host/domain Cloudflare di kartu akun; host.conf dipakai akun_baru (fallback: IP publik)
     local cur=$(cat /root/natssh/host.conf 2>/dev/null)
     echo -e "Host kartu akun saat ini: ${YELLOW}${cur:-OTOMATIS (IP publik)}${NC}"
     read -p "Domain/host baru (kosong = otomatis IP, 0 = batal): " h
@@ -721,16 +742,14 @@ menu_conf() {
         echo "3. Ubah Domain/Host di Kartu Akun"
         echo "4. Ubah Banner Pelanggan"
         echo "5. Ubah Maks Koneksi Serentak (MAX_TOTAL)"
-        echo "6. Ubah Domain CloudFront (kartu akun)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-6): " p || exit 0
+        read -p "Pilih (0-5): " p || exit 0
         case $p in
             1) conf_maxlogin ;;
             2) conf_port ;;
             3) conf_domain ;;
             4) conf_banner ;;
             5) conf_maxtotal ;;
-            6) conf_domain_cf ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
