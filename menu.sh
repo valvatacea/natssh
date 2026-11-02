@@ -66,7 +66,7 @@ do_hapus() {
     if [[ "$yakin" =~ ^[Yy]$ ]]; then
         res=$(userdel -r "$user" 2>&1); rc=$?
         # "mail spool not found" hanya notice (tak ada mailbox), bukan error — disembunyikan
-        warn=$(echo "$res" | grep -v "mail spool not found" || true)
+        warn=$(echo "$res" | grep -v "mail spool" || true)
         [ -n "$warn" ] && echo -e "${YELLOW}Peringatan: $warn${NC}"
         if [ $rc -eq 0 ]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') - HAPUS manual: $user (expired: $exp)" >> /root/autokill.log
