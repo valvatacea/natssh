@@ -289,8 +289,20 @@ sessi_online() {
 }
 
 autokill_manual() {
-    read -p "Batas maksimal perangkat untuk eksekusi ini (contoh: 1 atau 2): " max_login
-    echo -e "${YELLOW}Mengeksekusi pemutusan paksa (Autokill)...${NC}"
+    # batas utk eksekusi ini: Enter = pakai global (cron), 0 = batal, angka >= 1 = khusus
+    local global=$(crontab -l 2>/dev/null | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+    global=${global:-5}
+    read -p "Batas perangkat eksekusi ini (Enter = global ${global}, 0 = batal): " max_login
+    if [ "$max_login" == "0" ]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        return
+    fi
+    [ -z "$max_login" ] && max_login=$global
+    if ! [[ "$max_login" =~ ^[0-9]+$ ]] || [ "$max_login" -lt 1 ]; then
+        echo -e "${RED}Gagal: harus angka >= 1!${NC}"
+        return
+    fi
+    echo -e "${YELLOW}Mengeksekusi pemutusan paksa (Autokill, batas ${max_login})...${NC}"
     ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
         if id "$user" &>/dev/null; then
             shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
@@ -298,6 +310,7 @@ autokill_manual() {
             if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$max_login" ]; then
                 echo -e "Menendang user ${RED}$user${NC} ($devices perangkat)..."
                 pkill -u "$user" sshd
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang manual: $user ($devices perangkat, batas $max_login)" >> /root/autokill.log
             fi
         fi
     done
