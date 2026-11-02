@@ -93,17 +93,37 @@ counts: dict[str, int] = {}
 for u, _ in raw:
     counts[u] = counts.get(u, 0) + 1
 
+import itertools
+
 users_order = []
 for u, _ in raw:
     if u not in users_order:
         users_order.append(u)
-uidx = iter(range(1, len(users_order) + 1))
+uidx = itertools.count(1)   # offline dgn riwayat ikut bernomor lanjut
+
+groups: dict[str, list] = {}   # riwayat dikelompokkan per akun
+for r in riwayat:
+    groups.setdefault(r[1], []).append(r)
+
+
+def grup_riwayat(user):
+    rows = groups.get(user)
+    if not rows:
+        return
+    print(f"   {C_DIM}── riwayat {user}: {len(rows)} sesi (5 terakhir) ──{C_RESET}")
+    for t, u, ip, edge, cc, city, dur, up, down, ua in rows[-5:]:
+        jalur = f" {C_DIM}[{cdn_label(edge)}]{C_RESET}" if edge not in ("-", "") else ""
+        geo = f" {C_DIM}{city}{(' ' + cc) if cc != '-' else ''}{C_RESET}" if city != "-" else ""
+        print(f"     {t[11:]}   {ip:<16} {(ua or '-')[:14]:<14} {dur:>7} "
+              f"{up}\u2191{down}\u2193{C_RESET}{jalur}{geo}")
 
 seen: set[int] = set()
 cur = None
 for user, ep in [(u, int(e)) for u, e in raw]:
     if user != cur:
         recap()
+        if cur is not None:
+            grup_riwayat(cur)
         cur = user
         seen = set()
         print(f"{C_CYAN}{next(uidx)}\033[0m\033[1m) {user} ({counts[user]} sesi)\033[0m")
@@ -157,23 +177,13 @@ for user, ep in [(u, int(e)) for u, e in raw]:
     print(line)
 
 recap()
+if cur is not None:
+    grup_riwayat(cur)
 
-# seksi riwayat: sesi yg sudah berakhir (audit cron), DIKELOMPOKKAN PER AKUN,
-# akun diurut dari aktivitas terbaru, tiap akun 5 sesi terakhir
-if riwayat:
-    groups: dict[str, list] = {}
-    for r in riwayat:
-        groups.setdefault(r[1], []).append(r)
-    urut = sorted(groups, key=lambda u: groups[u][-1][0], reverse=True)
-    total = sum(len(v) for v in groups.values())
-    print()
-    print(f"   {C_DIM}── RIWAYAT SELESAI per akun ({total} sesi tercatat, 5 terakhir/akun) ──{C_RESET}")
-    for user in urut:
-        rows = groups[user][-5:]
-        print(f"   {C_CYAN}{user}{C_RESET} {C_DIM}({len(groups[user])} sesi){C_RESET}")
-        for r in rows:
-            t, u, ip, edge, cc, city, dur, up, down, ua = r
-            jalur = f" {C_DIM}[{cdn_label(edge)}]{C_RESET}" if edge not in ("-", "") else ""
-            geo = f" {C_DIM}{city}{(' ' + cc) if cc != '-' else ''}{C_RESET}" if city != "-" else ""
-            print(f"   {t[11:]}   {ip:<16} {(ua or '-')[:14]:<14} {dur:>7} "
-                  f"{up}\u2191{down}\u2193{C_RESET} {jalur}{geo}")
+# akun offline yg punya riwayat — tetap tampil sbg blok bernomor sendiri
+online = set(users_order)
+for u in sorted(groups, key=lambda x: groups[x][-1][0], reverse=True):
+    if u in online:
+        continue
+    print(f"{C_CYAN}{next(uidx)}{C_RESET}{C_BOLD}) {u} (offline){C_RESET}")
+    grup_riwayat(u)
