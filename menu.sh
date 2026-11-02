@@ -279,6 +279,28 @@ status_sistem() {
     echo -e "Disk      : $(df -h / | awk 'NR==2{print $3 " / " $2 " (" $5 ")"}')"
 }
 
+ws_peak() {
+    # puncak pemakaian slot jembatan (dari ws.log) — bantu keputusan naik/turun MAX_TOTAL
+    local log=$(dirname "${BASH_SOURCE[0]}")/ws.log
+    if [ ! -f "$log" ]; then
+        echo -e "${RED}Belum ada log ws.log.${NC}"
+        return
+    fi
+    local t peak=0 tolak=0
+    peak=$(grep -o "total=[0-9]*" "$log" | cut -d= -f2 | sort -n | tail -1)
+    peak=${peak:-0}
+    tolak=$(grep -c "TOLAK" "$log")
+    local cur_max=$(systemctl show natssh-ws -p Environment --value 2>/dev/null | grep -o "NATSSH_MAX_TOTAL=[0-9]*" | cut -d= -f2)
+    cur_max=${cur_max:-30}
+    echo -e "${YELLOW}--- PUNCAK KONEKSI WEBSOCKET ---${NC}"
+    echo -e "Puncak serentak : ${GREEN}${peak}${NC} slot"
+    echo -e "Batas kini      : ${YELLOW}${cur_max}${NC} slot (NATSSH_MAX_TOTAL)"
+    echo -e "Klok TOLAK      : ${RED}${tolak}${NC}x"
+    if [ "$peak" -ge $(( cur_max * 80 / 100 )) ]; then
+        echo -e "${RED}Puncak >= 80% batas — pertimbangkan naikkan (Konfigurasi > 5).${NC}"
+    fi
+}
+
 menu_monitor() {
     while true; do
         clear
@@ -289,13 +311,15 @@ menu_monitor() {
         echo "2. Autokill Manual (Tendang Multi-Login)"
         echo "3. Riwayat Autokill"
         echo "4. Status RAM / CPU / Disk"
+        echo "5. Puncak Koneksi WebSocket (slot)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-4): " p || exit 0
+        read -p "Pilih (0-5): " p || exit 0
         case $p in
             1) sessi_online ;;
             2) autokill_manual ;;
             3) autokill_riwayat ;;
             4) status_sistem ;;
+            5) ws_peak ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
@@ -427,6 +451,37 @@ conf_domain() {
         echo "$h" > /root/natssh/host.conf
         echo -e "${GREEN}Domain tersimpan: $h — dipakai otomatis di kartu akun berikutnya.${NC}"
     fi
+}
+
+conf_maxtotal() {
+    # batas koneksi serentak jembatan (Environment=NATSSH_MAX_TOTAL di unit systemd)
+    local unit=/etc/systemd/system/natssh-ws.service
+    local cur=$(systemctl show natssh-ws -p Environment --value 2>/dev/null | grep -o "NATSSH_MAX_TOTAL=[0-9]*" | cut -d= -f2)
+    cur=${cur:-30}
+    local peak=$(grep -o "total=[0-9]*" "$(dirname "${BASH_SOURCE[0]}")/ws.log" 2>/dev/null | cut -d= -f2 | sort -n | tail -1)
+    echo -e "Batas koneksi serentak (MAX_TOTAL) : ${YELLOW}${cur}${NC} slot"
+    echo -e "Puncak pemakaian sejauh ini        : ${GREEN}${peak:-0}${NC} slot${NC}"
+    read -p "Nilai baru (10-200, 0 = batal): " n
+    [ "$n" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 10 ] || [ "$n" -gt 200 ]; then
+        echo -e "${RED}Gagal: harus angka 10-200!${NC}"
+        return
+    fi
+    if [ ! -f "$unit" ]; then
+        echo -e "${RED}Gagal: unit natssh-ws.service tidak ditemukan.${NC}"
+        return
+    fi
+    if grep -q "Environment=NATSSH_MAX_TOTAL" "$unit"; then
+        sed -i "s/Environment=NATSSH_MAX_TOTAL=[0-9]*/Environment=NATSSH_MAX_TOTAL=$n/" "$unit"
+    else
+        sed -i "/^\[Service\]/a Environment=NATSSH_MAX_TOTAL=$n" "$unit"
+    fi
+    systemctl daemon-reload
+    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+    systemctl restart natssh-ws
+    sleep 1
+    systemctl is-active --quiet natssh-ws &&         echo -e "${GREEN}SUKSES! MAX_TOTAL kini $n slot.${NC}" || \
+        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
 }
 
 conf_banner() {
@@ -579,13 +634,15 @@ menu_conf() {
         echo "2. Ubah Port WebSocket"
         echo "3. Ubah Domain/Host di Kartu Akun"
         echo "4. Ubah Banner Pelanggan"
+        echo "5. Ubah Maks Koneksi Serentak (MAX_TOTAL)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-4): " p || exit 0
+        read -p "Pilih (0-5): " p || exit 0
         case $p in
             1) conf_maxlogin ;;
             2) conf_port ;;
             3) conf_domain ;;
             4) conf_banner ;;
+            5) conf_maxtotal ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
