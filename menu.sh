@@ -52,7 +52,10 @@ akun_baru() {
             echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC}"
             echo ""
             echo "================ DETAIL AKUN ================"
-            echo "Host      : $host"
+            # host = IP kalau domain tak didefinisikan -> cukup tampilkan sekali di baris IP
+            if [ "$host" != "$ipaddr" ]; then
+                echo "Domain    : $host"
+            fi
             echo "IP        : $ipaddr"
             echo "Port WS   : $cfport (via Cloudflare)"
             echo "            Cloudflare : 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
