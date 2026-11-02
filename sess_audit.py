@@ -76,6 +76,7 @@ def main():
         pass
 
     terlihat = {}
+    live_starts = {str(c["start"]) for c in pool if c["_live"]}
     for user in akun_jualan():
         for u, st in sesi_start(user):
             try:
@@ -95,26 +96,34 @@ def main():
                 terlihat[str(best["start"])] = best
                 key = str(best["start"])
                 if key not in state:
-                    state[key] = user
-                    catat((f"MULAI user={user} ip={best['ip']} "
-                           f"ua={best['ua'] or '-'} "
-                           f"kota={(best.get('city') or '') + ' ' + (best.get('cc') or '')}".rstrip()))
+                    # simpan dulu, catat SATU baris utuh saat sesi selesai
+                    state[key] = {"user": user, "ip": best["ip"],
+                                  "ua": best.get("ua") or "-",
+                                  "city": (best.get("city") or "-").replace(" ", "-"),
+                                  "cc": best.get("cc") or "-",
+                                  "edge": best.get("edge") or "-"}
 
-    # koneksi yang hilang dari live -> SELESAI
+    # koneksi yang hilang dari live -> SATU baris SELESAI lengkap
     for key in list(state):
+        if key in live_starts:
+            continue  # masih live — jangan catat apalagi (race dump/cron)
+        v = state[key]
+        if isinstance(v, str):          # state format lama: hanya username
+            v = {"user": v, "ip": "-", "ua": "-", "city": "-", "cc": "-", "edge": "-"}
         c = terlihat.get(key)
         if c is None:
             c = next((x for x in pool if str(x["start"]) == key and not x["_live"]), None)
         if c is None:
-            # hilang total (mis. bridge restart menghapus conns.json) — catat best-effort
+            # hilang total (mis. bridge restart) — best-effort durasi saja
             dur = now - float(key)
-            catat(f"SELESAI user={state[key]} ip=- durasi={int(dur//60)}m{int(dur%60):02d}s up=-MB down=-MB")
+            catat(f"SELESAI user={v['user']} ip={v['ip']} edge={v['edge']} cc={v['cc']} "
+                  f"city={v['city']} dur={int(dur//60)}m{int(dur%60):02d}s up=- down=- ua={v['ua']}")
             del state[key]
             continue
-        dur = now - c["start"]
-        catat((f"SELESAI user={state[key]} ip={c['ip']} "
-               f"durasi={int(dur//60)}m{int(dur%60):02d}s "
-               f"up={c['up']/1048576:.1f}MB down={c['down']/1048576:.1f}MB"))
+        dur = int(now - c["start"])
+        catat(f"SELESAI user={v['user']} ip={v['ip']} edge={v['edge']} cc={v['cc']} "
+              f"city={v['city']} dur={int(dur//60)}m{int(dur%60):02d}s "
+              f"up={c['up']/1048576:.1f} down={c['down']/1048576:.1f} ua={v['ua']}")
         del state[key]
 
     tmp = STATE + ".tmp"

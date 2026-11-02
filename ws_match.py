@@ -24,6 +24,7 @@ C_RESET = "\033[0m"
 
 now = time.time()
 conn_file, log_file = sys.argv[1], sys.argv[2]
+audit_file = sys.argv[3] if len(sys.argv) > 3 else None
 
 pool = []
 try:
@@ -71,6 +72,21 @@ def recap() -> None:
     print(f"   {C_DIM}rekap: {live} live · total {up:.1f}\u2191{down:.1f}\u2193 MB{C_RESET}")
     matched.clear()
 
+
+AUDIT_RE = re.compile(
+    r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) SELESAI user=(\S+) ip=(\S+) "
+    r"edge=(\S+) cc=(\S+) city=(\S+) dur=(\S+) up=([\d.-]+) down=([\d.-]+) ua=(.*)$"
+)
+
+riwayat = []
+if audit_file:
+    try:
+        for ln in open(audit_file):
+            m = AUDIT_RE.match(ln.rstrip("\n"))
+            if m:
+                riwayat.append(m.groups())
+    except OSError:
+        pass
 
 raw = [ln.split() for ln in sys.stdin.read().splitlines() if ln.strip()]
 counts: dict[str, int] = {}
@@ -139,3 +155,15 @@ for user, ep in [(u, int(e)) for u, e in raw]:
     print(line)
 
 recap()
+
+# seksi riwayat: sesi yg sudah berakhir (audit cron), terbaru di bawah
+if riwayat:
+    print()
+    print(f"   {C_DIM}── RIWAYAT SELESAI ({len(riwayat)} sesi, 12 terakhir) ──{C_RESET}")
+    for r in riwayat[-12:]:
+        t, user, ip, edge, cc, city, dur, up, down, ua = r
+        jalur = f" {C_DIM}[{cdn_label(edge)}]{C_RESET}" if edge not in ("-", "") else ""
+        geo = f" {C_DIM}{city}{(' ' + cc) if cc != '-' else ''}{C_RESET}" if city != "-" else ""
+        ua_show = (ua or "-")[:14]
+        print(f"   {t[11:]} {user:<10} {ip:<16} {ua_show:<14} {dur:>7} "
+              f"{up}\u2191{down}\u2193{C_RESET} {jalur}{geo}")
