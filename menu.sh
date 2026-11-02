@@ -401,6 +401,23 @@ conf_port() {
     fi
 }
 
+conf_domain() {
+    # host/domain di kartu akun; file host.conf dipakai akun_baru (fallback: IP publik)
+    local cur=$(cat /root/natssh/host.conf 2>/dev/null)
+    echo -e "Host kartu akun saat ini: ${YELLOW}${cur:-OTOMATIS (IP publik)}${NC}"
+    read -p "Domain/host baru (kosong = otomatis IP, 0 = batal): " h
+    [ "$h" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if [ -z "$h" ]; then
+        rm -f /root/natssh/host.conf
+        echo -e "${GREEN}Host kembali otomatis (IP publik terdeteksi saat buat akun).${NC}"
+    elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}(:[0-9]+)?$ ]]; then
+        echo -e "${RED}Gagal: format domain/host salah (contoh: vpn.example.com)!${NC}"
+    else
+        echo "$h" > /root/natssh/host.conf
+        echo -e "${GREEN}Domain tersimpan: $h — dipakai otomatis di kartu akun berikutnya.${NC}"
+    fi
+}
+
 conf_banner() {
     while true; do
         echo -e "${YELLOW}--- BANNER SAAT INI (/etc/issue.net) ---${NC}"
@@ -549,13 +566,15 @@ menu_conf() {
         garis
         echo "1. Atur Batas Login per Akun (Max Login)"
         echo "2. Ubah Port WebSocket"
-        echo "3. Ubah Banner Pelanggan"
+        echo "3. Ubah Domain/Host di Kartu Akun"
+        echo "4. Ubah Banner Pelanggan"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-3): " p || exit 0
+        read -p "Pilih (0-4): " p || exit 0
         case $p in
             1) conf_maxlogin ;;
             2) conf_port ;;
-            3) conf_banner ;;
+            3) conf_domain ;;
+            4) conf_banner ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
