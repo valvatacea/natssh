@@ -9,7 +9,8 @@ CYAN='\u001b[0;36m'
 NC='\u001b[0m'
 
 garis() { echo -e "${GREEN}======================================${NC}"; }
-pause()  { echo ""; read -n 1 -s -r -p "Tekan Enter untuk kembali..."; }
+pause()  { echo ""; read -r -p "Tekan Enter untuk kembali..." _ || true; }
+# catatan: JANGAN read -n 1 — sisakan newline di buffer, read berikutnya can baris kosong = "batal" palsu
 
 # ══════════ AKUN ══════════
 
@@ -148,11 +149,11 @@ akun_daftar() {
         echo -e "${RED}0. Kembali ke daftar${NC}"
         read -p "Aksi (0-4): " a || exit 0
         case $a in
-            1) do_suspend "$user"; break ;;
-            2) do_unsuspend "$user"; break ;;
-            3) do_perpanjang "$user"; break ;;
-            4) do_hapus "$user"; break ;;
-            0) break ;;
+            1) do_suspend "$user"; pause; continue ;;
+            2) do_unsuspend "$user"; pause; continue ;;
+            3) do_perpanjang "$user"; pause; continue ;;
+            4) do_hapus "$user"; pause; continue ;;
+            0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
     done
