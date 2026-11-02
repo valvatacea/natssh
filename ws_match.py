@@ -3,15 +3,20 @@
 
 Input stdin : baris "user <start_epoch>" per sesi sshd (dari menu.sh ws_peruser).
 Argumen    : conns.json lalu ws.log (fallback pra-patch).
-Output     : per user -> sesi + IP asli + aplikasi + durasi + trafik.
-Username SSH tak terbaca jembatan (terenkripsi post-KEX): korelasi -2..+10 dtk,
-label kemungkinan.
+Output     : per user bernomor -> baris sesi (IP asli, aplikasi, durasi, trafik,
+             status, jalur CDN) + rekap live/total. Username SSH tak terbaca
+             jembatan (terenkripsi post-KEX): korelasi -2..+10 dtk, kemungkinan.
 """
 import datetime
 import json
 import re
 import sys
 import time
+
+C_CYAN = "\033[36m"
+C_WHITE = "\033[37m"
+C_DIM = "\033[2m"
+C_RESET = "\033[0m"
 
 now = time.time()
 conn_file, log_file = sys.argv[1], sys.argv[2]
@@ -39,61 +44,92 @@ try:
 except OSError:
     pass
 
-C_CYAN = "\033[36m"
+
+def cdn_label(edge: str) -> str:
+    # ponytail: heuristik rentang edge umum; upgrade ke daftar resmi bila perlu
+    if edge.startswith(("52.", "99.", "18.", "13.32", "13.33", "3.5")):
+        return "CloudFront"
+    if edge.startswith(("104.", "172.64", "172.68", "172.69", "172.70", "172.71",
+                        "188.114", "162.158", "141.101", "108.162", "190.93", "103.2")):
+        return "Cloudflare"
+    return f"proxy {edge}"
+
+
+matched: list = []
+
+
+def recap() -> None:
+    if not matched:
+        return
+    live = sum(1 for c in matched if c["_live"])
+    up = sum(c["up"] for c in matched) / 1048576
+    down = sum(c["down"] for c in matched) / 1048576
+    print(f"   {C_DIM}rekap: {live} live · total {up:.1f}\u2191{down:.1f}\u2193 MB{C_RESET}")
+    matched.clear()
+
+
 raw = [ln.split() for ln in sys.stdin.read().splitlines() if ln.strip()]
 counts: dict[str, int] = {}
 for u, _ in raw:
     counts[u] = counts.get(u, 0) + 1
-seen: set[int] = set()
-cur = None
+
 users_order = []
 for u, _ in raw:
     if u not in users_order:
         users_order.append(u)
 uidx = iter(range(1, len(users_order) + 1))
+
+seen: set[int] = set()
+cur = None
 for user, ep in [(u, int(e)) for u, e in raw]:
-    ep = int(ep)
     if user != cur:
+        recap()
         cur = user
         seen = set()
         print(f"{C_CYAN}{next(uidx)}\033[0m\033[1m) {user} ({counts[user]} sesi)\033[0m")
+
+    wt = time.strftime("%H:%M:%S", time.localtime(ep))
+    # kandidat dalam jendela; utamakan koneksi LIVE, seri = kedekatan waktu
     best = None
-    bd = 99
+    bkey = None
     for c in pool:
         if id(c) in seen:
             continue
         dsec = ep - c["start"]
-        if -2 <= dsec <= 10 and abs(dsec) < bd:
-            bd = abs(dsec)
-            best = c
-    ip = ua = info = None
+        if -2 <= dsec <= 10:
+            key = (0 if c["_live"] else 1, abs(dsec))
+            if bkey is None or key < bkey:
+                bkey = key
+                best = c
+
     if best:
         seen.add(id(best))
+        matched.append(best)
         st = best["start"]
         end = now if best["_live"] else best.get("end", st)
         m = int((end - st) // 60)
         s = int((end - st) % 60)
-        info = (
-            f"{m}m{s:02d}s  up {best['up']/1048576:.1f}MB  down {best['down']/1048576:.1f}MB  "
-            + ("LIVE" if best["_live"] else "selesai " + time.strftime("%H:%M", time.localtime(end)))
-        )
-        ip, ua = best["ip"], best["ua"]
+        durasi = f"{m}m{s:02d}s"
+        if best["_live"]:
+            status = "\033[32mLIVE\033[0m"
+        else:
+            status = f"\033[33mselesai {time.strftime('%H:%M', time.localtime(end))}\033[0m"
+        jalur = ""
+        if best.get("edge") and best["ip"] != best["edge"]:
+            jalur = f"  {C_DIM}[{cdn_label(best['edge'])}]{C_RESET}"
+        line = (f"   {wt}  {C_WHITE}{best['ip']:<15}\033[0m {(best['ua'] or '-')[:18]:<18}"
+                f"  {durasi:>7}  {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193"
+                f"  {status}{jalur}")
     else:
+        ip = ua = None
+        bd = 99
         for t, rip, rua in logconns:
             dsec = ep - t
             if -2 <= dsec <= 10 and abs(dsec) < bd:
                 bd = abs(dsec)
                 ip, ua = rip, rua
-    wt = time.strftime("%H:%M:%S", time.localtime(ep))
-    if info:
-        durasi = f"{m}m{s:02d}s"
-        if best["_live"]:
-            status = f"\033[32mLIVE\033[0m"
-        else:
-            status = f"\033[33mselesai {time.strftime('%H:%M', time.localtime(end))}\033[0m"
-        line = (f"   {wt}  \033[37m{ip:<15}\033[0m {(ua or '-')[:18]:<18}  {durasi:>7}  "
-                f"{best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193  {status}")
-    else:
-        line = (f"   {wt}  \033[37m{(ip or '?-'):<15}\033[0m {(ua or '(tanpa UA)')[:18]:<18}"
-                f"  \033[2m(durasi/trafik pra-patch tak tersedia)\033[0m")
+        line = (f"   {wt}  {C_WHITE}{(ip or '?-'):<15}\033[0m {(ua or '(tanpa UA)')[:18]:<18}"
+                f"  {C_DIM}(durasi/trafik pra-patch tak tersedia){C_RESET}")
     print(line)
+
+recap()
