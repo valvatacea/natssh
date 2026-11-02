@@ -9,9 +9,13 @@ Output     : per user bernomor -> baris sesi (IP asli, aplikasi, durasi, trafik,
 """
 import datetime
 import json
+import os
 import re
 import sys
 import time
+
+os.environ["TZ"] = "Asia/Jakarta"
+time.tzset()  # semua waktu tampil WIB (GMT+7)
 
 C_CYAN = "\033[36m"
 C_WHITE = "\033[37m"
@@ -117,9 +121,8 @@ for user, ep in [(u, int(e)) for u, e in raw]:
         jalur = ""
         if best.get("edge") and best["ip"] != best["edge"]:
             jalur = f"  {C_DIM}[{cdn_label(best['edge'])}]{C_RESET}"
-        line = (f"   {wt}  {C_WHITE}{best['ip']:<15}\033[0m {(best['ua'] or '-')[:18]:<18}"
-                f"  {durasi:>7}  {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193"
-                f"  {status}{jalur}")
+        line = (f"   {wt} {C_WHITE}{best['ip']:<16}\033[0m{(best['ua'] or '-')[:14]:<14}"
+                f"{durasi:>7} {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193 {status}{jalur}")
     else:
         ip = ua = None
         bd = 99
