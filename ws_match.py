@@ -197,4 +197,5 @@ for u in sorted(groups, key=lambda x: groups[x][-1][0], reverse=True):
     if u in online:
         continue
     print(f"{C_CYAN}{next(uidx)}{C_RESET}{C_BOLD}) {u} (offline){C_RESET}")
+    recap(u)
     grup_riwayat(u)
