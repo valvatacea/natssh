@@ -2,3 +2,4 @@ ws.log
 banners/
 __pycache__/
 *.pyc
+host.conf
