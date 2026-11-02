@@ -153,6 +153,8 @@ def handle_client(client_socket, ip):
                or ip)
     via_cdn = real_ip != ip
     ua = _header(request, "User-Agent")[:48]
+    if os.environ.get("NATSSH_DEBUG_REQ"):
+        _log(f"DEBUG-REQ {ip}: {request[:800]!r}")
     if not _admit(ip, via_cdn):
         try:
             cur = _per_ip.get(ip, 0)
