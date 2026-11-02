@@ -64,13 +64,23 @@ def cdn_label(edge: str) -> str:
 matched: list = []
 
 
-def recap() -> None:
-    if not matched:
+def recap(user=None) -> None:
+    # rekap PER AKUN: sesi live + seluruh riwayat tercatat (audit) — profil trafik utuh
+    if not matched and not (user and groups.get(user)):
         return
-    live = sum(1 for c in matched if c["_live"])
-    up = sum(c["up"] for c in matched) / 1048576
-    down = sum(c["down"] for c in matched) / 1048576
-    print(f"   {C_DIM}rekap: {live} live · total {up:.1f}\u2191{down:.1f}\u2193 MB{C_RESET}")
+    live_n = sum(1 for c in matched if c["_live"])
+    lup = sum(c["up"] for c in matched) / 1048576
+    ldown = sum(c["down"] for c in matched) / 1048576
+    bag = []
+    if matched:
+        bag.append(f"{live_n} live (live {lup:.1f}\u2191{ldown:.1f}\u2193)")
+    if user and groups.get(user):
+        rows = groups[user]
+        rup = sum(float(r[7]) for r in rows if r[7] not in ("-", ""))
+        rdown = sum(float(r[8]) for r in rows if r[8] not in ("-", ""))
+        bag.append(f"riwayat {len(rows)} sesi ({rup:.1f}\u2191{rdown:.1f}\u2193)")
+    if bag:
+        print(f"   {C_DIM}rekap: {' · '.join(bag)} MB{C_RESET}")
     matched.clear()
 
 
@@ -122,7 +132,7 @@ seen: set[int] = set()
 cur = None
 for user, ep in [(u, int(e)) for u, e in raw]:
     if user != cur:
-        recap()
+        recap(cur)
         if cur is not None:
             grup_riwayat(cur)
         cur = user
@@ -177,7 +187,7 @@ for user, ep in [(u, int(e)) for u, e in raw]:
                 f"  {C_DIM}(sesi basi/pra-patch: koneksi sudah lepas){C_RESET}")
     print(line)
 
-recap()
+recap(cur)
 if cur is not None:
     grup_riwayat(cur)
 
