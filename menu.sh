@@ -336,9 +336,9 @@ ws_peak() {
     echo -e "${YELLOW}--- PUNCAK KONEKSI WEBSOCKET ---${NC}"
     echo -e "Puncak serentak : ${GREEN}${peak}${NC} slot"
     echo -e "Batas kini      : ${YELLOW}${cur_max}${NC} slot (NATSSH_MAX_TOTAL)"
-    echo -e "Klok TOLAK      : ${RED}${tolak}${NC}x"
+    echo -e "Ditolak (TOLAK) : ${RED}${tolak}${NC}x"
     if [ "$peak" -ge $(( cur_max * 80 / 100 )) ]; then
-        echo -e "${RED}Puncak >= 80% batas — pertimbangkan naikkan (Konfigurasi > 5).${NC}"
+        echo -e "${RED}Puncak >= 80% batas — pertimbangkan naikkan lewat Konfigurasi: Ubah Maks Koneksi Serentak (MAX_TOTAL).${NC}"
     fi
 }
 
