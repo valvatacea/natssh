@@ -331,6 +331,18 @@ status_sistem() {
     free -m | awk 'NR==2{printf "RAM Usage : %s / %s MB (%.2f%%)\n", $3,$2,$3*100/$2 }'
     top -bn1 | grep load | awk '{printf "CPU Load  : %.2f\n", $(NF-2)}'
     echo -e "Disk      : $(df -h / | awk 'NR==2{print $3 " / " $2 " (" $5 ")"}')"
+    # ── RESOURCE SSH ──
+    local nsess=$(ps -ef | grep sshd | grep -v root | grep -v grep | grep -vc priv)
+    local rss_ssh=$(ps -eo rss,user,comm | awk '$3=="sshd" && $2!="root" {s+=$1} END{printf "%d", s/1024}')
+    local rss_ws=$(ps -eo rss,args | awk '/[w]s.py/ {s+=$1} END{printf "%d", s/1024}')
+    local nuser=$(ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort -u | wc -l)
+    echo -e "${CYAN}── RESOURCE SSH ──${NC}"
+    echo -e "Sesi aktif      : ${GREEN}${nsess:-0}${NC} (dari ${nuser:-0} akun)"
+    echo -e "RAM sshd pelanggan : ${GREEN}${rss_ssh:-0}${NC} MB"
+    echo -e "RAM bridge ws.py   : ${GREEN}${rss_ws:-0}${NC} MB"
+    if [ "${nsess:-0}" -gt 0 ]; then
+        echo -e "Rata-rata/sesi  : $(awk "BEGIN{printf "%.1f", ${rss_ssh:-0}/${nsess}}") MB"
+    fi
 }
 
 ws_peak() {
@@ -390,18 +402,18 @@ menu_monitor() {
         echo "1. User Sedang Login"
         echo "2. Autokill Manual (Tendang Multi-Login)"
         echo "3. Riwayat Autokill"
-        echo "4. Status RAM / CPU / Disk"
-        echo "5. Puncak Koneksi WebSocket (slot)"
-        echo "6. Perangkat per Akun (live + riwayat sesi)"
+        echo "4. Puncak Koneksi WebSocket (slot)"
+        echo "5. Perangkat per Akun (live + riwayat sesi)"
+        echo "6. Status RAM / CPU / Disk + Resource SSH"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-6): " p || exit 0
         case $p in
             1) sessi_online ;;
             2) autokill_manual ;;
             3) autokill_riwayat ;;
-            4) status_sistem ;;
-            5) ws_peak ;;
-            6) ws_peruser ;;
+            4) ws_peak ;;
+            5) ws_peruser ;;
+            6) status_sistem ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
