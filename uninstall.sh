@@ -48,6 +48,7 @@ if [[ "$hapus_file" =~ ^[Yy]$ ]]; then
         rm -f /etc/issue.net /root/autokill.log /root/backup_akun_ssh.sh
         rm -rf /root/natssh/banners /root/natssh/ws.log
         rm -f /root/natssh/host.conf /root/natssh/port.conf /root/natssh/ip.conf
+        rm -rf /root/natssh/limits /root/natssh/conns.json /root/natssh/audit_state.json /root/natssh/audit_sess.log
         echo -e "${GREEN}Data banner/log/backup terhapus.${NC}"
     else
         echo -e "${YELLOW}Data dipertahankan.${NC}"

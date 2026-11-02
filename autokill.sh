@@ -19,13 +19,22 @@ fi
 
 # 1 sesi SSH tunnel = 1 proses user-owned ("sshd: user"); pasangan "[priv]" milik ROOT
 # (terbuang oleh grep -v root) -> perangkat = count langsung, JANGAN dibagi 2
+LIMITS_DIR="$(dirname "$(readlink -f "$0")")/limits"
 ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
     if id "$user" &>/dev/null; then
         shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
         devices=$count
-        if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$MAX_LOGIN" ]; then
+        # batas khusus per akun (limits/<user>, 1-20) menimpa global
+        limit="$MAX_LOGIN"
+        if [ -f "$LIMITS_DIR/$user" ]; then
+            khusus=$(cat "$LIMITS_DIR/$user" 2>/dev/null)
+            if [[ "$khusus" =~ ^[0-9]+$ ]] && [ "$khusus" -ge 1 ] && [ "$khusus" -le 20 ]; then
+                limit="$khusus"
+            fi
+        fi
+        if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$limit" ]; then
             pkill -u "$user" sshd
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang: $user ($devices perangkat, $count proses)" >> "$LOG_FILE"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang: $user ($devices perangkat, batas $limit)" >> "$LOG_FILE"
         fi
     fi
 done

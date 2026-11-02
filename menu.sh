@@ -168,17 +168,48 @@ akun_daftar() {
         echo "2. Unsuspend"
         echo "3. Perpanjang"
         echo "4. Hapus"
+        echo "5. Batas Login Khusus Akun Ini"
         echo -e "${RED}0. Kembali ke daftar${NC}"
-        read -p "Aksi (0-4): " a || exit 0
+        read -p "Aksi (0-5): " a || exit 0
         case $a in
             1) do_suspend "$user"; pause; continue ;;
             2) do_unsuspend "$user"; pause; continue ;;
             3) do_perpanjang "$user"; pause; continue ;;
             4) do_hapus "$user"; pause; continue ;;
+            5) do_limit "$user"; pause; continue ;;
             0) continue ;;   # kembali ke DAFTAR (label), bukan keluar browser
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
     done
+}
+
+do_limit() {
+    local selfdir=$(dirname "$(readlink -f "$0")")
+    local lfile="$selfdir/limits/$1"
+    local global=$(crontab -l 2>/dev/null | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+    global=${global:-5}
+    local khusus="" 
+    [ -f "$lfile" ] && khusus=$(cat "$lfile" 2>/dev/null)
+    echo -e "Batas login global : ${YELLOW}${global}${NC} perangkat"
+    if [ -n "$khusus" ]; then
+        echo -e "Batas khusus akun  : ${GREEN}${khusus}${NC} perangkat (aktif)"
+    else
+        echo -e "Batas khusus akun  : ${YELLOW}— (ikut global)${NC}"
+    fi
+    read -p "Nilai baru 1-20 (0/Enter = hapus, ikut global): " n
+    if [ "$n" == "0" ] || [ -z "$n" ]; then
+        rm -f "$lfile"
+        echo -e "${GREEN}Batas khusus dihapus — akun ini kembali ikut global (${global}).${NC}"
+        return
+    fi
+    if ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 1 ] || [ "$n" -gt 20 ]; then
+        echo -e "${RED}Gagal: harus angka 1-20!${NC}"
+        return
+    fi
+    mkdir -p "$selfdir/limits"
+    echo "$n" > "$lfile"
+    echo -e "${GREEN}SUKSES! Batas khusus akun $1: ${n} perangkat (autokill pakai ini, bukan global ${global}).${NC}"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - LIMIT: batas khusus $1 = $n perangkat (global $global)" >> /root/autokill.log
 }
 
 do_suspend() {
