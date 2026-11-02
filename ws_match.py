@@ -39,19 +39,24 @@ try:
 except OSError:
     pass
 
+C_CYAN = "\033[36m"
 raw = [ln.split() for ln in sys.stdin.read().splitlines() if ln.strip()]
 counts: dict[str, int] = {}
 for u, _ in raw:
     counts[u] = counts.get(u, 0) + 1
 seen: set[int] = set()
 cur = None
+users_order = []
+for u, _ in raw:
+    if u not in users_order:
+        users_order.append(u)
+uidx = iter(range(1, len(users_order) + 1))
 for user, ep in [(u, int(e)) for u, e in raw]:
     ep = int(ep)
     if user != cur:
         cur = user
         seen = set()
-        print(f"{user} ({counts[user]} sesi)")
-        print("  WAKTU     IP ASLI            APLIKASI             DURASI  UP/DOWN MB     STATUS")
+        print(f"{C_CYAN}{next(uidx)}\033[0m\033[1m) {user} ({counts[user]} sesi)\033[0m")
     best = None
     bd = 99
     for c in pool:
@@ -79,14 +84,16 @@ for user, ep in [(u, int(e)) for u, e in raw]:
             if -2 <= dsec <= 10 and abs(dsec) < bd:
                 bd = abs(dsec)
                 ip, ua = rip, rua
+    wt = time.strftime("%H:%M:%S", time.localtime(ep))
     if info:
-        trafik = f"{best['up']/1048576:.1f}/{best['down']/1048576:.1f}"
         durasi = f"{m}m{s:02d}s"
-        status = "LIVE" if best["_live"] else "selesai " + time.strftime("%H:%M", time.localtime(end))
-        line = (f"  {time.strftime('%H:%M:%S', time.localtime(ep))}  {ip:<15}  "
-                f"{(ua or '-')[:19]:<19}  {durasi:>6}  {trafik:>9}  {status}")
+        if best["_live"]:
+            status = f"\033[32mLIVE\033[0m"
+        else:
+            status = f"\033[33mselesai {time.strftime('%H:%M', time.localtime(end))}\033[0m"
+        line = (f"   {wt}  \033[37m{ip:<15}\033[0m {(ua or '-')[:18]:<18}  {durasi:>7}  "
+                f"{best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193  {status}")
     else:
-        line = (f"  {time.strftime('%H:%M:%S', time.localtime(ep))}  {ip or '?-':<15}  "
-                f"{(ua or '(tanpa UA/tak via CF)')[:19]:<19}"
-                f"{'pra-patch: durasi/trafik tak tersedia':>42}")
+        line = (f"   {wt}  \033[37m{(ip or '?-'):<15}\033[0m {(ua or '(tanpa UA)')[:18]:<18}"
+                f"  \033[2m(durasi/trafik pra-patch tak tersedia)\033[0m")
     print(line)
