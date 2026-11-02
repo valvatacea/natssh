@@ -341,7 +341,8 @@ status_sistem() {
     echo -e "RAM sshd pelanggan : ${GREEN}${rss_ssh:-0}${NC} MB"
     echo -e "RAM bridge ws.py   : ${GREEN}${rss_ws:-0}${NC} MB"
     if [ "${nsess:-0}" -gt 0 ]; then
-        echo -e "Rata-rata/sesi  : $(awk "BEGIN{printf "%.1f", ${rss_ssh:-0}/${nsess}}") MB"
+        local avg=$(awk -v a="${rss_ssh:-0}" -v b="${nsess:-1}" 'BEGIN{printf "%.1f", a/b}')
+        echo -e "Rata-rata/sesi  : ${GREEN}${avg}${NC} MB"
     fi
 }
 
