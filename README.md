@@ -4,13 +4,15 @@ NATSSH adalah ekosistem manajemen VPN SSH murni yang dirancang secara khusus unt
 
 ## ✨ Fitur Unggulan
 
-*   **Bypass Cloudflare (`ws.py`):** Skrip Python ringan yang menjembatani port NAT eksternal ke port SSH lokal (Port 22).
-*   **Menu Manajemen v3.0 (`menu.sh`):** Antarmuka terminal interaktif dengan 13 opsi fitur untuk mengelola akun (Buat, Hapus, Perpanjang, Suspend, Auto-Clean, dll).
-*   **Sistem Backup Portabel:** Mengekstrak seluruh akun aktif beserta kata sandi terenkripsinya menjadi satu file script mandiri (`backup_akun_ssh.sh`) yang siap di-*restore* di VPS mana pun.
-*   **Autokill Cerdas (`autokill.sh`):** Memonitor via Cronjob dan memutus otomatis klien yang melakukan *multi-login*. Dilengkapi dengan sistem rotasi log (maksimal 500KB) agar penyimpanan VPS tidak penuh.
-*   **Banner SSH Otomatis:** Menampilkan pesan peringatan/sapaan khusus saat klien berhasil terhubung.
-*   **High Availability:** Terintegrasi penuh dengan `systemd`, sehingga layanan Proxy WebSocket akan otomatis menyala ulang (*auto-start*) meskipun VPS baru saja di-*reboot*.
-*   **Instalasi Satu Klik:** Skrip `install.sh` interaktif yang mengurus semua pengaturan secara otomatis.
+*   **Bypass Cloudflare (`ws.py` v2):** Jembatan port NAT eksternal → SSH lokal (port 22) dengan **rate-limit banjir pra-auth** (default 10 koneksi/IP, 30 total; env `NATSSH_MAX_PER_IP`/`NATSSH_MAX_TOTAL`) — banjir scanner di internet ditahan sebelum menyentuh `sshd` (pencegah insiden *MaxStartups throttling* yang bikin SSH "mati"). Koneksi, penolakan, dan kegagalan tercatat di `ws.log` dengan rotasi otomatis 500KB.
+*   **Menu Manajemen v4.0 (`menu.sh`):** Antarmuka terminal interaktif — buat akun, **browser daftar akun** (suspend/unsuspend/perpanjang/hapus di satu tempat, dengan konfirmasi + catatan audit), monitoring online/autokill/sistem, backup portabel, dan konfigurasi sistem.
+*   **Kartu Akun Siap-Salin:** Setiap akun baru menampilkan blok DETAIL AKUN — Domain (bila didefinisikan), IP, Port WS Cloudflare, username/password, tanggal kedaluwarsa, dan limit perangkat.
+*   **Sistem Backup Portabel:** Mengekstrak seluruh akun aktif beserta kata sandi terenkripsinya menjadi satu file script mandiri (`backup_akun_ssh.sh`, mode 700) yang siap di-*restore* di VPS mana pun.
+*   **Autokill Cerdas (`autokill.sh`):** Cron tiap 2 menit, tendang multi-login melebihi batas (`MAX_LOGIN` via env, default 5). Hitungan perangkat = proses sshd / 2 (satu sesi tunnel = 2 proses) — batas akurat, bukan setengahnya.
+*   **Full Audit:** Tiga jalur tercatat di `autokill.log` — tendangan autokill, HAPUS manual, dan AUTO-CLEAN akun kedaluwarsa.
+*   **Banner SSH Fleksibel:** Edit via nano/vi, reset ke template (baris "Maksimal N Perangkat" otomatis sinkron dengan limit), plus **slot simpan/muat/hapus** (`banners/`).
+*   **High Availability:** Terintegrasi penuh dengan `systemd` (Environment-aware, auto-start, auto-restart).
+*   **Instalasi Interaktif:** `install.sh` menanyakan port NAT & batas perangkat; port disetel via `Environment=` systemd (bukan edit source), unduhan tervalidasi.
 
 ---
 
@@ -37,7 +39,7 @@ cd natssh
 sudo bash install.sh
 ```
 
-**Catatan saat instalasi:** Skrip akan meminta Anda untuk memasukkan **Port NAT Kosong**. Pastikan Anda memasukkan port yang sudah Anda buka di panel provider VPS Anda.
+**Catatan saat instalasi:** Skrip akan meminta **Port NAT kosong** (pastikan sudah di-forward provider) dan **batas perangkat per akun** (default 5). Port disetel via `Environment=NATSSH_WS_PORT` di unit systemd — aman diubah kapan pun lewat menu tanpa menyentuh source.
 
 ### Konfigurasi Cloudflare (Origin Rules)
 Agar koneksi bisa menembus jaringan Cloudflare:
@@ -57,20 +59,32 @@ Setelah terinstal, Anda dapat memanggil menu manajemen kapan saja dengan mengeti
 ```
 *(Pastikan Anda berada di dalam folder tempat Anda menginstal skrip ini, atau gunakan path lengkap `/root/natssh/menu.sh`)*
 
-**Daftar Fitur Menu:**
-1. Buat Akun SSH Baru
-2. Hapus Akun SSH
-3. Perpanjang Masa Aktif Akun
-4. Cek Daftar Semua Akun SSH & Kedaluwarsa
-5. Kunci Akun Sementara (Suspend)
-6. Buka Kunci Akun (Unsuspend)
-7. Bersihkan Semua Akun Kedaluwarsa (Auto-Clean)
-8. Cek User Yang Sedang Login
-9. Autokill (Tendang Multi-Login Manual)
-10. Cek Riwayat Autokill (Log File)
-11. Info RAM & CPU VPS
-12. Backup Data Akun (Ekspor Portabel)
-13. Keluar
+**Struktur Menu (v4.0):**
+```
+1. Manajemen Akun
+   1. Buat Akun SSH Baru        → kartu DETAIL AKUN siap-salin
+   2. Daftar Akun (browser)     → pilih nomor/username, lalu:
+                                 1 Suspend · 2 Unsuspend · 3 Perpanjang · 4 Hapus
+                                 (semua berkonfirmasi; perpanjang dihitung DARI
+                                  tanggal expired, sisa pelanggan tidak hangus)
+   3. Auto-Clean                → hapus akun kedaluwarsa + catat audit
+2. Monitoring & Log             → user online (perangkat nyata), autokill manual,
+                                  riwayat, RAM/CPU/disk
+3. Backup & Restore             → ekspor portabel (hash password, mode 700)
+4. Konfigurasi Sistem
+   1. Atur Batas Login          → cron + banner + kartu akun sinkron otomatis
+   2. Ubah Port WebSocket       → cek bentrok, injeksi Environment systemd
+   3. Ubah Domain/Host           → host.conf (kosong = auto IP publik)
+   4. Ubah Banner Pelanggan     → edit / reset / slot simpan-muat-hapus
+```
+
+**File konfigurasi opsional** (semua bisa lewat menu):
+| File | Isi | Bila kosong |
+|---|---|---|
+| `host.conf` | Domain di kartu akun | host = IP publik |
+| `ip.conf` | IP di kartu akun | auto-detect via ifconfig.me |
+| `port.conf` | Port Cloudflare di kartu akun | default 2086 |
+| `banners/` | Slot banner tersimpan | — |
 
 ---
 
