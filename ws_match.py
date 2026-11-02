@@ -19,6 +19,7 @@ time.tzset()  # semua waktu tampil WIB (GMT+7)
 
 C_CYAN = "\033[36m"
 C_WHITE = "\033[37m"
+C_BOLD = "\033[1m"
 C_DIM = "\033[2m"
 C_RESET = "\033[0m"
 
