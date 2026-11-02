@@ -3,3 +3,6 @@ banners/
 __pycache__/
 *.pyc
 host.conf
+port.conf
+ip.conf
+limits/
