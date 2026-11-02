@@ -401,6 +401,49 @@ conf_port() {
     fi
 }
 
+conf_banner() {
+    echo -e "${YELLOW}--- BANNER SAAT INI (/etc/issue.net) ---${NC}"
+    cat /etc/issue.net 2>/dev/null || echo "(kosong)"
+    echo ""
+    echo -e "${CYAN}--- AKSI BANNER ---${NC}"
+    echo "1. Edit banner di editor (nano/vi)"
+    echo "2. Reset ke banner bawaan"
+    echo "0. Batal"
+    read -p "Pilih (0-2): " b || exit 0
+    case $b in
+        1)
+            if command -v nano &>/dev/null; then
+                nano /etc/issue.net
+            elif command -v vi &>/dev/null; then
+                vi /etc/issue.net
+            else
+                echo -e "${RED}Tidak ada editor (nano/vi) terpasang!${NC}"
+                return
+            fi
+            echo -e "${GREEN}Banner diperbarui.${NC}"
+            ;;
+        2)
+            # samakan nilai limit dgn konfigurasi autokill agar konsisten
+            maxlog=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+            maxlog=${maxlog:-5}
+            cat > /etc/issue.net <<BEOF
+<br>
+<font color="green"><b>======================================</b></font><br>
+<font color="yellow"><b>       SELAMAT DATANG DI PREMIUM VPN  </b></font><br>
+<font color="green"><b>======================================</b></font><br>
+<font color="red"><b> PERINGATAN: </b></font><br>
+<font color="white"> - Dilarang Torrent </font><br>
+<font color="white"> - Dilarang DDOS / Hacking </font><br>
+<font color="white"> - Maksimal ${maxlog} Perangkat per Akun (Auto-Kill) </font><br>
+<font color="green"><b>======================================</b></font><br>
+BEOF
+            echo -e "${GREEN}Banner direset ke bawaan (limit ${maxlog} perangkat).${NC}"
+            ;;
+        0) return ;;
+        *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+    esac
+}
+
 menu_conf() {
     while true; do
         clear
@@ -409,11 +452,13 @@ menu_conf() {
         garis
         echo "1. Atur Batas Login per Akun (Max Login)"
         echo "2. Ubah Port WebSocket"
+        echo "3. Ubah Banner Pelanggan"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-2): " p || exit 0
+        read -p "Pilih (0-3): " p || exit 0
         case $p in
             1) conf_maxlogin ;;
             2) conf_port ;;
+            3) conf_banner ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
