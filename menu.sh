@@ -328,7 +328,7 @@ ws_riwayat_sesi() {
         return
     fi
     echo -e "${YELLOW}--- RIWAYAT SESI PER USER (15 terakhir) ---${NC}"
-    tail -15 "$log" | sed 's/MULAI  /\033[32mMULAI \033[0m/;s/SELESAI /\033[33mSELESAI\033[0m/'
+    tail -15 "$log"
     echo ""
     echo -e "Total baris: $(wc -l < "$log") | catatan: sesi < 2 mnt bisa lolos tak tercatat"
 }
