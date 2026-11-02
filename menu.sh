@@ -228,7 +228,8 @@ menu_akun() {
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && pause
+        # browser akun (2) mengelola pause-nya sendiri — 0 = kembali instan, tanpa pause ekstra
+        [ "$p" != "0" ] && [ "$p" != "2" ] && pause
     done
 }
 
