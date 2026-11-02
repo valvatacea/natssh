@@ -122,6 +122,8 @@ for user, ep in [(u, int(e)) for u, e in raw]:
                 bkey = key
                 best = c
 
+    if best and not best["_live"]:
+        best = None   # koneksi sudah selesai -> jangan duplikat riwayat di seksi live
     if best:
         seen.add(id(best))
         matched.append(best)
@@ -151,7 +153,7 @@ for user, ep in [(u, int(e)) for u, e in raw]:
                 bd = abs(dsec)
                 ip, ua = rip, rua
         line = (f"   {wt}  {C_WHITE}{(ip or '?-'):<15}\033[0m {(ua or '(tanpa UA)')[:18]:<18}"
-                f"  {C_DIM}(durasi/trafik pra-patch tak tersedia){C_RESET}")
+                f"  {C_DIM}(sesi basi/pra-patch: koneksi sudah lepas){C_RESET}")
     print(line)
 
 recap()

@@ -8,7 +8,7 @@ NATSSH adalah ekosistem manajemen VPN SSH murni yang dirancang secara khusus unt
 *   **Menu Manajemen v4.0 (`menu.sh`):** Antarmuka terminal interaktif — buat akun, **browser daftar akun** (suspend/unsuspend/perpanjang/hapus di satu tempat, dengan konfirmasi + catatan audit), monitoring online/autokill/sistem, backup portabel, dan konfigurasi sistem.
 *   **Kartu Akun Siap-Salin:** Setiap akun baru menampilkan blok DETAIL AKUN — Domain (bila didefinisikan), IP, Port WS Cloudflare, username/password, tanggal kedaluwarsa, dan limit perangkat.
 *   **Sistem Backup Portabel:** Mengekstrak seluruh akun aktif beserta kata sandi terenkripsinya menjadi satu file script mandiri (`backup_akun_ssh.sh`, mode 700) yang siap di-*restore* di VPS mana pun.
-*   **Autokill Cerdas (`autokill.sh`):** Cron tiap 2 menit, tendang multi-login melebihi batas (`MAX_LOGIN` via env, default 5). Hitungan perangkat = proses sshd / 2 (satu sesi tunnel = 2 proses) — batas akurat, bukan setengahnya.
+*   **Autokill Cerdas (`autokill.sh`):** Cron tiap 2 menit, tendang multi-login melebihi batas (`MAX_LOGIN` via env, default 5). Hitungan perangkat = jumlah proses `sshd: user` (user-owned) LANGSUNG — pasangan `[priv]` milik root terbuang oleh filter. Sesi hantu (proses hidup tapi soket bridge mati) dibersihkan `reap.py` sebelum penghitungan.
 *   **Full Audit:** Tiga jalur tercatat di `autokill.log` — tendangan autokill, HAPUS manual, dan AUTO-CLEAN akun kedaluwarsa.
 *   **Banner SSH Fleksibel:** Edit via nano/vi, reset ke template (baris "Maksimal N Perangkat" otomatis sinkron dengan limit), plus **slot simpan/muat/hapus** (`banners/`).
 *   **High Availability:** Terintegrasi penuh dengan `systemd` (Environment-aware, auto-start, auto-restart).

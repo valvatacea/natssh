@@ -131,7 +131,8 @@ def handle_client(client_socket, ip):
     cid = 0
     via_cdn = False
     try:
-        request = client_socket.recv(4096).decode("utf-8", errors="ignore")
+        buf = client_socket.recv(4096)                      # RAW (bytes): utk diteruskan
+        request = buf.decode("utf-8", errors="ignore")     # hanya utk deteksi header
     except OSError:
         try:
             client_socket.close()
@@ -173,6 +174,10 @@ def handle_client(client_socket, ip):
         ssh_socket.settimeout(10)
         ssh_socket.connect(("127.0.0.1", SSH_PORT))
         ssh_socket.settimeout(None)
+        if "HTTP" not in request and buf:
+            # klien raw-SSH (tanpa upgrade HTTP): paket pertama masih di RAW buffer
+            # — WAJIB diteruskan apa adanya (decode/re-encode str = merusak bytes)
+            ssh_socket.sendall(buf)
         # idle-timeout dua arah: soket diem IDLE_TIMEOUT detik -> putus, slot lepas
         client_socket.settimeout(IDLE_TIMEOUT)
         ssh_socket.settimeout(IDLE_TIMEOUT)

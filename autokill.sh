@@ -14,6 +14,9 @@ if [ -f "$LOG_FILE" ]; then
     fi
 fi
 
+# ── REAPER: bunuh sesi sshd hantu (soket bridge mati, proses hidup) ──
+"$(dirname "$(readlink -f "$0")")/reap.py" 2>/dev/null
+
 # 1 sesi SSH tunnel = 1 proses user-owned ("sshd: user"); pasangan "[priv]" milik ROOT
 # (terbuang oleh grep -v root) -> perangkat = count langsung, JANGAN dibagi 2
 ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do

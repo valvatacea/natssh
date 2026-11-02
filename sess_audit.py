@@ -95,7 +95,7 @@ def main():
             if best is not None:
                 terlihat[str(best["start"])] = best
                 key = str(best["start"])
-                if key not in state:
+                if key not in state and best["_live"]:
                     # simpan dulu, catat SATU baris utuh saat sesi selesai
                     state[key] = {"user": user, "ip": best["ip"],
                                   "ua": best.get("ua") or "-",
