@@ -8,6 +8,15 @@ YELLOW='\u001b[0;33m'
 CYAN='\u001b[0;36m'
 NC='\u001b[0m'
 
+port_ws() {
+    # port WebSocket running — ss menampilkan nama proses "python3", bukan ws.py,
+    # maka cocokkan via PID: hasil kosong = service tak berjalan
+    local wpid
+    wpid=$(pgrep -f "ws.py" | head -1)
+    [ -n "$wpid" ] || return 1
+    ss -tlnp 2>/dev/null | grep "pid=$wpid," | awk '{print $4}' | awk -F: '{print $NF}' | head -1
+}
+
 garis() { echo -e "${GREEN}======================================${NC}"; }
 pause()  { echo ""; read -r -p "Tekan Enter untuk kembali..." _ || true; }
 # catatan: JANGAN read -n 1 — sisakan newline di buffer, read berikutnya can baris kosong = "batal" palsu
@@ -35,7 +44,7 @@ akun_baru() {
             # port.conf  = port Cloudflare yg dipakai klien (default 2086); asal via Origin Rule ke port NAT
             host=$(cat /root/natssh/host.conf 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
             host=${host:-$(hostname -I | awk '{print $1}')}
-            wsport=$(ss -tlnp 2>/dev/null | grep ws.py | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
+            wsport=$(port_ws)
             cfport=$(cat /root/natssh/port.conf 2>/dev/null)
             cfport=${cfport:-2086}
             maxlog=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
@@ -360,8 +369,12 @@ conf_maxlogin() {
 }
 
 conf_port() {
-    cur_port=$(ss -tlnp 2>/dev/null | grep ws.py | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
-    echo -e "Port WebSocket saat ini: ${YELLOW}${cur_port:-tidak dikenal}${NC}"
+    cur_port=$(port_ws)
+    if [ -z "$cur_port" ]; then
+        echo -e "${RED}Service natssh-ws tidak berjalan/tak terdeteksi! Cek: systemctl status natssh-ws${NC}"
+        return
+    fi
+    echo -e "Port WebSocket saat ini: ${YELLOW}${cur_port}${NC}"
     read -p "Port WebSocket baru: " new_port
     if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
         echo -e "${RED}Gagal: port harus angka 1-65535!${NC}"
