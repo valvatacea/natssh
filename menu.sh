@@ -71,11 +71,6 @@ do_hapus() {
     fi
 }
 
-akun_hapus() {
-    pilih_akun "Hapus akun" || return
-    do_hapus "$AKUN"
-}
-
 pilih_akun() {
     # Cetak daftar akun jualan bernomor -> set global AKUN; return 1 bila batal/kosong/salah
     AKUN=""
@@ -132,21 +127,6 @@ do_perpanjang() {
     local exp=$(date -d "@$(( base + aktif * 86400 ))" +"%Y-%m-%d")
     chage -E "$exp" "$user"
     echo -e "${GREEN}SUKSES! Masa aktif $user diperpanjang hingga $exp.${NC}"
-}
-
-akun_perpanjang() {
-    pilih_akun "Perpanjang akun" || return
-    do_perpanjang "$AKUN"
-}
-
-akun_suspend() {
-    pilih_akun "Suspend akun" || return
-    do_suspend "$AKUN"
-}
-
-akun_unsuspend() {
-    pilih_akun "Unsuspend akun" || return
-    do_unsuspend "$AKUN"
 }
 
 akun_daftar() {
@@ -214,22 +194,14 @@ menu_akun() {
         echo -e "${YELLOW}   MANAJEMEN AKUN SSH${NC}"
         garis
         echo "1. Buat Akun SSH Baru"
-        echo "2. Hapus Akun SSH"
-        echo "3. Perpanjang Masa Aktif"
-        echo "4. Daftar Akun — kelola: suspend/unsuspend/perpanjang/hapus"
-        echo "5. Suspend Akun"
-        echo "6. Unsuspend Akun"
-        echo "7. Bersihkan Akun Kedaluwarsa (Auto-Clean)"
+        echo "2. Daftar Akun (kelola: suspend/unsuspend/perpanjang/hapus)"
+        echo "3. Bersihkan Akun Kedaluwarsa (Auto-Clean)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-7): " p || exit 0
+        read -p "Pilih (0-3): " p || exit 0
         case $p in
             1) akun_baru ;;
-            2) akun_hapus ;;
-            3) akun_perpanjang ;;
-            4) akun_daftar ;;
-            5) akun_suspend ;;
-            6) akun_unsuspend ;;
-            7) akun_autoclean ;;
+            2) akun_daftar ;;
+            3) akun_autoclean ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
