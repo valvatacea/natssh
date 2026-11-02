@@ -121,8 +121,11 @@ for user, ep in [(u, int(e)) for u, e in raw]:
         jalur = ""
         if best.get("edge") and best["ip"] != best["edge"]:
             jalur = f"  {C_DIM}[{cdn_label(best['edge'])}]{C_RESET}"
+        geo = ""
+        if best.get("city") or best.get("cc"):
+            geo = f"  {C_DIM}{best.get('city') or ''}{(' ' + best['cc']) if best.get('cc') else ''}{C_RESET}"
         line = (f"   {wt} {C_WHITE}{best['ip']:<16}\033[0m{(best['ua'] or '-')[:14]:<14}"
-                f"{durasi:>7} {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193 {status}{jalur}")
+                f"{durasi:>7} {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193 {status}{jalur}{geo}")
     else:
         ip = ua = None
         bd = 99

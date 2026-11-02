@@ -153,6 +153,9 @@ def handle_client(client_socket, ip):
                or ip)
     via_cdn = real_ip != ip
     ua = _header(request, "User-Agent")[:48]
+    # geo gratis dari CDN: CloudFront -> CloudFront-Viewer-City/Country; Cloudflare -> CF-IPCountry
+    city = _header(request, "CloudFront-Viewer-City")[:32]
+    cc = _header(request, "CloudFront-Viewer-Country") or _header(request, "CF-IPCountry")
     if os.environ.get("NATSSH_DEBUG_REQ"):
         _log(f"DEBUG-REQ {ip}: {request[:800]!r}")
     if not _admit(ip, via_cdn):
@@ -175,7 +178,7 @@ def handle_client(client_socket, ip):
         ssh_socket.settimeout(IDLE_TIMEOUT)
         _log(f"JEMBAT {real_ip} (edge={ip}, ua='{ua}', total={_total})")
         conn = {"start": round(time.time(), 3), "ip": real_ip, "edge": ip,
-                "ua": ua, "up": 0, "down": 0}
+                "ua": ua, "city": city, "cc": cc, "up": 0, "down": 0}
         with _lock:
             cid = next(_SEQ)
             _CONNS[cid] = conn
