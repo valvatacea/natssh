@@ -39,17 +39,19 @@ try:
 except OSError:
     pass
 
+raw = [ln.split() for ln in sys.stdin.read().splitlines() if ln.strip()]
+counts: dict[str, int] = {}
+for u, _ in raw:
+    counts[u] = counts.get(u, 0) + 1
 seen: set[int] = set()
 cur = None
-for line in sys.stdin.read().splitlines():
-    if not line.strip():
-        continue
-    user, ep = line.split()
+for user, ep in [(u, int(e)) for u, e in raw]:
     ep = int(ep)
     if user != cur:
         cur = user
         seen = set()
-        print(user)
+        print(f"{user} ({counts[user]} sesi)")
+        print("  WAKTU     IP ASLI            APLIKASI             DURASI  UP/DOWN MB     STATUS")
     best = None
     bd = 99
     for c in pool:
@@ -77,9 +79,14 @@ for line in sys.stdin.read().splitlines():
             if -2 <= dsec <= 10 and abs(dsec) < bd:
                 bd = abs(dsec)
                 ip, ua = rip, rua
-    suffix = f"  {info}" if info else "  (pra-patch: durasi/trafik tak tersedia)"
-    print(
-        f"  sesi {time.strftime('%H:%M:%S', time.localtime(ep))}:  {ip or '?-'}  "
-        + (ua or "(tanpa UA/tak via CF)")[:30]
-        + suffix
-    )
+    if info:
+        trafik = f"{best['up']/1048576:.1f}/{best['down']/1048576:.1f}"
+        durasi = f"{m}m{s:02d}s"
+        status = "LIVE" if best["_live"] else "selesai " + time.strftime("%H:%M", time.localtime(end))
+        line = (f"  {time.strftime('%H:%M:%S', time.localtime(ep))}  {ip:<15}  "
+                f"{(ua or '-')[:19]:<19}  {durasi:>6}  {trafik:>9}  {status}")
+    else:
+        line = (f"  {time.strftime('%H:%M:%S', time.localtime(ep))}  {ip or '?-':<15}  "
+                f"{(ua or '(tanpa UA/tak via CF)')[:19]:<19}"
+                f"{'pra-patch: durasi/trafik tak tersedia':>42}")
+    print(line)
