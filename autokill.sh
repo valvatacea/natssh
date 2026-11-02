@@ -14,11 +14,12 @@ if [ -f "$LOG_FILE" ]; then
     fi
 fi
 
-# 1 sesi SSH tunnel = 2 proses sshd (priv + net) -> hitungan dibagi 2
+# 1 sesi SSH tunnel = 1 proses user-owned ("sshd: user"); pasangan "[priv]" milik ROOT
+# (terbuang oleh grep -v root) -> perangkat = count langsung, JANGAN dibagi 2
 ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
     if id "$user" &>/dev/null; then
         shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
-        devices=$(( count / 2 ))
+        devices=$count
         if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$MAX_LOGIN" ]; then
             pkill -u "$user" sshd
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang: $user ($devices perangkat, $count proses)" >> "$LOG_FILE"

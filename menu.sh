@@ -76,7 +76,7 @@ do_hapus() {
     local user="$1"
     local exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
     local online=$(ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | grep -c "^$user$")
-    echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: $((online/2)) perangkat)"
+    echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: ${online} perangkat)"
     read -p "Yakin hapus? (y/N): " yakin
     if [[ "$yakin" =~ ^[Yy]$ ]]; then
         res=$(userdel -r "$user" 2>&1); rc=$?
@@ -241,7 +241,7 @@ sessi_online() {
         if id "$user" &>/dev/null; then
             shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
             if [ "$shell" == "/bin/false" ]; then
-                echo -e "User: ${GREEN}$user${NC} | Online: ${RED}$((count / 2))${NC} perangkat"
+                echo -e "User: ${GREEN}$user${NC} | Online: ${RED}${count}${NC} perangkat"
             fi
         fi
     done
@@ -253,7 +253,7 @@ autokill_manual() {
     ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
         if id "$user" &>/dev/null; then
             shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
-            devices=$(( count / 2 ))
+            devices=$count   # 1 sesi tunnel = 1 proses user-owned (pasangan [priv] milik root)
             if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$max_login" ]; then
                 echo -e "Menendang user ${RED}$user${NC} ($devices perangkat)..."
                 pkill -u "$user" sshd
