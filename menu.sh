@@ -64,9 +64,16 @@ do_hapus() {
     echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: $((online/2)) perangkat)"
     read -p "Yakin hapus? (y/N): " yakin
     if [[ "$yakin" =~ ^[Yy]$ ]]; then
-        userdel -r "$user"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - HAPUS manual: $user (expired: $exp)" >> /root/autokill.log
-        echo -e "${GREEN}SUKSES! Akun $user telah dihapus beserta datanya.${NC}"
+        res=$(userdel -r "$user" 2>&1); rc=$?
+        # "mail spool not found" hanya notice (tak ada mailbox), bukan error — disembunyikan
+        warn=$(echo "$res" | grep -v "mail spool not found" || true)
+        [ -n "$warn" ] && echo -e "${YELLOW}Peringatan: $warn${NC}"
+        if [ $rc -eq 0 ]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - HAPUS manual: $user (expired: $exp)" >> /root/autokill.log
+            echo -e "${GREEN}SUKSES! Akun $user telah dihapus beserta datanya.${NC}"
+        else
+            echo -e "${RED}Gagal menghapus (exit $rc) — cek manual: $res${NC}"
+        fi
     else
         echo -e "${YELLOW}Dibatalkan — akun tidak dihapus.${NC}"
     fi
