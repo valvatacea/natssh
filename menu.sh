@@ -428,14 +428,19 @@ conf_banner() {
             maxlog=${maxlog:-5}
             cat > /etc/issue.net <<BEOF
 <br>
-<font color="green"><b>======================================</b></font><br>
-<font color="yellow"><b>       SELAMAT DATANG DI PREMIUM VPN  </b></font><br>
-<font color="green"><b>======================================</b></font><br>
-<font color="red"><b> PERINGATAN: </b></font><br>
-<font color="white"> - Dilarang Torrent </font><br>
-<font color="white"> - Dilarang DDOS / Hacking </font><br>
-<font color="white"> - Maksimal ${maxlog} Perangkat per Akun (Auto-Kill) </font><br>
-<font color="green"><b>======================================</b></font><br>
+<font color="cyan">╔══════════════════════════════════╗</font><br>
+<font color="yellow"><b>   ⚡ PREMIUM VPN SERVICE ⚡</b></font><br>
+<font color="cyan">╚══════════════════════════════════╝</font><br>
+<font color="green"> ✅ KONEKSI BERHASIL DIBUAT</font><br>
+<font color="white"> ──────────────────────────────</font><br>
+<font color="orange"> 🌍 Server    : Indonesia — Premium</font><br>
+<font color="aqua"> 🚀 Kecepatan : Up to 100 Mbps</font><br>
+<font color="lime"> 📱 Batas     : Maksimal ${maxlog} Perangkat/Akun</font><br>
+<font color="orange"> ⚔  Auto-Kill : AKTIF — melanggar = putus otomatis</font><br>
+<font color="white"> ──────────────────────────────</font><br>
+<font color="red"> ⛔ DILARANG : Torrent · DDoS · Hacking</font><br>
+<font color="grey"> 🛡  Support  : Hubungi Admin</font><br>
+<font color="green"><b> ══════ SELAMAT MENIKMATI ══════</b></font><br>
 BEOF
             echo -e "${GREEN}Banner direset ke bawaan (limit ${maxlog} perangkat).${NC}"
             ;;
