@@ -42,8 +42,9 @@ akun_baru() {
             # Detail siap-salin untuk dikirim ke pelanggan
             # host.conf  = domain Cloudflare (recommended) / IP utk koneksi langsung
             # port.conf  = port Cloudflare yg dipakai klien (default 2086); asal via Origin Rule ke port NAT
-            host=$(cat /root/natssh/host.conf 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
-            host=${host:-$(hostname -I | awk '{print $1}')}
+            ipaddr=$(cat /root/natssh/ip.conf 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
+            ipaddr=${ipaddr:-$(hostname -I | awk '{print $1}')}
+            host=$(cat /root/natssh/host.conf 2>/dev/null || echo "$ipaddr")
             wsport=$(port_ws)
             cfport=$(cat /root/natssh/port.conf 2>/dev/null)
             cfport=${cfport:-2086}
@@ -52,6 +53,7 @@ akun_baru() {
             echo ""
             echo "================ DETAIL AKUN ================"
             echo "Host      : $host"
+            echo "IP        : $ipaddr"
             echo "Port WS   : $cfport (via Cloudflare)"
             echo "            Cloudflare : 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
             echo "            CloudFront : 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443 (HTTPS)"
