@@ -409,7 +409,7 @@ conf_banner() {
     echo "1. Edit banner di editor (nano/vi)"
     echo "2. Reset ke banner bawaan"
     echo "3. Simpan banner saat ini ke slot"
-    echo "4. Muat banner dari slot tersimpan"
+    echo "4. Daftar Banner Tersimpan (muat/hapus)"
     read -p "Pilih (0-4): " b || exit 0
     case $b in
         1)
@@ -474,29 +474,52 @@ BEOF
                 echo -e "${RED}Belum ada slot tersimpan.${NC}"
                 return
             fi
-            echo -e "${YELLOW}--- SLOT BANNER TERSIMPAN ---${NC}"
+            echo -e "${YELLOW}--- DAFTAR BANNER TERSIMPAN ---${NC}"
             local i
             for i in "${!files[@]}"; do
                 local nm=$(basename "${files[$i]}" .txt)
                 local tgl=$(stat -c '%y' "${files[$i]}" | cut -d. -f1)
                 echo -e "$((i+1)). ${CYAN}$nm${NC} ($tgl)"
             done
-            read -p "Muat slot nomor (0 = batal): " p
+            read -p "Pilih slot nomor (0 = batal): " p
             [ -z "$p" ] || [ "$p" == "0" ] && return
             if ! [[ "$p" =~ ^[0-9]+$ ]] || [ "$p" -lt 1 ] || [ "$p" -gt ${#files[@]} ]; then
                 echo -e "${RED}Gagal: nomor di luar daftar!${NC}"
                 return
             fi
             local pilih="${files[$((p-1))]}"
-            echo -e "${YELLOW}--- ISI SLOT ---${NC}"
+            local nm=$(basename "$pilih" .txt)
+            echo -e ""
+            echo -e "${CYAN}Slot: ${YELLOW}$nm${NC}"
+            echo -e "${YELLOW}--- ISI (8 baris awal) ---${NC}"
             cat "$pilih" | head -8
-            read -p "Timpa banner saat ini dengan ini? (y/N): " y
-            if [[ "$y" =~ ^[Yy]$ ]]; then
-                cp "$pilih" /etc/issue.net
-                echo -e "${GREEN}Banner dimuat dari '$(basename "$pilih" .txt)'.${NC}"
-            else
-                echo -e "${YELLOW}Dibatalkan.${NC}"
-            fi
+            echo ""
+            echo "1. Muat (timpa banner aktif)"
+            echo "2. Hapus slot ini"
+            echo "0. Batal"
+            read -p "Aksi (0-2): " a || exit 0
+            case $a in
+                1)
+                    read -p "Yakin timpa banner aktif dengan '$nm'? (y/N): " y
+                    if [[ "$y" =~ ^[Yy]$ ]]; then
+                        cp "$pilih" /etc/issue.net
+                        echo -e "${GREEN}Banner dimuat dari '$nm'.${NC}"
+                    else
+                        echo -e "${YELLOW}Dibatalkan.${NC}"
+                    fi
+                    ;;
+                2)
+                    read -p "Yakin hapus slot '$nm'? (y/N): " y
+                    if [[ "$y" =~ ^[Yy]$ ]]; then
+                        rm -f "$pilih"
+                        echo -e "${GREEN}Slot '$nm' dihapus.${NC}"
+                    else
+                        echo -e "${YELLOW}Dibatalkan.${NC}"
+                    fi
+                    ;;
+                0) ;;
+                *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+            esac
             ;;
         *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
     esac
