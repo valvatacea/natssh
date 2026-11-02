@@ -402,32 +402,32 @@ conf_port() {
 }
 
 conf_banner() {
-    echo -e "${YELLOW}--- BANNER SAAT INI (/etc/issue.net) ---${NC}"
-    cat /etc/issue.net 2>/dev/null || echo "(kosong)"
-    echo ""
-    echo -e "${CYAN}--- AKSI BANNER ---${NC}"
-    echo "1. Edit banner di editor (nano/vi)"
-    echo "2. Reset ke banner bawaan"
-    echo "3. Simpan banner saat ini ke slot"
-    echo "4. Daftar Banner Tersimpan (muat/hapus)"
-    read -p "Pilih (0-4): " b || exit 0
-    case $b in
-        1)
-            if command -v nano &>/dev/null; then
-                nano /etc/issue.net
-            elif command -v vi &>/dev/null; then
-                vi /etc/issue.net
-            else
-                echo -e "${RED}Tidak ada editor (nano/vi) terpasang!${NC}"
-                return
-            fi
-            echo -e "${GREEN}Banner diperbarui.${NC}"
-            ;;
-        2)
-            # samakan nilai limit dgn konfigurasi autokill agar konsisten
-            maxlog=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
-            maxlog=${maxlog:-5}
-            cat > /etc/issue.net <<BEOF
+    while true; do
+        echo -e "${YELLOW}--- BANNER SAAT INI (/etc/issue.net) ---${NC}"
+        cat /etc/issue.net 2>/dev/null || echo "(kosong)"
+        echo ""
+        echo -e "${CYAN}--- AKSI BANNER ---${NC}"
+        echo "1. Edit banner di editor (nano/vi)"
+        echo "2. Reset ke banner bawaan"
+        echo "3. Simpan banner saat ini ke slot"
+        echo "4. Daftar Banner Tersimpan (muat/hapus)"
+        echo "0. Kembali ke Konfigurasi Sistem"
+        read -p "Pilih (0-4): " b || exit 0
+        case $b in
+            1)
+                if command -v nano &>/dev/null; then
+                    nano /etc/issue.net
+                elif command -v vi &>/dev/null; then
+                    vi /etc/issue.net
+                else
+                    echo -e "${RED}Tidak ada editor (nano/vi) terpasang!${NC}"
+                fi
+                pause
+                ;;
+            2)
+                maxlog=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+                maxlog=${maxlog:-5}
+                cat > /etc/issue.net <<BEOF
 <br>
 <center>
 <font color="cyan">　　　　　　　　　　╔══════════════════════════════════╗</font><br>
@@ -445,84 +445,100 @@ conf_banner() {
 <font color="green"><b>　　　　　　　　　　  ═══ SELAMAT MENIKMATI ═══</b></font><br>
 </center>
 BEOF
-            echo -e "${GREEN}Banner direset ke bawaan (limit ${maxlog} perangkat).${NC}"
-            ;;
-        0) return ;;
-        3)
-            mkdir -p /root/natssh/banners
-            read -p "Nama slot (huruf/angka, 1-24): " nama
-            if ! [[ "$nama" =~ ^[a-zA-Z0-9_-]{1,24}$ ]]; then
-                echo -e "${RED}Gagal: nama hanya huruf/angka/-/_ maks 24!${NC}"
-            elif [ -f "/root/natssh/banners/$nama.txt" ]; then
-                read -p "Slot '$nama' sudah ada — timpa? (y/N): " t
-                if [[ "$t" =~ ^[Yy]$ ]]; then
+                echo -e "${GREEN}Banner direset ke bawaan (limit ${maxlog} perangkat).${NC}"
+                pause
+                ;;
+            3)
+                mkdir -p /root/natssh/banners
+                read -p "Nama slot (huruf/angka, 1-24): " nama
+                if ! [[ "$nama" =~ ^[a-zA-Z0-9_-]{1,24}$ ]]; then
+                    echo -e "${RED}Gagal: nama hanya huruf/angka/-/_ maks 24!${NC}"
+                elif [ -f "/root/natssh/banners/$nama.txt" ]; then
+                    read -p "Slot '$nama' sudah ada — timpa? (y/N): " t
+                    if [[ "$t" =~ ^[Yy]$ ]]; then
+                        cp /etc/issue.net "/root/natssh/banners/$nama.txt"
+                        echo -e "${GREEN}Banner tersimpan ke slot '$nama'.${NC}"
+                    else
+                        echo -e "${YELLOW}Dibatalkan.${NC}"
+                    fi
+                else
                     cp /etc/issue.net "/root/natssh/banners/$nama.txt"
                     echo -e "${GREEN}Banner tersimpan ke slot '$nama'.${NC}"
-                else
-                    echo -e "${YELLOW}Dibatalkan.${NC}"
                 fi
-            else
-                cp /etc/issue.net "/root/natssh/banners/$nama.txt"
-                echo -e "${GREEN}Banner tersimpan ke slot '$nama'.${NC}"
-            fi
-            ;;
-        4)
-            local dir=/root/natssh/banners
-            local files=()
-            for f in "$dir"/*.txt; do [ -f "$f" ] && files+=("$f"); done
-            if [ ${#files[@]} -eq 0 ]; then
-                echo -e "${RED}Belum ada slot tersimpan.${NC}"
-                return
-            fi
-            echo -e "${YELLOW}--- DAFTAR BANNER TERSIMPAN ---${NC}"
-            local i
-            for i in "${!files[@]}"; do
-                local nm=$(basename "${files[$i]}" .txt)
-                local tgl=$(stat -c '%y' "${files[$i]}" | cut -d. -f1)
-                echo -e "$((i+1)). ${CYAN}$nm${NC} ($tgl)"
-            done
-            read -p "Pilih slot nomor (0 = batal): " p
-            [ -z "$p" ] || [ "$p" == "0" ] && return
-            if ! [[ "$p" =~ ^[0-9]+$ ]] || [ "$p" -lt 1 ] || [ "$p" -gt ${#files[@]} ]; then
-                echo -e "${RED}Gagal: nomor di luar daftar!${NC}"
-                return
-            fi
-            local pilih="${files[$((p-1))]}"
-            local nm=$(basename "$pilih" .txt)
-            echo -e ""
-            echo -e "${CYAN}Slot: ${YELLOW}$nm${NC}"
-            echo -e "${YELLOW}--- ISI (8 baris awal) ---${NC}"
-            cat "$pilih" | head -8
-            echo ""
-            echo "1. Muat (timpa banner aktif)"
-            echo "2. Hapus slot ini"
-            echo "0. Batal"
-            read -p "Aksi (0-2): " a || exit 0
-            case $a in
-                1)
-                    read -p "Yakin timpa banner aktif dengan '$nm'? (y/N): " y
-                    if [[ "$y" =~ ^[Yy]$ ]]; then
-                        cp "$pilih" /etc/issue.net
-                        echo -e "${GREEN}Banner dimuat dari '$nm'.${NC}"
-                    else
-                        echo -e "${YELLOW}Dibatalkan.${NC}"
+                pause
+                ;;
+            4)
+                local dir=/root/natssh/banners
+                local files=()
+                for f in "$dir"/*.txt; do [ -f "$f" ] && files+=("$f"); done
+                if [ ${#files[@]} -eq 0 ]; then
+                    echo -e "${RED}Belum ada slot tersimpan.${NC}"
+                    pause
+                    continue
+                fi
+                while true; do
+                    files=()
+                    for f in "$dir"/*.txt; do [ -f "$f" ] && files+=("$f"); done
+                    if [ ${#files[@]} -eq 0 ]; then
+                        echo -e "${RED}Tidak ada slot tersimpan.${NC}"
+                        break
                     fi
-                    ;;
-                2)
-                    read -p "Yakin hapus slot '$nm'? (y/N): " y
-                    if [[ "$y" =~ ^[Yy]$ ]]; then
-                        rm -f "$pilih"
-                        echo -e "${GREEN}Slot '$nm' dihapus.${NC}"
-                    else
-                        echo -e "${YELLOW}Dibatalkan.${NC}"
+                    echo -e "${YELLOW}--- DAFTAR BANNER TERSIMPAN ---${NC}"
+                    local i
+                    for i in "${!files[@]}"; do
+                        local nm=$(basename "${files[$i]}" .txt)
+                        local tgl=$(stat -c '%y' "${files[$i]}" | cut -d. -f1)
+                        echo -e "$((i+1)). ${CYAN}$nm${NC} ($tgl)"
+                    done
+                    read -p "Pilih slot nomor (0 = kembali): " p || exit 0
+                    [ -z "$p" ] || [ "$p" == "0" ] && break
+                    if ! [[ "$p" =~ ^[0-9]+$ ]] || [ "$p" -lt 1 ] || [ "$p" -gt ${#files[@]} ]; then
+                        echo -e "${RED}Gagal: nomor di luar daftar!${NC}"
+                        continue
                     fi
-                    ;;
-                0) ;;
-                *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
-            esac
-            ;;
-        *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
-    esac
+                    local pilih="${files[$((p-1))]}"
+                    local nm=$(basename "$pilih" .txt)
+                    echo -e ""
+                    echo -e "${CYAN}Slot: ${YELLOW}$nm${NC}"
+                    echo -e "${YELLOW}--- ISI (8 baris awal) ---${NC}"
+                    cat "$pilih" | head -8
+                    echo ""
+                    echo "1. Muat (timpa banner aktif)"
+                    echo "2. Hapus slot ini"
+                    echo "0. Kembali ke daftar"
+                    read -p "Aksi (0-2): " a || exit 0
+                    case $a in
+                        1)
+                            read -p "Yakin timpa banner aktif dengan '$nm'? (y/N): " y
+                            if [[ "$y" =~ ^[Yy]$ ]]; then
+                                cp "$pilih" /etc/issue.net
+                                echo -e "${GREEN}Banner dimuat dari '$nm'.${NC}"
+                                pause
+                            else
+                                echo -e "${YELLOW}Dibatalkan.${NC}"
+                                sleep 1
+                            fi
+                            ;;
+                        2)
+                            read -p "Yakin hapus slot '$nm'? (y/N): " y
+                            if [[ "$y" =~ ^[Yy]$ ]]; then
+                                rm -f "$pilih"
+                                echo -e "${GREEN}Slot '$nm' dihapus.${NC}"
+                                sleep 1
+                            else
+                                echo -e "${YELLOW}Dibatalkan.${NC}"
+                                sleep 1
+                            fi
+                            ;;
+                        0) ;;
+                        *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+                    esac
+                done
+                ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+        esac
+    done
 }
 
 menu_conf() {
