@@ -204,9 +204,13 @@ do_limit() {
         echo -e "${GREEN}Batas khusus dihapus — akun ini kembali ikut global (${global}).${NC}"
         return
     fi
-    if [ "$n" != "unlimited" ] && { ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 1 ]; }; then
-        echo -e "${RED}Gagal: harus angka >= 1 atau 'unlimited' (0/negatif = bahaya, ditolak)!${NC}"
+    if [ "$n" != "unlimited" ] && ! [[ "$n" =~ ^-?[0-9]+$ || "$n" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}Gagal: harus angka atau 'unlimited'!${NC}"
         return
+    fi
+    if [[ "$n" =~ ^- ]]; then
+        echo -e "${YELLOW}Angka di bawah 1 → otomatis jadi 1.${NC}"
+        n=1
     fi
     mkdir -p "$selfdir/limits"
     echo "$n" > "$lfile"
