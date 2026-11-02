@@ -41,25 +41,31 @@ def _log(msg: str) -> None:
         pass
 
 
-def _admit(ip: str) -> bool:
+def _admit(ip: str, via_cdn: bool = False) -> bool:
+    # via_cdn: per-IP disisihkan — semua klien CDN berbagi beberapa edge IP
+    # (CloudFront=AWS 52/99.x, Cloudflare=104/172.64-71.x); hanya dihitung MAX_TOTAL.
     global _total
     with _lock:
-        n = _per_ip.get(ip, 0)
-        if _total >= MAX_TOTAL or n >= MAX_PER_IP:
+        if _total >= MAX_TOTAL:
             return False
-        _per_ip[ip] = n + 1
+        if not via_cdn:
+            n = _per_ip.get(ip, 0)
+            if n >= MAX_PER_IP:
+                return False
+            _per_ip[ip] = n + 1
         _total += 1
         return True
 
 
-def _release(ip: str) -> None:
+def _release(ip: str, via_cdn: bool = False) -> None:
     global _total
     with _lock:
-        n = _per_ip.get(ip, 1) - 1
-        if n <= 0:
-            _per_ip.pop(ip, None)
-        else:
-            _per_ip[ip] = n
+        if not via_cdn:
+            n = _per_ip.get(ip, 1) - 1
+            if n <= 0:
+                _per_ip.pop(ip, None)
+            else:
+                _per_ip[ip] = n
         _total = max(0, _total - 1)
 
 
@@ -121,28 +127,43 @@ def forward(src, dst, conn=None, field=None):
 
 def handle_client(client_socket, ip):
     global _total
-    if not _admit(ip):
+    conn = None
+    cid = 0
+    via_cdn = False
+    try:
+        request = client_socket.recv(4096).decode("utf-8", errors="ignore")
+    except OSError:
+        try:
+            client_socket.close()
+        except OSError:
+            pass
+        return
+    if "HTTP" in request:
+        try:
+            client_socket.send(b"HTTP/1.1 101 Switching Protocols\r\n"
+                              b"Upgrade: websocket\r\n"
+                              b"Connection: Upgrade\r\n\r\n")
+        except OSError:
+            pass
+    # Cloudflare -> CF-Connecting-IP; CloudFront (AWS) -> X-Forwarded-For;
+    # UA = aplikasi klien (Dark Tunnel/injektor dkk.)
+    xff = _header(request, "X-Forwarded-For")
+    real_ip = (_header(request, "CF-Connecting-IP")
+               or (xff.split(",")[0].strip() if xff else "")
+               or ip)
+    via_cdn = real_ip != ip
+    ua = _header(request, "User-Agent")[:48]
+    if not _admit(ip, via_cdn):
         try:
             cur = _per_ip.get(ip, 0)
-            _log(f"TOLAK {ip} (per-ip={cur}, total={_total}, limit {MAX_PER_IP}/{MAX_TOTAL})")
+            _log(f"TOLAK {ip} (via-CDN={via_cdn}, per-ip={cur}, total={_total}, limit {MAX_PER_IP}/{MAX_TOTAL})")
         finally:
             try:
                 client_socket.close()
             except OSError:
                 pass
         return
-    conn = None
-    cid = 0
     try:
-        request = client_socket.recv(4096).decode("utf-8", errors="ignore")
-        if "HTTP" in request:
-            client_socket.send(b"HTTP/1.1 101 Switching Protocols\r\n"
-                              b"Upgrade: websocket\r\n"
-                              b"Connection: Upgrade\r\n\r\n")
-        # Cloudflare menyuntikkan IP asli pelanggan di header paket upgrade;
-        # UA = aplikasi klien (Dark Tunnel/injektor dkk.)
-        real_ip = _header(request, "CF-Connecting-IP") or ip
-        ua = _header(request, "User-Agent")[:48]
         ssh_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         ssh_socket.settimeout(10)
         ssh_socket.connect(("127.0.0.1", SSH_PORT))
@@ -174,7 +195,7 @@ def handle_client(client_socket, ip):
                 _LAST.append({**conn, "end": round(time.time(), 3)})
                 _CONNS.pop(cid, None)
             _dump()
-        _release(ip)
+        _release(ip, via_cdn)
 
 
 def main():
