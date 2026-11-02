@@ -428,6 +428,7 @@ conf_banner() {
             maxlog=${maxlog:-5}
             cat > /etc/issue.net <<BEOF
 <br>
+<center>
 <font color="cyan">╔══════════════════════════════════╗</font><br>
 <font color="yellow"><b>   ⚡ PREMIUM VPN SERVICE ⚡</b></font><br>
 <font color="cyan">╚══════════════════════════════════╝</font><br>
@@ -441,6 +442,7 @@ conf_banner() {
 <font color="red"> ⛔ DILARANG : Torrent · DDoS · Hacking</font><br>
 <font color="grey"> 🛡  Support  : Hubungi Admin</font><br>
 <font color="green"><b> ══════ SELAMAT MENIKMATI ══════</b></font><br>
+</center>
 BEOF
             echo -e "${GREEN}Banner direset ke bawaan (limit ${maxlog} perangkat).${NC}"
             ;;
