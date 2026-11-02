@@ -44,7 +44,7 @@ akun_baru() {
             # port.conf  = port Cloudflare yg dipakai klien (default 2086); asal via Origin Rule ke port NAT
             ipaddr=$(cat /root/natssh/ip.conf 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
             ipaddr=${ipaddr:-$(hostname -I | awk '{print $1}')}
-            host=$(cat /root/natssh/host.conf 2>/dev/null || echo "$ipaddr")
+            host=$(cat /root/natssh/host.conf 2>/dev/null)
             wsport=$(port_ws)
             cfport=$(cat /root/natssh/port.conf 2>/dev/null)
             cfport=${cfport:-2086}
@@ -53,6 +53,7 @@ akun_baru() {
             echo ""
             echo "================ DETAIL AKUN ================"
             # host = IP kalau domain tak didefinisikan -> cukup tampilkan sekali di baris IP
+            [ -z "$host" ] && host="$ipaddr"
             if [ "$host" != "$ipaddr" ]; then
                 echo "Domain    : $host"
             fi
@@ -363,10 +364,14 @@ conf_maxlogin() {
     if ! [[ "$max_login" =~ ^[0-9]+$ ]] || [ "$max_login" -lt 1 ] || [ "$max_login" -gt 20 ]; then
         echo -e "${RED}Gagal: harus angka 1-20!${NC}"
     else
-        if crontab -l | grep -q "MAX_LOGIN="; then
+        local selfdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+        if crontab -l 2>/dev/null | grep -q "MAX_LOGIN="; then
             (crontab -l | sed "s/MAX_LOGIN=[0-9]*/MAX_LOGIN=$max_login/") | crontab -
-        else
+        elif crontab -l 2>/dev/null | grep -q "autokill.sh"; then
             (crontab -l | sed "s|\(.*autokill.sh\)|MAX_LOGIN=$max_login \1|") | crontab -
+        else
+            # crontab kosong / tanpa autokill: TULIS baris penuh — jangan pipa kosong ke crontab
+            (crontab -l 2>/dev/null; echo "*/2 * * * * MAX_LOGIN=$max_login $selfdir/autokill.sh") | crontab -
         fi
         sed -i "s/Maksimal [0-9]* Perangkat/Maksimal $max_login Perangkat/g" /etc/issue.net
         echo -e "${GREEN}SUKSES! Batas menjadi ${max_login} perangkat (cron autokill + banner diperbarui).${NC}"

@@ -31,11 +31,27 @@ echo -e "
 crontab -l | grep -v "autokill.sh" | crontab -
 echo -e "${GREEN}Cronjob berhasil dihapus.${NC}"
 
-echo -e "
-[*] Menghapus file skrip..."
+echo -e "[*] Menonaktifkan Banner SSH..."
+if grep -qE "^\s*Banner" /etc/ssh/sshd_config; then
+    sed -i "/^\s*Banner/d" /etc/ssh/sshd_config
+    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+fi
+echo -e "${GREEN}Banner SSH dinonaktifkan.${NC}"
+
+echo -e ""
+echo -e "[*] Menghapus file skrip..."
 read -p "Apakah Anda ingin menghapus file menu.sh, ws.py, autokill.sh, dan install.sh? (y/n): " hapus_file
 if [[ "$hapus_file" =~ ^[Yy]$ ]]; then
     rm -f menu.sh ws.py autokill.sh install.sh autokill_v2.sh
+    read -p "Hapus juga data (issue.net, ws.log, autokill.log, backup, slot banner, conf)? (y/N): " hapus_data
+    if [[ "$hapus_data" =~ ^[Yy]$ ]]; then
+        rm -f /etc/issue.net /root/autokill.log /root/backup_akun_ssh.sh
+        rm -rf /root/natssh/banners /root/natssh/ws.log
+        rm -f /root/natssh/host.conf /root/natssh/port.conf /root/natssh/ip.conf
+        echo -e "${GREEN}Data banner/log/backup terhapus.${NC}"
+    else
+        echo -e "${YELLOW}Data dipertahankan.${NC}"
+    fi
     echo -e "${GREEN}File skrip berhasil dihapus dari direktori saat ini.${NC}"
 else
     echo -e "${YELLOW}File skrip tetap dipertahankan.${NC}"

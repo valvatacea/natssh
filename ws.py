@@ -16,6 +16,7 @@ WS_PORT = int(os.environ.get("NATSSH_WS_PORT", "20865"))  # port publik NAT (Clo
 SSH_PORT = int(os.environ.get("NATSSH_SSH_PORT", "22"))   # sshd lokal
 MAX_PER_IP = int(os.environ.get("NATSSH_MAX_PER_IP", "10"))
 MAX_TOTAL = int(os.environ.get("NATSSH_MAX_TOTAL", "30"))
+IDLE_TIMEOUT = int(os.environ.get("NATSSH_IDLE_TIMEOUT", "300"))  # detik tanpa data -> putuskan
 MAX_LOG_SIZE = 512_000  # 500 KB, selaras autokill.sh
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ws.log")
@@ -99,6 +100,9 @@ def handle_client(client_socket, ip):
         ssh_socket.settimeout(10)
         ssh_socket.connect(("127.0.0.1", SSH_PORT))
         ssh_socket.settimeout(None)
+        # idle-timeout dua arah: soket diem IDLE_TIMEOUT detik -> putus, slot lepas
+        client_socket.settimeout(IDLE_TIMEOUT)
+        ssh_socket.settimeout(IDLE_TIMEOUT)
         _log(f"JEMBAT {ip} (total={_total})")
         t_back = threading.Thread(target=forward,
                                   args=(ssh_socket, client_socket), daemon=True)
