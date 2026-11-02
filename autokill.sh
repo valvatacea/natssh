@@ -1,5 +1,5 @@
 #!/bin/bash
-MAX_LOGIN="${MAX_LOGIN:-5}" # batas perangkat; env MAX_LOGIN dari cron/installer (hitungan sesi/2)
+MAX_LOGIN="${MAX_LOGIN:-5}" # batas perangkat global; env MAX_LOGIN disuntik cron; khusus per akun di limits/<user>
 
 LOG_FILE="/root/autokill.log"
 MAX_LOG_SIZE=512000 # 500KB
@@ -24,7 +24,7 @@ ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uni
     if id "$user" &>/dev/null; then
         shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
         devices=$count
-        # batas khusus per akun (limits/<user>, 1-20) menimpa global
+        # batas khusus per akun (limits/<user>, angka >= 1 bebas) menimpa global
         limit="$MAX_LOGIN"
         if [ -f "$LIMITS_DIR/$user" ]; then
             khusus=$(cat "$LIMITS_DIR/$user" 2>/dev/null)
