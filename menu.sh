@@ -175,7 +175,7 @@ akun_daftar() {
             2) do_unsuspend "$user"; pause; continue ;;
             3) do_perpanjang "$user"; pause; continue ;;
             4) do_hapus "$user"; pause; continue ;;
-            0) return ;;
+            0) continue ;;   # kembali ke DAFTAR (label), bukan keluar browser
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
     done
