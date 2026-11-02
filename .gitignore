@@ -9,3 +9,4 @@ limits/
 conns.json
 audit_sess.log
 audit_state.json
+host_cf.conf

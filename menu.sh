@@ -57,10 +57,12 @@ akun_baru() {
             if [ "$host" != "$ipaddr" ]; then
                 echo "Domain    : $host"
             fi
+            local hostcf=$(cat /root/natssh/host_cf.conf 2>/dev/null)
+            [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
             echo "IP        : $ipaddr"
             echo "Port WS   : $cfport (via Cloudflare)"
-            echo "            Cloudflare : 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
-            echo "            CloudFront : 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443 (HTTPS)"
+            echo "Cloudflare: 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
+            echo "CloudFront: 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443 (HTTPS)"
             echo "Port NAT  : ${wsport:-20865} (cadangan, koneksi langsung tanpa Cloudflare)"
             echo "Username  : $user"
             echo "Password  : $pass"
@@ -470,6 +472,23 @@ conf_maxlogin() {
     fi
 }
 
+conf_domain_cf() {
+    # domain CloudFront (jalur AWS) utk kartu akun; host_cf.conf — opsional
+    local cur=$(cat /root/natssh/host_cf.conf 2>/dev/null)
+    echo -e "Domain CloudFront saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
+    read -p "Domain CloudFront baru (kosong = hapus/sembunyikan, 0 = batal): " h
+    [ "$h" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if [ -z "$h" ]; then
+        rm -f /root/natssh/host_cf.conf
+        echo -e "${GREEN}Domain CloudFront dihapus — baris 'Domain CF' tak tampil di kartu.${NC}"
+    elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}(:[0-9]+)?$ ]]; then
+        echo -e "${RED}Gagal: format domain salah (contoh: dabcdefgh.cloudfront.net)!${NC}"
+    else
+        echo "$h" > /root/natssh/host_cf.conf
+        echo -e "${GREEN}Domain CloudFront tersimpan: $h — muncul di baris 'Domain CF' kartu akun.${NC}"
+    fi
+}
+
 conf_port() {
     cur_port=$(port_ws)
     if [ -z "$cur_port" ]; then
@@ -702,14 +721,16 @@ menu_conf() {
         echo "3. Ubah Domain/Host di Kartu Akun"
         echo "4. Ubah Banner Pelanggan"
         echo "5. Ubah Maks Koneksi Serentak (MAX_TOTAL)"
+        echo "6. Ubah Domain CloudFront (kartu akun)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-5): " p || exit 0
+        read -p "Pilih (0-6): " p || exit 0
         case $p in
             1) conf_maxlogin ;;
             2) conf_port ;;
             3) conf_domain ;;
             4) conf_banner ;;
             5) conf_maxtotal ;;
+            6) conf_domain_cf ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
