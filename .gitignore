@@ -1,2 +1,4 @@
 ws.log
 banners/
+__pycache__/
+*.pyc
