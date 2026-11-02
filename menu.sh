@@ -192,23 +192,26 @@ do_limit() {
     [ -f "$lfile" ] && khusus=$(cat "$lfile" 2>/dev/null)
     echo -e "Batas login global : ${YELLOW}${global}${NC} perangkat"
     if [ -n "$khusus" ]; then
-        echo -e "Batas khusus akun  : ${GREEN}${khusus}${NC} perangkat (aktif)"
+        local disp="${khusus} perangkat (aktif)"
+        [ "$khusus" == "unlimited" ] && disp="TANPA BATAS (aktif)"
+        echo -e "Batas khusus akun  : ${GREEN}${disp}${NC}"
     else
         echo -e "Batas khusus akun  : ${YELLOW}— (ikut global)${NC}"
     fi
-    read -p "Nilai baru 1-20 (0/Enter = hapus, ikut global): " n
+    read -p "Nilai baru 1-20 atau 'unlimited' (0/Enter = hapus, ikut global): " n
     if [ "$n" == "0" ] || [ -z "$n" ]; then
         rm -f "$lfile"
         echo -e "${GREEN}Batas khusus dihapus — akun ini kembali ikut global (${global}).${NC}"
         return
     fi
-    if ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 1 ] || [ "$n" -gt 20 ]; then
-        echo -e "${RED}Gagal: harus angka 1-20!${NC}"
+    if [ "$n" != "unlimited" ] && { ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 1 ] || [ "$n" -gt 20 ]; }; then
+        echo -e "${RED}Gagal: harus angka 1-20 atau 'unlimited'!${NC}"
         return
     fi
     mkdir -p "$selfdir/limits"
     echo "$n" > "$lfile"
-    echo -e "${GREEN}SUKSES! Batas khusus akun $1: ${n} perangkat (autokill pakai ini, bukan global ${global}).${NC}"
+    local nn="$n perangkat"; [ "$n" == "unlimited" ] && nn="TANPA BATAS"
+    echo -e "${GREEN}SUKSES! Batas khusus akun $1: ${nn} (autokill pakai ini, bukan global ${global}).${NC}"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - LIMIT: batas khusus $1 = $n perangkat (global $global)" >> /root/autokill.log
 }
 

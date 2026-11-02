@@ -28,6 +28,9 @@ ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uni
         limit="$MAX_LOGIN"
         if [ -f "$LIMITS_DIR/$user" ]; then
             khusus=$(cat "$LIMITS_DIR/$user" 2>/dev/null)
+            if [ "$khusus" == "unlimited" ]; then
+                continue   # TANPA BATAS — akun ini tak pernah ditendang
+            fi
             if [[ "$khusus" =~ ^[0-9]+$ ]] && [ "$khusus" -ge 1 ] && [ "$khusus" -le 20 ]; then
                 limit="$khusus"
             fi
