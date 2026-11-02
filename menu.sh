@@ -198,14 +198,14 @@ do_limit() {
     else
         echo -e "Batas khusus akun  : ${YELLOW}— (ikut global)${NC}"
     fi
-    read -p "Nilai baru 1-20 atau 'unlimited' (0/Enter = hapus, ikut global): " n
+    read -p "Nilai baru (angka >= 1, bebas) atau 'unlimited' (0/Enter = hapus, ikut global): " n
     if [ "$n" == "0" ] || [ -z "$n" ]; then
         rm -f "$lfile"
         echo -e "${GREEN}Batas khusus dihapus — akun ini kembali ikut global (${global}).${NC}"
         return
     fi
-    if [ "$n" != "unlimited" ] && { ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 1 ] || [ "$n" -gt 20 ]; }; then
-        echo -e "${RED}Gagal: harus angka 1-20 atau 'unlimited'!${NC}"
+    if [ "$n" != "unlimited" ] && { ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 1 ]; }; then
+        echo -e "${RED}Gagal: harus angka >= 1 atau 'unlimited' (0/negatif = bahaya, ditolak)!${NC}"
         return
     fi
     mkdir -p "$selfdir/limits"

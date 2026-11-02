@@ -31,8 +31,8 @@ ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uni
             if [ "$khusus" == "unlimited" ]; then
                 continue   # TANPA BATAS — akun ini tak pernah ditendang
             fi
-            if [[ "$khusus" =~ ^[0-9]+$ ]] && [ "$khusus" -ge 1 ] && [ "$khusus" -le 20 ]; then
-                limit="$khusus"
+            if [[ "$khusus" =~ ^[0-9]+$ ]] && [ "$khusus" -ge 1 ]; then
+                limit="$khusus"   # angka berapapun >= 1 (tak dibatasi 20)
             fi
         fi
         if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$limit" ]; then
