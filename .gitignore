@@ -7,3 +7,5 @@ port.conf
 ip.conf
 limits/
 conns.json
+audit_sess.log
+audit_state.json

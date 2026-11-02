@@ -320,6 +320,19 @@ ws_klien() {
     echo -e "Total JEMBAT tercatat: $(grep -c " JEMBAT " "$log") | Catatan: log pra-patch tak membawa UA/IP-asli"
 }
 
+ws_riwayat_sesi() {
+    # riwayat MULAI/SELESAI per user (dibangun cron sess_audit tiap 2 mnt)
+    local log=$(dirname "${BASH_SOURCE[0]}")/audit_sess.log
+    if [ ! -s "$log" ]; then
+        echo -e "${RED}Belum ada riwayat sesi (audit berjalan tiap 2 menit).${NC}"
+        return
+    fi
+    echo -e "${YELLOW}--- RIWAYAT SESI PER USER (15 terakhir) ---${NC}"
+    tail -15 "$log" | sed 's/MULAI  /\033[32mMULAI \033[0m/;s/SELESAI /\033[33mSELESAI\033[0m/'
+    echo ""
+    echo -e "Total baris: $(wc -l < "$log") | catatan: sesi < 2 mnt bisa lolos tak tercatat"
+}
+
 ws_peruser() {
     # Sanding waktu: sesi "sshd: user" (lstart) <-> koneksi bridge (conns.json:
     # IP asli, aplikasi, durasi, byte up/down; fallback ws.log pra-patch).
@@ -359,8 +372,9 @@ menu_monitor() {
         echo "5. Puncak Koneksi WebSocket (slot)"
         echo "6. Koneksi Klien Terakhir (IP asli + aplikasi)"
         echo "7. Perangkat per Akun (IP, aplikasi, durasi, trafik)"
+        echo "8. Riwayat Sesi per User (audit MULAI/SELESAI)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-7): " p || exit 0
+        read -p "Pilih (0-8): " p || exit 0
         case $p in
             1) sessi_online ;;
             2) autokill_manual ;;
@@ -369,6 +383,7 @@ menu_monitor() {
             5) ws_peak ;;
             6) ws_klien ;;
             7) ws_peruser ;;
+            8) ws_riwayat_sesi ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
