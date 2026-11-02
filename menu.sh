@@ -57,41 +57,10 @@ akun_baru() {
 }
 
 akun_hapus() {
-    # daftar akun jualan bernomor -> pilih nomor urut ATAU ketik username
-    local users=()
-    while read u; do users+=("$u"); done < <(awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd)
-    if [ ${#users[@]} -eq 0 ]; then
-        echo -e "${RED}Tidak ada akun untuk dihapus.${NC}"
-        return
-    fi
-    echo -e "${YELLOW}--- DAFTAR AKUN (pilih nomor, atau ketik username) ---${NC}"
-    for i in "${!users[@]}"; do
-        u=${users[$i]}
-        exp=$(chage -l "$u" | grep "Account expires" | awk -F": " '{print $2}')
-        status=$(passwd -S "$u" | awk '{print $2}')
-        st=""; [ "$status" == "L" ] && st=" ${RED}[LOCKED]${NC}"
-        echo -e "$((i+1)). ${CYAN}$u${NC} | Exp: ${YELLOW}$exp${NC}$st"
-    done
-    read -p "Hapus nomor urut / username (0 = batal): " pilih
-    [ -z "$pilih" ] && return
-    [ "$pilih" == "0" ] && return
-    user=""
-    if [[ "$pilih" =~ ^[0-9]+$ ]]; then
-        if [ "$pilih" -ge 1 ] && [ "$pilih" -le ${#users[@]} ]; then
-            user=${users[$((pilih-1))]}
-        else
-            echo -e "${RED}Gagal: nomor $pilih di luar daftar!${NC}"
-            return
-        fi
-    else
-        user="$pilih"
-    fi
-    if ! id "$user" &>/dev/null; then
-        echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
-        return
-    fi
-    exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
-    online=$(ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | grep -c "^$user$")
+    pilih_akun "Hapus akun" || return
+    local user="$AKUN"
+    local exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
+    local online=$(ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | grep -c "^$user$")
     echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: $((online/2)) perangkat)"
     read -p "Yakin hapus? (y/N): " yakin
     if [[ "$yakin" =~ ^[Yy]$ ]]; then
@@ -103,27 +72,63 @@ akun_hapus() {
     fi
 }
 
-akun_perpanjang() {
-    # Dihitung dari tanggal expired AKUN (bukan hari ini) — sisa pelanggan tak hangus
-    read -p "Masukkan Username : " user
-    if id "$user" &>/dev/null; then
-        read -p "Tambah Masa Aktif (Hari) : " aktif
-        if ! [[ "$aktif" =~ ^[0-9]+$ ]]; then
-            echo -e "${RED}Gagal: jumlah hari harus angka!${NC}"
+pilih_akun() {
+    # Cetak daftar akun jualan bernomor -> set global AKUN; return 1 bila batal/kosong/salah
+    AKUN=""
+    local users=()
+    while read u; do users+=("$u"); done < <(awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd)
+    if [ ${#users[@]} -eq 0 ]; then
+        echo -e "${RED}Tidak ada akun jualan.${NC}"
+        return 1
+    fi
+    echo -e "${YELLOW}--- DAFTAR AKUN ---${NC}"
+    local i u exp status st
+    for i in "${!users[@]}"; do
+        u=${users[$i]}
+        exp=$(chage -l "$u" | grep "Account expires" | awk -F": " '{print $2}')
+        status=$(passwd -S "$u" | awk '{print $2}')
+        st=""; [ "$status" == "L" ] && st=" ${RED}[LOCKED]${NC}"
+        echo -e "$((i+1)). ${CYAN}$u${NC} | Exp: ${YELLOW}$exp${NC}$st"
+    done
+    read -p "$1 (nomor / username, 0 = batal): " pilih
+    [ -z "$pilih" ] && return 1
+    [ "$pilih" == "0" ] && return 1
+    if [[ "$pilih" =~ ^[0-9]+$ ]]; then
+        if [ "$pilih" -ge 1 ] && [ "$pilih" -le ${#users[@]} ]; then
+            AKUN=${users[$((pilih-1))]}
         else
-            cur_exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
-            base=$(date +%s)
-            if [ "$cur_exp" != "never" ] && [ -n "$cur_exp" ]; then
-                exp_sec=$(date -d "$cur_exp" +%s 2>/dev/null || echo 0)
-                [ "$exp_sec" -gt "$base" ] && base=$exp_sec
-            fi
-            exp=$(date -d "@$(( base + aktif * 86400 ))" +"%Y-%m-%d")
-            chage -E "$exp" "$user"
-            echo -e "${GREEN}SUKSES! Masa aktif $user diperpanjang hingga $exp.${NC}"
+            echo -e "${RED}Gagal: nomor $pilih di luar daftar!${NC}"
+            return 1
         fi
     else
-        echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
+        AKUN="$pilih"
     fi
+    if ! id "$AKUN" &>/dev/null; then
+        echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
+        return 1
+    fi
+    return 0
+}
+
+akun_perpanjang() {
+    # Dihitung dari tanggal expired AKUN (bukan hari ini) — sisa pelanggan tak hangus
+    pilih_akun "Perpanjang akun" || return
+    local user="$AKUN"
+    read -p "Tambah Masa Aktif (Hari) (0 = batal): " aktif
+    [ "$aktif" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if ! [[ "$aktif" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}Gagal: jumlah hari harus angka!${NC}"
+        return
+    fi
+    local cur_exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
+    local base=$(date +%s)
+    if [ "$cur_exp" != "never" ] && [ -n "$cur_exp" ]; then
+        local exp_sec=$(date -d "$cur_exp" +%s 2>/dev/null || echo 0)
+        [ "$exp_sec" -gt "$base" ] && base=$exp_sec
+    fi
+    local exp=$(date -d "@$(( base + aktif * 86400 ))" +"%Y-%m-%d")
+    chage -E "$exp" "$user"
+    echo -e "${GREEN}SUKSES! Masa aktif $user diperpanjang hingga $exp.${NC}"
 }
 
 akun_daftar() {
@@ -137,23 +142,17 @@ akun_daftar() {
 }
 
 akun_suspend() {
-    read -p "Masukkan Username yang akan dikunci: " user
-    if id "$user" &>/dev/null; then
-        usermod -L "$user"
-        echo -e "${GREEN}SUKSES! Akun $user telah dikunci sementara.${NC}"
-    else
-        echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
-    fi
+    pilih_akun "Suspend akun" || return
+    local user="$AKUN"
+    usermod -L "$user"
+    echo -e "${GREEN}SUKSES! Akun $user dikunci (suspend) — pelanggan tak bisa login.${NC}"
 }
 
 akun_unsuspend() {
-    read -p "Masukkan Username yang akan dibuka kuncinya: " user
-    if id "$user" &>/dev/null; then
-        usermod -U "$user"
-        echo -e "${GREEN}SUKSES! Akun $user telah dibuka kuncinya dan bisa login kembali.${NC}"
-    else
-        echo -e "${RED}Gagal: Username tidak ditemukan!${NC}"
-    fi
+    pilih_akun "Unsuspend akun" || return
+    local user="$AKUN"
+    usermod -U "$user"
+    echo -e "${GREEN}SUKSES! Akun $user dibuka kuncinya — bisa login kembali.${NC}"
 }
 
 akun_autoclean() {
