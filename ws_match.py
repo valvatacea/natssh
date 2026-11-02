@@ -158,14 +158,22 @@ for user, ep in [(u, int(e)) for u, e in raw]:
 
 recap()
 
-# seksi riwayat: sesi yg sudah berakhir (audit cron), terbaru di bawah
+# seksi riwayat: sesi yg sudah berakhir (audit cron), DIKELOMPOKKAN PER AKUN,
+# akun diurut dari aktivitas terbaru, tiap akun 5 sesi terakhir
 if riwayat:
+    groups: dict[str, list] = {}
+    for r in riwayat:
+        groups.setdefault(r[1], []).append(r)
+    urut = sorted(groups, key=lambda u: groups[u][-1][0], reverse=True)
+    total = sum(len(v) for v in groups.values())
     print()
-    print(f"   {C_DIM}── RIWAYAT SELESAI ({len(riwayat)} sesi, 12 terakhir) ──{C_RESET}")
-    for r in riwayat[-12:]:
-        t, user, ip, edge, cc, city, dur, up, down, ua = r
-        jalur = f" {C_DIM}[{cdn_label(edge)}]{C_RESET}" if edge not in ("-", "") else ""
-        geo = f" {C_DIM}{city}{(' ' + cc) if cc != '-' else ''}{C_RESET}" if city != "-" else ""
-        ua_show = (ua or "-")[:14]
-        print(f"   {t[11:]} {user:<10} {ip:<16} {ua_show:<14} {dur:>7} "
-              f"{up}\u2191{down}\u2193{C_RESET} {jalur}{geo}")
+    print(f"   {C_DIM}── RIWAYAT SELESAI per akun ({total} sesi tercatat, 5 terakhir/akun) ──{C_RESET}")
+    for user in urut:
+        rows = groups[user][-5:]
+        print(f"   {C_CYAN}{user}{C_RESET} {C_DIM}({len(groups[user])} sesi){C_RESET}")
+        for r in rows:
+            t, u, ip, edge, cc, city, dur, up, down, ua = r
+            jalur = f" {C_DIM}[{cdn_label(edge)}]{C_RESET}" if edge not in ("-", "") else ""
+            geo = f" {C_DIM}{city}{(' ' + cc) if cc != '-' else ''}{C_RESET}" if city != "-" else ""
+            print(f"   {t[11:]}   {ip:<16} {(ua or '-')[:14]:<14} {dur:>7} "
+                  f"{up}\u2191{down}\u2193{C_RESET} {jalur}{geo}")
