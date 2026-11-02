@@ -321,80 +321,29 @@ ws_klien() {
 }
 
 ws_peruser() {
-    # Sanding waktu: sesi "sshd: user" (start proses) <-> JEMBAT ws.log (IP asli + UA)
-    # Jembatan tak bisa baca username (SSH terenkripsi post-KEX) — cocokkan ±10 dtk, label kemungkinan.
-    local log=$(dirname "${BASH_SOURCE[0]}")/ws.log
-    echo -e "${YELLOW}--- PERANGKAT PER AKUN (korelasi waktu) ---${NC}"
-    # akun jualan online
-    local online_users=$(ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | awk '$2!="" {print $2}' | sort -u)
-    local any=0
+    # Sanding waktu: sesi "sshd: user" (lstart) <-> koneksi bridge (conns.json:
+    # IP asli, aplikasi, durasi, byte up/down; fallback ws.log pra-patch).
+    # Username SSH tak terbaca jembatan (terenkripsi post-KEX) -> -2..+10 dtk, kemungkinan.
+    local dir=$(dirname "${BASH_SOURCE[0]}")
+    local rows=""
     while read -r user; do
+        [ -z "$user" ] && continue
         local shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
         [ "$shell" == "/bin/false" ] || continue
-        any=1
-        echo -e "${CYAN}${user}${NC}"
         for pid in $(pgrep -u "$user" sshd); do
             local st=$(ps -o lstart= -p "$pid" 2>/dev/null | sed 's/^ *//')
             [ -z "$st" ] && continue
-            local t0=$(date -d "$st" +%s 2>/dev/null)
-            echo -n "  sesi $(date -d "@$t0" +%H:%M:%S 2>/dev/null): "
-            if [ -f "$log" ]; then
-                local best="" bestd=9999
-                while read -r jt rjip rest; do
-                    local jt2=$(date -d "$jt $rjip" +%s 2>/dev/null) || continue
-                    local rip=$(echo "$rest" | awk '{print $2}')
-                    local rua=$(echo "$rest" | grep -o "ua='[^']*'" | sed "s/ua='//;s/'$//")
-                    local d=$(( t0 - jt2 ))
-                    if [ $d -ge -2 ] && [ $d -le 10 ] && [ $d -lt $bestd ]; then
-                        bestd=$d; best="${rip}|${rua}"
-                    fi
-                done < <(grep " JEMBAT " "$log"; echo "")
-                if [ -n "$best" ]; then
-                    local bip=${best%%|*}
-                    local bua=${best#*|}
-                    echo -e "${GREEN}${bip}${NC} ${bua}"
-                else
-                    echo -e "${RED}tak ada JEMBAT ±10 dtk (pra-patch / via NAT-era lama)${NC}"
-                fi
-            else
-                echo -e "${RED}ws.log tak ada${NC}"
-            fi
+            local ep=$(date -d "$st" +%s 2>/dev/null)
+            [ -z "$ep" ] && continue
+            rows+="$user $ep\n"
         done
-    done <<< "$online_users"
-    [ $any -eq 0 ] && echo -e "${YELLOW}Tidak ada akun jualan yang sedang online.${NC}"
-    echo ""
-    echo -e "Penyandingan = ${YELLOW}kemungkinan${NC} (toleransi -2..+10 dtk, koneksi berbarengan bisa tertukar)."
-}
-
-ws_traffic() {
-    # detail koneksi live + terakhir: IP asli, aplikasi, durasi, upload/download (conns.json dari ws.py)
-    local cf=$(dirname "${BASH_SOURCE[0]}")/conns.json
-    if [ ! -f "$cf" ]; then
-        echo -e "${RED}Belum ada conns.json — bridge baru start?${NC}"
+    done < <(ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort -u)
+    if [ -z "$rows" ]; then
+        echo -e "${YELLOW}Tidak ada akun jualan yang sedang online.${NC}"
         return
     fi
-    python3 - "$cf" <<'PYEOF2'
-import json, sys, time
-d = json.load(open(sys.argv[1]))
-now = time.time()
-def dur(c, live):
-    s = (now if live else c.get("end", now)) - c["start"]
-    return f"{int(s//60)}m{int(s%60):02d}s"
-def row(c, live):
-    t = time.strftime("%H:%M:%S", time.localtime(c["start"]))
-    return (f"  {t}  {c['ip']:<16} {(c['ua'] or '-')[:26]:<27} "
-            f"{dur(c, live):>7}  {c['up']/1048576:6.2f}MB  {c['down']/1048576:6.2f}MB  "
-            f"{'LIVE' if live else time.strftime('%H:%M', time.localtime(c.get('end', now)))}")
-live = d.get("live", [])
-print(f"--- KONEKSI LIVE: {len(live)} ---")
-print("  WAKTU    IP-ASLI           APLIKASI                   DURASI    UP       DOWN     AKHIR")
-for c in sorted(live, key=lambda x: -x["start"]):
-    print(row(c, True))
-last = d.get("last", [])[-10:]
-print(f"--- {len(last)} TERAKHIR SELESAI (dari {len(d.get('last', []))}) ---")
-for c in reversed(last):
-    print(row(c, False))
-PYEOF2
+    echo -e "${YELLOW}--- PERANGKAT PER AKUN (korelasi waktu) ---${NC}"
+    printf '%b' "$rows" | python3 "$dir/ws_match.py" "$dir/conns.json" "$dir/ws.log"
 }
 
 menu_monitor() {
@@ -409,10 +358,9 @@ menu_monitor() {
         echo "4. Status RAM / CPU / Disk"
         echo "5. Puncak Koneksi WebSocket (slot)"
         echo "6. Koneksi Klien Terakhir (IP asli + aplikasi)"
-        echo "7. Perangkat per Akun (IP kemungkinan per sesi)"
-        echo "8. Detail Koneksi + Trafik (live & selesai)"
+        echo "7. Perangkat per Akun (IP, aplikasi, durasi, trafik)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-8): " p || exit 0
+        read -p "Pilih (0-7): " p || exit 0
         case $p in
             1) sessi_online ;;
             2) autokill_manual ;;
@@ -421,7 +369,6 @@ menu_monitor() {
             5) ws_peak ;;
             6) ws_klien ;;
             7) ws_peruser ;;
-            8) ws_traffic ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
