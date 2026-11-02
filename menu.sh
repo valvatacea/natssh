@@ -193,28 +193,29 @@ do_limit() {
     echo -e "Batas login global : ${YELLOW}${global}${NC} perangkat"
     if [ -n "$khusus" ]; then
         local disp="${khusus} perangkat (aktif)"
-        [ "$khusus" == "unlimited" ] && disp="TANPA BATAS (aktif)"
+        [ "$khusus" == "unlimited" ] && disp="TANPA BATAS (aktif)"   # toleransi file manual
         echo -e "Batas khusus akun  : ${GREEN}${disp}${NC}"
     else
         echo -e "Batas khusus akun  : ${YELLOW}— (ikut global)${NC}"
     fi
-    read -p "Nilai baru (angka >= 1, bebas) atau 'unlimited' (0/Enter = hapus, ikut global): " n
-    if [ "$n" == "0" ] || [ -z "$n" ]; then
+    read -p "Nilai baru (angka bebas; di bawah 1 / kosong = ikut global ${global}): " n
+    if [[ "$n" =~ ^-?[0-9]+$ ]] && [ "$n" -lt 1 ]; then
+        rm -f "$lfile"
+        echo -e "${GREEN}Di bawah 1 → akun ini ikut global (${global} perangkat).${NC}"
+        return
+    fi
+    if [ -z "$n" ]; then
         rm -f "$lfile"
         echo -e "${GREEN}Batas khusus dihapus — akun ini kembali ikut global (${global}).${NC}"
         return
     fi
-    if [ "$n" != "unlimited" ] && ! [[ "$n" =~ ^-?[0-9]+$ || "$n" =~ ^[0-9]+$ ]]; then
-        echo -e "${RED}Gagal: harus angka atau 'unlimited'!${NC}"
+    if ! [[ "$n" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}Gagal: harus angka!${NC}"
         return
-    fi
-    if [[ "$n" =~ ^- ]]; then
-        echo -e "${YELLOW}Angka di bawah 1 → otomatis jadi 1.${NC}"
-        n=1
     fi
     mkdir -p "$selfdir/limits"
     echo "$n" > "$lfile"
-    local nn="$n perangkat"; [ "$n" == "unlimited" ] && nn="TANPA BATAS"
+    local nn="$n perangkat"
     echo -e "${GREEN}SUKSES! Batas khusus akun $1: ${nn} (autokill pakai ini, bukan global ${global}).${NC}"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - LIMIT: batas khusus $1 = $n perangkat (global $global)" >> /root/autokill.log
 }
