@@ -60,6 +60,16 @@ def _release(ip: str) -> None:
         _total = max(0, _total - 1)
 
 
+def _header(req: str, name: str) -> str:
+    """Ambil nilai header HTTP dari paket upgrade; case-insensitive."""
+    for line in req.split("\r\n"):
+        if ":" in line:
+            k, v = line.split(":", 1)
+            if k.strip().lower() == name.lower():
+                return v.strip()
+    return ""
+
+
 def forward(src, dst):
     """Salur satu arah; tutup dua-duanya saat satu arah berhenti."""
     try:
@@ -96,6 +106,10 @@ def handle_client(client_socket, ip):
             client_socket.send(b"HTTP/1.1 101 Switching Protocols\r\n"
                               b"Upgrade: websocket\r\n"
                               b"Connection: Upgrade\r\n\r\n")
+        # Cloudflare menyuntikkan IP asli pelanggan di header paket upgrade;
+        # UA = aplikasi klien (Dark Tunnel/injektor dkk.)
+        real_ip = _header(request, "CF-Connecting-IP") or ip
+        ua = _header(request, "User-Agent")[:48]
         ssh_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         ssh_socket.settimeout(10)
         ssh_socket.connect(("127.0.0.1", SSH_PORT))
@@ -103,7 +117,7 @@ def handle_client(client_socket, ip):
         # idle-timeout dua arah: soket diem IDLE_TIMEOUT detik -> putus, slot lepas
         client_socket.settimeout(IDLE_TIMEOUT)
         ssh_socket.settimeout(IDLE_TIMEOUT)
-        _log(f"JEMBAT {ip} (total={_total})")
+        _log(f"JEMBAT {real_ip} (edge={ip}, ua='{ua}', total={_total})")
         t_back = threading.Thread(target=forward,
                                   args=(ssh_socket, client_socket), daemon=True)
         t_back.start()

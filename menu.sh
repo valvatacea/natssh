@@ -301,6 +301,25 @@ ws_peak() {
     fi
 }
 
+ws_klien() {
+    # riwayat koneksi dari ws.log — IP asli pelanggan (CF-Connecting-IP) + aplikasi klien
+    local log=$(dirname "${BASH_SOURCE[0]}")/ws.log
+    if [ ! -f "$log" ]; then
+        echo -e "${RED}Belum ada log ws.log.${NC}"
+        return
+    fi
+    echo -e "${YELLOW}--- KONEKSI KLIEN TERAKHIR (10) ---${NC}"
+    echo -e "WAKTU             IP ASLI           APLIKASI"
+    grep " JEMBAT " "$log" | tail -10 | while read -r tgl wkt tag ip rest; do
+        edge=$(echo "$rest" | grep -o "edge=[0-9.]*" | cut -d= -f2)
+        ua=$(echo "$rest" | grep -o "ua='[^']*'" | sed "s/ua='//;s/'$//")
+        [ -z "$ua" ] && ua="(tanpa UA/tak via CF)"
+        printf "%s %s  %-16s  %s\n" "$tgl" "$wkt" "$ip" "$ua"
+    done
+    echo ""
+    echo -e "Total JEMBAT tercatat: $(grep -c " JEMBAT " "$log") | Catatan: log pra-patch tak membawa UA/IP-asli"
+}
+
 menu_monitor() {
     while true; do
         clear
@@ -312,14 +331,16 @@ menu_monitor() {
         echo "3. Riwayat Autokill"
         echo "4. Status RAM / CPU / Disk"
         echo "5. Puncak Koneksi WebSocket (slot)"
+        echo "6. Koneksi Klien Terakhir (IP asli + aplikasi)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-5): " p || exit 0
+        read -p "Pilih (0-6): " p || exit 0
         case $p in
             1) sessi_online ;;
             2) autokill_manual ;;
             3) autokill_riwayat ;;
             4) status_sistem ;;
             5) ws_peak ;;
+            6) ws_klien ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
