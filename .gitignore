@@ -6,3 +6,4 @@ host.conf
 port.conf
 ip.conf
 limits/
+conns.json

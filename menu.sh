@@ -366,6 +366,37 @@ ws_peruser() {
     echo -e "Penyandingan = ${YELLOW}kemungkinan${NC} (toleransi -2..+10 dtk, koneksi berbarengan bisa tertukar)."
 }
 
+ws_traffic() {
+    # detail koneksi live + terakhir: IP asli, aplikasi, durasi, upload/download (conns.json dari ws.py)
+    local cf=$(dirname "${BASH_SOURCE[0]}")/conns.json
+    if [ ! -f "$cf" ]; then
+        echo -e "${RED}Belum ada conns.json — bridge baru start?${NC}"
+        return
+    fi
+    python3 - "$cf" <<'PYEOF2'
+import json, sys, time
+d = json.load(open(sys.argv[1]))
+now = time.time()
+def dur(c, live):
+    s = (now if live else c.get("end", now)) - c["start"]
+    return f"{int(s//60)}m{int(s%60):02d}s"
+def row(c, live):
+    t = time.strftime("%H:%M:%S", time.localtime(c["start"]))
+    return (f"  {t}  {c['ip']:<16} {(c['ua'] or '-')[:26]:<27} "
+            f"{dur(c, live):>7}  {c['up']/1048576:6.2f}MB  {c['down']/1048576:6.2f}MB  "
+            f"{'LIVE' if live else time.strftime('%H:%M', time.localtime(c.get('end', now)))}")
+live = d.get("live", [])
+print(f"--- KONEKSI LIVE: {len(live)} ---")
+print("  WAKTU    IP-ASLI           APLIKASI                   DURASI    UP       DOWN     AKHIR")
+for c in sorted(live, key=lambda x: -x["start"]):
+    print(row(c, True))
+last = d.get("last", [])[-10:]
+print(f"--- {len(last)} TERAKHIR SELESAI (dari {len(d.get('last', []))}) ---")
+for c in reversed(last):
+    print(row(c, False))
+PYEOF2
+}
+
 menu_monitor() {
     while true; do
         clear
@@ -379,8 +410,9 @@ menu_monitor() {
         echo "5. Puncak Koneksi WebSocket (slot)"
         echo "6. Koneksi Klien Terakhir (IP asli + aplikasi)"
         echo "7. Perangkat per Akun (IP kemungkinan per sesi)"
+        echo "8. Detail Koneksi + Trafik (live & selesai)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-7): " p || exit 0
+        read -p "Pilih (0-8): " p || exit 0
         case $p in
             1) sessi_online ;;
             2) autokill_manual ;;
@@ -389,6 +421,7 @@ menu_monitor() {
             5) ws_peak ;;
             6) ws_klien ;;
             7) ws_peruser ;;
+            8) ws_traffic ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac

@@ -7,6 +7,9 @@ maks MAX_PER_IP koneksi concurrent per IP dan MAX_TOTAL keseluruhan;
 sisanya ditutup sebelum menyentuh sshd, dan dicatat.
 """
 
+import collections
+import itertools
+import json
 import os
 import socket
 import threading
@@ -60,6 +63,29 @@ def _release(ip: str) -> None:
         _total = max(0, _total - 1)
 
 
+_CONNS = {}                      # conn_id -> state koneksi live
+_SEQ = itertools.count(1)
+_LAST = collections.deque(maxlen=100)   # 100 koneksi terakhir selesai
+_last_dump = 0.0
+CONNS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "conns.json")
+
+
+def _dump():
+    global _last_dump
+    with _lock:
+        data = json.dumps({"live": list(_CONNS.values()), "last": list(_LAST)})
+        _last_dump = time.time()
+    tmp = CONNS_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(data)
+    os.replace(tmp, CONNS_FILE)
+
+
+def _maybe_dump():
+    if time.time() - _last_dump > 2.5:
+        _dump()
+
+
 def _header(req: str, name: str) -> str:
     """Ambil nilai header HTTP dari paket upgrade; case-insensitive."""
     for line in req.split("\r\n"):
@@ -70,14 +96,19 @@ def _header(req: str, name: str) -> str:
     return ""
 
 
-def forward(src, dst):
-    """Salur satu arah; tutup dua-duanya saat satu arah berhenti."""
+def forward(src, dst, conn=None, field=None):
+    """Salur satu arah; tutup dua-duanya saat satu arah berhenti.
+    conn/field opsional: menghitung byte lewat (statistik trafik per koneksi)."""
     try:
         while True:
             data = src.recv(4096)
             if not data:
                 break
             dst.send(data)
+            if conn is not None:
+                with _lock:
+                    conn[field] += len(data)
+                _maybe_dump()
     except OSError:
         pass
     finally:
@@ -100,6 +131,8 @@ def handle_client(client_socket, ip):
             except OSError:
                 pass
         return
+    conn = None
+    cid = 0
     try:
         request = client_socket.recv(4096).decode("utf-8", errors="ignore")
         if "HTTP" in request:
@@ -118,10 +151,16 @@ def handle_client(client_socket, ip):
         client_socket.settimeout(IDLE_TIMEOUT)
         ssh_socket.settimeout(IDLE_TIMEOUT)
         _log(f"JEMBAT {real_ip} (edge={ip}, ua='{ua}', total={_total})")
+        conn = {"start": round(time.time(), 3), "ip": real_ip, "edge": ip,
+                "ua": ua, "up": 0, "down": 0}
+        with _lock:
+            cid = next(_SEQ)
+            _CONNS[cid] = conn
+        _dump()
         t_back = threading.Thread(target=forward,
-                                  args=(ssh_socket, client_socket), daemon=True)
+                                  args=(ssh_socket, client_socket, conn, "down"), daemon=True)
         t_back.start()
-        forward(client_socket, ssh_socket)   # blok sampai koneksi selesai
+        forward(client_socket, ssh_socket, conn, "up")   # blok sampai koneksi selesai
         t_back.join(timeout=5)
     except OSError as exc:
         _log(f"GAGAL {ip}: {exc}")
@@ -130,6 +169,11 @@ def handle_client(client_socket, ip):
         except OSError:
             pass
     finally:
+        if conn is not None:
+            with _lock:
+                _LAST.append({**conn, "end": round(time.time(), 3)})
+                _CONNS.pop(cid, None)
+            _dump()
         _release(ip)
 
 
