@@ -586,6 +586,105 @@ conf_domain_edit() {
     fi
 }
 
+conf_service() {
+    while true; do
+        clear
+        garis
+        echo -e "${YELLOW}   KONTROL LAYANAN NATSSH-WS${NC}"
+        garis
+        status=$(systemctl is-active natssh-ws 2>/dev/null)
+        echo -e "Status saat ini: ${GREEN}${status}${NC}"
+        echo ""
+        echo "1. Start"
+        echo "2. Stop"
+        echo "3. Restart"
+        echo -e "${RED}0. Kembali${NC}"
+        read -p "Pilih (0-3): " p || exit 0
+        case $p in
+            1)
+                echo -e "${YELLOW}Menjalankan natssh-ws...${NC}"
+                systemctl start natssh-ws
+                sleep 2
+                systemctl is-active --quiet natssh-ws && echo -e "${GREEN}SUKSES! natssh-ws berjalan.${NC}" || echo -e "${RED}Gagal start!${NC}"
+                pause
+                ;;
+            2)
+                echo -e "${YELLOW}Menghentikan natssh-ws...${NC}"
+                echo -e "${RED}PERINGATAN: Semua koneksi aktif akan terputus!${NC}"
+                read -p "Yakin stop? (y/N): " y
+                if [[ "$y" =~ ^[Yy]$ ]]; then
+                    systemctl stop natssh-ws
+                    sleep 2
+                    systemctl is-active --quiet natssh-ws && echo -e "${RED}Masih berjalan!${NC}" || echo -e "${GREEN}Berhasil dihentikan.${NC}"
+                else
+                    echo -e "${YELLOW}Dibatalkan.${NC}"
+                fi
+                pause
+                ;;
+            3)
+                echo -e "${YELLOW}Me-restart natssh-ws...${NC}"
+                echo -e "${RED}PERINGATAN: Semua koneksi aktif akan terputus!${NC}"
+                read -p "Yakin restart? (y/N): " y
+                if [[ "$y" =~ ^[Yy]$ ]]; then
+                    systemctl restart natssh-ws
+                    sleep 3
+                    systemctl is-active --quiet natssh-ws && echo -e "${GREEN}SUKSES! natssh-ws berjalan kembali.${NC}" || echo -e "${RED}Gagal restart!${NC}"
+                else
+                    echo -e "${YELLOW}Dibatalkan.${NC}"
+                fi
+                pause
+                ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
+        esac
+    done
+}
+
+conf_restart_schedule() {
+    echo -e "${YELLOW}--- JADWAL RESTART OTOMATIS NATSSH-WS ---${NC}"
+    echo ""
+    if crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
+        echo -e "${GREEN}Jadwal saat ini:${NC}"
+        crontab -l | grep "systemctl.*restart.*natssh-ws"
+        echo ""
+        read -p "Hapus jadwal restart? (y/N): " h
+        if [[ "$h" =~ ^[Yy]$ ]]; then
+            crontab -l | grep -v "systemctl.*restart.*natssh-ws" | crontab -
+            echo -e "${GREEN}Jadwal restart dihapus.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Belum ada jadwal restart otomatis.${NC}"
+        echo ""
+        echo "Pilih jadwal:"
+        echo "1. Setiap jam"
+        echo "2. Setiap 6 jam"
+        echo "3. Setiap 12 jam"
+        echo "4. Setiap hari jam 03:00"
+        echo "5. Custom"
+        echo -e "${RED}0. Batal${NC}"
+        read -p "Pilih (0-5): " p
+        case $p in
+            1) (crontab -l 2>/dev/null; echo "0 * * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap jam.${NC}";;
+            2) (crontab -l 2>/dev/null; echo "0 */6 * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap 6 jam.${NC}";;
+            3) (crontab -l 2>/dev/null; echo "0 */12 * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap 12 jam.${NC}";;
+            4) (crontab -l 2>/dev/null; echo "0 3 * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap hari jam 03:00.${NC}";;
+            5)
+                read -p "Masukkan cron (contoh: 0 3 * * *): " cron
+                read -p "Lanjut? (y/N): " y
+                if [[ "$y" =~ ^[Yy]$ ]] && [ -n "$cron" ]; then
+                    (crontab -l 2>/dev/null; echo "$cron /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab -
+                    echo -e "${GREEN}Jadwal custom tersimpan.${NC}"
+                else
+                    echo -e "${YELLOW}Dibatalkan.${NC}"
+                fi
+                ;;
+            0) echo -e "${YELLOW}Dibatalkan.${NC}";;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}";;
+        esac
+    fi
+    pause
+}
+
 conf_maxtotal() {
     # batas koneksi serentak jembatan (Environment=NATSSH_MAX_TOTAL di unit systemd)
     local unit=/etc/systemd/system/natssh-ws.service
@@ -768,14 +867,18 @@ menu_conf() {
         echo "3. Ubah Domain/Host di Kartu Akun"
         echo "4. Ubah Banner Pelanggan"
         echo "5. Ubah Maks Koneksi Serentak (MAX_TOTAL)"
+        echo "6. Kontrol Layanan natssh-ws (Start/Stop/Restart)"
+        echo "7. Atur Jadwal Restart Otomatis"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-5): " p || exit 0
+        read -p "Pilih (0-7): " p || exit 0
         case $p in
             1) conf_maxlogin ;;
             2) conf_port ;;
             3) conf_domain ;;
             4) conf_banner ;;
             5) conf_maxtotal ;;
+            6) conf_service ;;
+            7) conf_restart_schedule ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
