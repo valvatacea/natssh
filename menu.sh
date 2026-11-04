@@ -645,12 +645,12 @@ conf_speed() {
     iface=${iface:-eth0}
     clear
     garis
-    echo -e "${YELLOW}--- ATUR LIMIT SPEED SSH SAJA ---${NC}"
+    echo -e "${YELLOW}--- ATUR LIMIT SPEED SSH SAJA (TBF) ---${NC}"
     garis
     echo -e "Interface: ${GREEN}${iface}${NC}"
     echo -e "Hanya trafik SSH (port 22) yg dibatasi"
     echo ""
-    if tc class show dev $iface 2>/dev/null | grep -q "class htb.*1:10"; then
+    if tc qdisc show dev $iface 2>/dev/null | grep -q "tbf"; then
         echo -e "${GREEN}Limit SSH AKTIF:${NC}"
         if [ -f /root/natssh/speed.conf ]; then
             grep -E "^UP=|^DOWN=" /root/natssh/speed.conf | sed 's/UP=/  Upload: /;s/DOWN=/  Download: /'
@@ -693,10 +693,8 @@ conf_speed() {
         if [ -n "$up" ]; then
             tc qdisc add dev $iface root handle 1: htb default 30
             tc class add dev $iface parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
-            tc class add dev $iface parent 1:1 classid 1:10 htb rate $up ceil $(echo $up | sed 's/mbit/mbit/; s/kbit/kbit/') prio 1 burst 32k
-            tc class add dev $iface parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
-            tc qdisc add dev $iface parent 1:10 handle 10: fq_codel
-            tc qdisc add dev $iface parent 1:30 handle 30: fq_codel
+            tc class add dev $iface parent 1:1 classid 1:10 tbf rate $up burst 64kb latency 50ms
+            tc class add dev $iface parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit
             tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
             tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip dport 22 0xffff flowid 1:10 2>/dev/null
         fi
@@ -712,10 +710,8 @@ conf_speed() {
             tc qdisc del dev ifb0 root 2>/dev/null
             tc qdisc add dev ifb0 root handle 1: htb default 30
             tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
-            tc class add dev ifb0 parent 1:1 classid 1:10 htb rate $down ceil $down prio 1 burst 32k
-            tc class add dev ifb0 parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
-            tc qdisc add dev ifb0 parent 1:10 handle 10: fq_codel
-            tc qdisc add dev ifb0 parent 1:30 handle 30: fq_codel
+            tc class add dev ifb0 parent 1:1 classid 1:10 tbf rate $down burst 64kb latency 50ms
+            tc class add dev ifb0 parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit
             tc filter add dev ifb0 parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
         fi
         echo "IFACE=$iface" > /root/natssh/speed.conf
