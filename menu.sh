@@ -643,12 +643,12 @@ conf_service() {
 conf_speed() {
     local iface=$(ip route | grep default | awk '{print $5}' | head -1)
     iface=${iface:-eth0}
-    echo -e "${YELLOW}--- ATUR LIMIT SPEED GLOBAL ---${NC}"
+    echo -e "${YELLOW}--- ATUR LIMIT SPEED SSH SAJA ---${NC}"
     echo -e "Interface: ${GREEN}${iface}${NC}"
+    echo -e "Hanya trafik SSH (port 22) yg dibatasi"
     echo ""
     if tc qdisc show dev $iface | grep -q "htb"; then
-        echo -e "${GREEN}Limit sedang aktif${NC}"
-        tc class show dev $iface 2>/dev/null | head -2
+        echo -e "${GREEN}Limit SSH sedang aktif${NC}"
         echo ""
         read -p "Hapus limit speed? (y/N): " h
         if [[ "$h" =~ ^[Yy]$ ]]; then
@@ -674,30 +674,36 @@ conf_speed() {
             pause
             return
         fi
-        # Apply limit
         tc qdisc del dev $iface root 2>/dev/null
         tc qdisc del dev $iface ingress 2>/dev/null
         if [ -n "$up" ]; then
-            tc qdisc add dev $iface root handle 1: htb default 30
-            tc class add dev $iface parent 1: classid 1:1 htb rate $up ceil $up
-            tc class add dev $iface parent 1:1 classid 1:30 htb rate $up ceil $up
-            tc qdisc add dev $iface parent 1:30 handle 30: sfq perturb 10
-            tc filter add dev $iface protocol ip parent 1:0 u32 match ip dst 0.0.0.0/0 flowid 1:30
+            tc qdisc add dev $iface root handle 1: htb default 1:999
+            tc class add dev $iface parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
+            tc class add dev $iface parent 1:1 classid 1:10 htb rate $up ceil $up
+            tc qdisc add dev $iface parent 1:10 handle 10: sfq perturb 10
+            tc filter add dev $iface protocol ip parent 1:0 prio 1 u32 match ip sport 22 0xffff flowid 1:10
+            tc filter add dev $iface protocol ip parent 1:0 prio 1 u32 match ip dport 22 0xffff flowid 1:10
+            tc class add dev $iface parent 1:1 classid 1:999 htb rate 1000mbit ceil 1000mbit
+            tc qdisc add dev $iface parent 1:999 handle 999: sfq perturb 10
         fi
         if [ -n "$down" ]; then
             modprobe ifb numifbs=1 2>/dev/null
             ip link set dev ifb0 up 2>/dev/null
             tc qdisc add dev $iface ingress
-            tc filter add dev $iface parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb0
-            tc qdisc add dev ifb0 root handle 1: htb default 30
-            tc class add dev ifb0 parent 1: classid 1:1 htb rate $down ceil $down
-            tc class add dev ifb0 parent 1:1 classid 1:30 htb rate $down ceil $down
-            tc qdisc add dev ifb0 parent 1:30 handle 30: sfq perturb 10
+            tc filter add dev $iface parent ffff: protocol ip u32 match ip sport 22 0xffff action mirred egress redirect dev ifb0
+            tc filter add dev $iface parent ffff: protocol ip u32 match ip dport 22 0xffff action mirred egress redirect dev ifb0
+            tc qdisc add dev ifb0 root handle 1: htb default 1:999
+            tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
+            tc class add dev ifb0 parent 1:1 classid 1:10 htb rate $down ceil $down
+            tc qdisc add dev ifb0 parent 1:10 handle 10: sfq perturb 10
+            tc class add dev ifb0 parent 1:1 classid 1:999 htb rate 1000mbit ceil 1000mbit
+            tc qdisc add dev ifb0 parent 1:999 handle 999: sfq perturb 10
         fi
         echo "IFACE=$iface" > /root/natssh/speed.conf
         [ -n "$up" ] && echo "UP=$up" >> /root/natssh/speed.conf
         [ -n "$down" ] && echo "DOWN=$down" >> /root/natssh/speed.conf
-        echo -e "${GREEN}Limit speed berhasil diterapkan!${NC}"
+        echo "MODE=ssh-only" >> /root/natssh/speed.conf
+        echo -e "${GREEN}Limit speed SSH berhasil diterapkan!${NC}"
     fi
     pause
 }
@@ -931,7 +937,7 @@ menu_conf() {
         echo "5. Ubah Maks Koneksi Serentak (MAX_TOTAL)"
         echo "6. Kontrol Layanan natssh-ws (Start/Stop/Restart)"
         echo "7. Atur Jadwal Restart Otomatis"
-        echo "8. Atur Limit Speed Global"
+        echo "8. Atur Limit Speed SSH"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-8): " p || exit 0
         case $p in
