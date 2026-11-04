@@ -654,7 +654,6 @@ conf_speed() {
         if [[ "$h" =~ ^[Yy]$ ]]; then
             tc qdisc del dev $iface root 2>/dev/null
             tc qdisc del dev $iface ingress 2>/dev/null
-            modprobe ifb 2>/dev/null
             ip link set dev ifb0 down 2>/dev/null
             ip link del ifb0 2>/dev/null
             rm -f /root/natssh/speed.conf
@@ -696,11 +695,14 @@ conf_speed() {
             tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip dport 22 0xffff flowid 1:10
         fi
         if [ -n "$down" ]; then
-            modprobe ifb numifbs=1 2>/dev/null
+            modprobe ifb 2>/dev/null
+            ip link del ifb0 2>/dev/null
+            ip link add ifb0 type ifb 2>/dev/null
             ip link set dev ifb0 up 2>/dev/null
-            tc qdisc del dev ifb0 root 2>/dev/null
-            tc qdisc add dev $iface ingress
+            tc qdisc del dev $iface ingress 2>/dev/null
+            tc qdisc add dev $iface ingress handle ffff:
             tc filter add dev $iface parent ffff: protocol ip prio 1 u32 match ip dport 22 0xffff action mirred egress redirect dev ifb0
+            tc qdisc del dev ifb0 root 2>/dev/null
             tc qdisc add dev ifb0 root handle 1: htb default 30
             tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
             tc class add dev ifb0 parent 1:1 classid 1:10 htb rate $down ceil $down prio 1
