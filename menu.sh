@@ -664,12 +664,12 @@ conf_speed() {
         echo -e "${YELLOW}Belum ada limit speed${NC}"
         echo ""
         echo "Format: angka + unit (kbit, mbit, gbit)"
-        echo "Contoh: 10mbit = 10 Mbps"
+        echo "Contoh: 25mbit/25Mbps atau 10mbit"
         echo ""
-        read -p "Limit Upload (kosong = skip, 0 = batal, default 25mbit): " up
+        read -p "Limit Upload (kosong = skip, 0 = batal, default 25mbps): " up
         [ "$up" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; return; }
         [ -z "$up" ] && up="25mbit"
-        read -p "Limit Download (kosong = skip, default 25mbit): " down
+        read -p "Limit Download (kosong = skip, default 25mbps): " down
         [ -z "$down" ] && down="25mbit"
         if [ -z "$up" ] && [ -z "$down" ]; then
             echo -e "${RED}Minimal isi salah satu!${NC}"
