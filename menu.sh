@@ -650,7 +650,7 @@ conf_speed() {
     echo -e "Interface: ${GREEN}${iface}${NC}"
     echo -e "Hanya trafik SSH (port 22) yg dibatasi"
     echo ""
-    if tc qdisc show dev $iface 2>/dev/null | grep -q "htb.*1:10"; then
+    if tc class show dev $iface 2>/dev/null | grep -q "class htb.*1:10"; then
         echo -e "${GREEN}Limit SSH AKTIF:${NC}"
         if [ -f /root/natssh/speed.conf ]; then
             grep -E "^UP=|^DOWN=" /root/natssh/speed.conf | sed 's/UP=/  Upload: /;s/DOWN=/  Download: /'
