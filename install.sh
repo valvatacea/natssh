@@ -92,6 +92,11 @@ if ! crontab -l | grep -q "autokill.sh"; then
 else
     echo -e "${GREEN}Cronjob Autokill sudah ada.${NC}"
 fi
+# Auto restart natssh-ws setiap jam 03:00
+if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
+    (crontab -l 2>/dev/null; echo "0 3 * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab -
+    echo -e "${GREEN}Cronjob auto-restart natssh-ws berhasil ditambahkan (jam 03:00).${NC}"
+fi
 
 echo -e "
 [*] Mengatur Banner Pesan SSH..."
