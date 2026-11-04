@@ -663,14 +663,21 @@ conf_speed() {
     else
         echo -e "${YELLOW}Belum ada limit speed${NC}"
         echo ""
-        echo "Format: angka + unit (kbit, mbit, gbit)"
-        echo "Contoh: 25mbit/25Mbps atau 10mbit"
+        echo "Format: bisa cuma angka (otomatis jadi Mbps) atau pakai unit (kbit/mbit/gbit)"
+        echo "Contoh: 25, 5, .5, 10mbit"
         echo ""
-        read -p "Limit Upload (kosong = skip, 0 = batal, default 25mbps): " up
+        read -p "Limit Upload (kosong = skip, 0 = batal, default 25): " up
         [ "$up" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; return; }
-        [ -z "$up" ] && up="25mbit"
-        read -p "Limit Download (kosong = skip, default 25mbps): " down
-        [ -z "$down" ] && down="25mbit"
+        [ -z "$up" ] && up="25"
+        # convert angka aja jadi mbit
+        if [[ "$up" =~ ^[0-9]+$ ]] || [[ "$up" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$up" =~ ^\.[0-9]+$ ]]; then
+            up="${up}mbit"
+        fi
+        read -p "Limit Download (kosong = skip, default 25): " down
+        [ -z "$down" ] && down="25"
+        if [[ "$down" =~ ^[0-9]+$ ]] || [[ "$down" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$down" =~ ^\.[0-9]+$ ]]; then
+            down="${down}mbit"
+        fi
         if [ -z "$up" ] && [ -z "$down" ]; then
             echo -e "${RED}Minimal isi salah satu!${NC}"
             pause
