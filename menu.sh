@@ -693,7 +693,7 @@ conf_speed() {
         if [ -n "$up" ]; then
             tc qdisc add dev $iface root handle 1: htb default 30
             tc class add dev $iface parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
-            tc class add dev $iface parent 1:1 classid 1:10 htb rate $up ceil $up prio 1
+            tc class add dev $iface parent 1:1 classid 1:10 htb rate $up ceil $up prio 1 burst 15k cburst 15k
             tc class add dev $iface parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
             tc qdisc add dev $iface parent 1:10 handle 10: sfq perturb 10
             tc qdisc add dev $iface parent 1:30 handle 30: sfq perturb 10
@@ -712,7 +712,7 @@ conf_speed() {
             tc qdisc del dev ifb0 root 2>/dev/null
             tc qdisc add dev ifb0 root handle 1: htb default 30
             tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
-            tc class add dev ifb0 parent 1:1 classid 1:10 htb rate $down ceil $down prio 1
+            tc class add dev ifb0 parent 1:1 classid 1:10 htb rate $down ceil $down prio 1 burst 15k cburst 15k
             tc class add dev ifb0 parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
             tc qdisc add dev ifb0 parent 1:10 handle 10: sfq perturb 10
             tc qdisc add dev ifb0 parent 1:30 handle 30: sfq perturb 10
