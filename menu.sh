@@ -643,12 +643,18 @@ conf_service() {
 conf_speed() {
     local iface=$(ip route | grep default | awk '{print $5}' | head -1)
     iface=${iface:-eth0}
+    clear
+    garis
     echo -e "${YELLOW}--- ATUR LIMIT SPEED SSH SAJA ---${NC}"
+    garis
     echo -e "Interface: ${GREEN}${iface}${NC}"
     echo -e "Hanya trafik SSH (port 22) yg dibatasi"
     echo ""
-    if tc qdisc show dev $iface | grep -q "htb"; then
-        echo -e "${GREEN}Limit SSH sedang aktif${NC}"
+    if tc qdisc show dev $iface 2>/dev/null | grep -q "htb.*1:10"; then
+        echo -e "${GREEN}Limit SSH AKTIF:${NC}"
+        if [ -f /root/natssh/speed.conf ]; then
+            grep -E "^UP=|^DOWN=" /root/natssh/speed.conf | sed 's/UP=/  Upload: /;s/DOWN=/  Download: /'
+        fi
         echo ""
         read -p "Hapus limit speed? (y/N): " h
         if [[ "$h" =~ ^[Yy]$ ]]; then
@@ -666,9 +672,8 @@ conf_speed() {
         echo "Contoh: 25, 5, .5, 10mbit"
         echo ""
         read -p "Limit Upload (kosong = skip, 0 = batal, default 25): " up
-        [ "$up" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; return; }
+        [ "$up" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
         [ -z "$up" ] && up="25"
-        # convert angka aja jadi mbit
         if [[ "$up" =~ ^[0-9]+$ ]] || [[ "$up" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$up" =~ ^\.[0-9]+$ ]]; then
             up="${up}mbit"
         fi
@@ -679,11 +684,12 @@ conf_speed() {
         fi
         if [ -z "$up" ] && [ -z "$down" ]; then
             echo -e "${RED}Minimal isi salah satu!${NC}"
-            pause
             return
         fi
         tc qdisc del dev $iface root 2>/dev/null
         tc qdisc del dev $iface ingress 2>/dev/null
+        ip link set dev ifb0 down 2>/dev/null
+        ip link del ifb0 2>/dev/null
         if [ -n "$up" ]; then
             tc qdisc add dev $iface root handle 1: htb default 30
             tc class add dev $iface parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
@@ -691,17 +697,18 @@ conf_speed() {
             tc class add dev $iface parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
             tc qdisc add dev $iface parent 1:10 handle 10: sfq perturb 10
             tc qdisc add dev $iface parent 1:30 handle 30: sfq perturb 10
-            tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10
-            tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip dport 22 0xffff flowid 1:10
+            tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
+            tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip dport 22 0xffff flowid 1:10 2>/dev/null
         fi
         if [ -n "$down" ]; then
             modprobe ifb 2>/dev/null
-            ip link del ifb0 2>/dev/null
-            ip link add ifb0 type ifb 2>/dev/null
+            if ! ip link show ifb0 >/dev/null 2>&1; then
+                ip link add ifb0 type ifb 2>/dev/null
+            fi
             ip link set dev ifb0 up 2>/dev/null
             tc qdisc del dev $iface ingress 2>/dev/null
             tc qdisc add dev $iface ingress handle ffff:
-            tc filter add dev $iface parent ffff: protocol ip prio 1 u32 match ip dport 22 0xffff action mirred egress redirect dev ifb0
+            tc filter add dev $iface parent ffff: protocol ip prio 1 u32 match ip dport 22 0xffff action mirred egress redirect dev ifb0 2>/dev/null
             tc qdisc del dev ifb0 root 2>/dev/null
             tc qdisc add dev ifb0 root handle 1: htb default 30
             tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
@@ -709,7 +716,7 @@ conf_speed() {
             tc class add dev ifb0 parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
             tc qdisc add dev ifb0 parent 1:10 handle 10: sfq perturb 10
             tc qdisc add dev ifb0 parent 1:30 handle 30: sfq perturb 10
-            tc filter add dev ifb0 parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10
+            tc filter add dev ifb0 parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
         fi
         echo "IFACE=$iface" > /root/natssh/speed.conf
         [ -n "$up" ] && echo "UP=$up" >> /root/natssh/speed.conf
@@ -717,7 +724,6 @@ conf_speed() {
         echo "MODE=ssh-only" >> /root/natssh/speed.conf
         echo -e "${GREEN}Limit speed SSH berhasil diterapkan!${NC}"
     fi
-    pause
 }
 
 conf_restart_schedule() {
