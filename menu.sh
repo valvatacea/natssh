@@ -61,8 +61,6 @@ akun_baru() {
             [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
             if [ "$(cat /root/natssh/hide_ip.conf 2>/dev/null)" != "1" ]; then
                 echo "IP        : $ipaddr"
-            else
-                echo "IP        : (disembunyikan)"
             fi
             echo "Port WS   : $cfport (via Cloudflare)"
             echo "Cloudflare: 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
