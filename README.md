@@ -11,6 +11,9 @@ NATSSH adalah ekosistem manajemen VPN SSH murni yang dirancang secara khusus unt
 *   **Autokill Cerdas (`autokill.sh`):** Cron tiap 2 menit, tendang multi-login melebihi batas (`MAX_LOGIN` via env, default 5). Hitungan perangkat = jumlah proses `sshd: user` (user-owned) LANGSUNG — pasangan `[priv]` milik root terbuang oleh filter. Sesi hantu (proses hidup tapi soket bridge mati) dibersihkan `reap.py` sebelum penghitungan.
 *   **Full Audit:** Tiga jalur tercatat di `autokill.log` — tendangan autokill, HAPUS manual, dan AUTO-CLEAN akun kedaluwarsa.
 *   **Banner SSH Fleksibel:** Edit via nano/vi, reset ke template (baris "Maksimal N Perangkat" otomatis sinkron dengan limit), plus **slot simpan/muat/hapus** (`banners/`).
+*   **Hide IP (Konfigurasi Sistem):** Toggle untuk menyembunyikan IP publik pada kartu akun baru (menu Konfigurasi item 9). Status disimpan di `hide_ip.conf` (server-local, tidak di-track git) dan otomatis dibersihkan saat uninstall.
+*   **Speed Limiting SSH:** Pembatasan bandwidth per akun menggunakan qdisc (HTB/TBF + fq_codel) dengan burst, dicek via `tc classes`. Menu menampilkan status limit saat ini.
+*   **Auto-restart Terjadwal:** Installer menambahkan restart otomatis `natssh-ws` pukul 03:00 (cron/systemd) untuk stabilitas.
 *   **High Availability:** Terintegrasi penuh dengan `systemd` (Environment-aware, auto-start, auto-restart).
 *   **Instalasi Interaktif:** `install.sh` menanyakan port NAT & batas perangkat; port disetel via `Environment=` systemd (bukan edit source), unduhan tervalidasi.
 
@@ -76,6 +79,8 @@ Setelah terinstal, Anda dapat memanggil menu manajemen kapan saja dengan mengeti
    2. Ubah Port WebSocket       → cek bentrok, injeksi Environment systemd
    3. Ubah Domain/Host           → host.conf (kosong = auto IP publik)
    4. Ubah Banner Pelanggan     → edit / reset / slot simpan-muat-hapus
+   5. Speed Limit SSH            → atur/cek pembatasan bandwidth (HTB/TBF)
+   9. Hide IP                   → toggle sembunyikan IP pada kartu akun baru
 ```
 
 **File konfigurasi opsional** (semua bisa lewat menu):
