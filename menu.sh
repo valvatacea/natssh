@@ -59,7 +59,11 @@ akun_baru() {
             fi
             local hostcf=$(cat /root/natssh/host_cf.conf 2>/dev/null)
             [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
-            echo "IP        : $ipaddr"
+            if [ "$(cat /root/natssh/hide_ip.conf 2>/dev/null)" != "1" ]; then
+                echo "IP        : $ipaddr"
+            else
+                echo "IP        : (disembunyikan)"
+            fi
             echo "Port WS   : $cfport (via Cloudflare)"
             echo "Cloudflare: 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
             echo "CloudFront: 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443 (HTTPS)"
@@ -942,6 +946,28 @@ BEOF
     done
 }
 
+conf_hide_ip() {
+    local cur=$(cat /root/natssh/hide_ip.conf 2>/dev/null)
+    cur=${cur:-0}
+    echo -e "${YELLOW}---- HIDE IP SAAT BUAT AKUN ----${NC}"
+    if [ "$cur" = "1" ]; then
+        echo -e "Status: ${GREEN}ON (IP disembunyikan)${NC}"
+    else
+        echo -e "Status: ${YELLOW}OFF (IP ditampilkan)${NC}"
+    fi
+    read -p "Toggle? (1=ON, 0=OFF, kosong=batal): " v
+    [ -z "$v" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if [ "$v" = "1" ]; then
+        echo "1" > /root/natssh/hide_ip.conf
+        echo -e "${GREEN}Hide IP diaktifkan.${NC}"
+    elif [ "$v" = "0" ]; then
+        echo "0" > /root/natssh/hide_ip.conf
+        echo -e "${GREEN}Hide IP dinonaktifkan.${NC}"
+    else
+        echo -e "${RED}Pilihan tidak valid!${NC}"
+    fi
+}
+
 menu_conf() {
     while true; do
         clear
@@ -956,8 +982,9 @@ menu_conf() {
         echo "6. Kontrol Layanan natssh-ws (Start/Stop/Restart)"
         echo "7. Atur Jadwal Restart Otomatis"
         echo "8. Atur Limit Speed SSH (port 22)"
+        echo "9. Hide IP saat Buat Akun (ON/OFF)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-8): " p || exit 0
+        read -p "Pilih (0-9): " p || exit 0
         case $p in
             1) conf_maxlogin ;;
             2) conf_port ;;
@@ -967,6 +994,7 @@ menu_conf() {
             6) conf_service ;;
             7) conf_restart_schedule ;;
             8) conf_speed ;;
+            9) conf_hide_ip ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
