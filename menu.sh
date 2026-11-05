@@ -980,7 +980,7 @@ menu_conf() {
         echo "6. Kontrol Layanan natssh-ws (Start/Stop/Restart)"
         echo "7. Atur Jadwal Restart Otomatis"
         echo "8. Atur Limit Speed SSH (port 22)"
-        echo "9. Hide IP saat Buat Akun (ON/OFF)"
+        echo "9. Hide IP"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-9): " p || exit 0
         case $p in
