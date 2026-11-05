@@ -933,7 +933,7 @@ BEOF
                                 sleep 1
                             fi
                             ;;
-                        0) ;;
+                        0) break ;;
                         *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
                     esac
                 done
