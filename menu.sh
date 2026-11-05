@@ -770,7 +770,6 @@ conf_restart_schedule() {
             *) echo -e "${RED}Pilihan tidak valid!${NC}";;
         esac
     fi
-    pause
 }
 
 conf_maxtotal() {
