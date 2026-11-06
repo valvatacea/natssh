@@ -79,7 +79,7 @@ akun_baru() {
 do_hapus() {
     local user="$1"
     local exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
-    local online=$(ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | grep -c "^$user$")
+    local online=$(ps -eo user:40=,comm= | awk '$2=="sshd" && $1=="'"$user"'" {print}' | wc -l)
     echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: ${online} perangkat)"
     read -p "Yakin hapus? (y/N): " yakin
     if [[ "$yakin" =~ ^[Yy]$ ]]; then
@@ -280,7 +280,7 @@ menu_akun() {
 
 sessi_online() {
     echo -e "${YELLOW}--- USER YANG SEDANG LOGIN ---${NC}"
-    ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
+    ps -eo user:40=,comm= | awk '$2=="sshd" && $1!="root" {print $1}' | sort | uniq -c | while read count user; do
         if id "$user" &>/dev/null; then
             shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
             if [ "$shell" == "/bin/false" ]; then
@@ -305,7 +305,7 @@ autokill_manual() {
         return
     fi
     echo -e "${YELLOW}Mengeksekusi pemutusan paksa (Autokill, batas ${max_login})...${NC}"
-    ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
+    ps -eo user:40=,comm= | awk '$2=="sshd" && $1!="root" {print $1}' | sort | uniq -c | while read count user; do
         if id "$user" &>/dev/null; then
             shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
             devices=$count   # 1 sesi tunnel = 1 proses user-owned (pasangan [priv] milik root)
@@ -334,10 +334,10 @@ status_sistem() {
     top -bn1 | grep load | awk '{printf "CPU Load  : %.2f\n", $(NF-2)}'
     echo -e "Disk      : $(df -h / | awk 'NR==2{print $3 " / " $2 " (" $5 ")"}')"
     # ── RESOURCE SSH ──
-    local nsess=$(ps -ef | grep sshd | grep -v root | grep -v grep | grep -vc priv)
+    local nsess=$(ps -eo user:40=,args= | awk '$1!="root" && /sshd/ && !/priv/ {c++} END{print c+0}')
     local rss_ssh=$(ps -eo rss,user,comm | awk '$3=="sshd" && $2!="root" {s+=$1} END{printf "%d", s/1024}')
     local rss_ws=$(ps -eo rss,args | awk '/[w]s.py/ {s+=$1} END{printf "%d", s/1024}')
-    local nuser=$(ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort -u | wc -l)
+    local nuser=$(ps -eo user:40=,comm= | awk '$2=="sshd" && $1!="root" {print $1}' | sort -u | wc -l)
     echo -e "${CYAN}── RESOURCE SSH ──${NC}"
     echo -e "Sesi aktif      : ${GREEN}${nsess:-0}${NC} (dari ${nuser:-0} akun)"
     echo -e "RAM sshd pelanggan : ${GREEN}${rss_ssh:-0}${NC} MB"
@@ -387,7 +387,7 @@ ws_peruser() {
             [ -z "$ep" ] && continue
             rows+="$user $ep\n"
         done
-    done < <(ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort -u)
+    done < <(ps -eo user:40=,comm= | awk '$2=="sshd" && $1!="root" {print $1}' | sort -u)
     if [ -z "$rows" ]; then
         echo -e "${YELLOW}Tidak ada akun jualan yang sedang online.${NC}"
         return
