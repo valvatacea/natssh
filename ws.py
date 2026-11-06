@@ -208,14 +208,18 @@ def handle_client(client_socket, ip):
             _dump()
             # catat pending untuk audit real-time
             try:
-                pending=[]
-                if os.path.exists(PENDING_FILE):
-                    with open(PENDING_FILE) as f: pending=json.load(f)
-                pending.append({**conn, "end": round(time.time(),3)})
-                pending=pending[-200:]
-                tmp=PENDING_FILE+".tmp"
-                with open(tmp,"w") as f: json.dump(pending,f)
-                os.replace(tmp,PENDING_FILE)
+                with _lock:
+                    pending=[]
+                    if os.path.exists(PENDING_FILE):
+                        try:
+                            with open(PENDING_FILE) as f: pending=json.load(f)
+                        except Exception:
+                            pending=[]
+                    pending.append({**conn, "end": round(time.time(),3)})
+                    pending=pending[-200:]
+                    tmp=PENDING_FILE+".tmp"
+                    with open(tmp,"w") as f: json.dump(pending,f)
+                    os.replace(tmp,PENDING_FILE)
             except Exception:
                 pass
         _release(ip, via_cdn)
