@@ -3,8 +3,33 @@ from pydantic import BaseModel
 import json, os, subprocess, re
 from datetime import datetime, timedelta
 
+import secrets
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOKEN = os.environ.get("NATSSH_API_TOKEN", "change-me")
+TOKEN = os.environ.get("NATSSH_API_TOKEN", "")
+if not TOKEN or TOKEN == "change-me":
+    tf = os.path.join(BASE, ".api_token")
+    if os.path.exists(tf):
+        TOKEN = open(tf).read().strip()
+    else:
+        TOKEN = secrets.token_urlsafe(48)
+        with open(tf, "w") as f:
+            f.write(TOKEN)
+        # sync to .env files if present
+        for envp in (os.path.join(BASE, "api", ".env"), "/root/natssh-bot/.env"):
+            if os.path.exists(envp):
+                lines = open(envp).read().splitlines()
+                out = []
+                found = False
+                for ln in lines:
+                    if ln.startswith("NATSSH_API_TOKEN="):
+                        out.append(f"NATSSH_API_TOKEN={TOKEN}")
+                        found = True
+                    else:
+                        out.append(ln)
+                if not found:
+                    out.append(f"NATSSH_API_TOKEN={TOKEN}")
+                with open(envp, "w") as f:
+                    f.write("\n".join(out) + "\n")
 app = FastAPI(title="NATSSH API", version="0.2")
 
 import logging
