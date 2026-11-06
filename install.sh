@@ -134,6 +134,7 @@ echo -e "
 # Cek apakah cronjob sudah ada agar tidak duplikat
 if ! crontab -l | grep -q "autokill.sh"; then
     (crontab -l 2>/dev/null; echo "*/1 * * * * MAX_LOGIN=$max_login $(pwd)/autokill.sh") | crontab -
+    echo 15 > suspend_minutes.conf
     echo -e "${GREEN}Cronjob Autokill berhasil ditambahkan (berjalan setiap 1 menit).${NC}"
 else
     echo -e "${GREEN}Cronjob Autokill sudah ada.${NC}"
@@ -143,6 +144,7 @@ mkdir -p /root/natssh/suspended 2>/dev/null
 if ! crontab -l 2>/dev/null | grep -q "unsuspend.sh"; then
     (crontab -l 2>/dev/null; echo "* * * * * $(pwd)/unsuspend.sh >> /root/autokill.log 2>&1") | crontab -
 fi
+[ -f suspend_minutes.conf ] || echo 15 > suspend_minutes.conf
 # Auto restart natssh-ws setiap jam 03:00
 if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
     (crontab -l 2>/dev/null; echo "0 3 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab -
