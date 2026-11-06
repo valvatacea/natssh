@@ -1026,17 +1026,17 @@ menu_conf() {
         garis
         echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
         garis
-        echo "1. Atur Batas Login per Akun (Max Login)"
-        echo "2. Ubah Port WebSocket"
-        echo "3. Ubah Domain/Host di Kartu Akun"
-        echo "4. Ubah Banner Pelanggan"
-        echo "5. Ubah Maks Koneksi Serentak (MAX_TOTAL)"
-        echo "6. Kontrol Layanan natssh-ws (Start/Stop/Restart)"
-        echo "7. Atur Jadwal Restart Otomatis"
-        echo "8. Atur Limit Speed SSH (port 22)"
-        echo "9. Hide IP"
-        echo "10. badvpn-udpgw (UDP Gateway)"
-        echo -e "${RED}0. Kembali ke Menu Utama${NC}"
+        printf "  %-3s %-46s\n" "1." "Atur Batas Login per Akun (Max Login)"
+        printf "  %-3s %-46s\n" "2." "Ubah Port WebSocket"
+        printf "  %-3s %-46s\n" "3." "Ubah Domain/Host di Kartu Akun"
+        printf "  %-3s %-46s\n" "4." "Ubah Banner Pelanggan"
+        printf "  %-3s %-46s\n" "5." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
+        printf "  %-3s %-46s\n" "6." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
+        printf "  %-3s %-46s\n" "7." "Atur Jadwal Restart Otomatis"
+        printf "  %-3s %-46s\n" "8." "Atur Limit Speed SSH (port 22)"
+        printf "  %-3s %-46s\n" "9." "Hide IP"
+        printf "  %-3s %-46s\n" "10." "badvpn-udpgw (UDP Gateway)"
+        echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-10): " p || exit 0
         case $p in
             1) conf_maxlogin ;;
