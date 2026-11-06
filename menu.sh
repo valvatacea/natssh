@@ -378,7 +378,7 @@ ws_peruser() {
     # Sanding waktu: sesi "sshd: user" (lstart) <-> koneksi bridge (conns.json:
     # IP asli, aplikasi, durasi, byte up/down; fallback ws.log pra-patch).
     # Username SSH tak terbaca jembatan (terenkripsi post-KEX) -> -2..+10 dtk, kemungkinan.
-    local dir=$(dirname "${BASH_SOURCE[0]}")
+    local dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
     local rows=""
     while read -r user; do
         [ -z "$user" ] && continue
@@ -583,7 +583,12 @@ conf_port() {
         return
     fi
     echo -e "Port WebSocket saat ini: ${YELLOW}${cur_port}${NC}"
+    echo -e "${YELLOW}Ketik 0 atau kosong untuk batal.${NC}"
     read -p "Port WebSocket baru: " new_port
+    if [ -z "$new_port" ] || [ "$new_port" = "0" ]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        return
+    fi
     if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
         echo -e "${RED}Gagal: port harus angka 1-65535!${NC}"
     elif ss -tln | grep -q ":$new_port "; then
