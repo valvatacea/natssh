@@ -1041,7 +1041,6 @@ menu_conf() {
         echo -e "${CYAN}  -- Lainnya --${NC}"
         printf "  %-3s %-46s\n" "10." "Ubah Banner Pelanggan"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-10): " p || exit 0
         case $p in
             1) conf_port ;;
