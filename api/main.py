@@ -337,6 +337,31 @@ def set_max_per_ip(body: MaxPerIpIn, x_api_token: str | None = Header(default=No
         sh(f"sed -i 's/Environment=NATSSH_MAX_PER_IP=[0-9]*/Environment=NATSSH_MAX_PER_IP={body.value}/' {unit}")
     sh("systemctl daemon-reload && systemctl restart natssh-ws")
     return {"ok": True}
+class RestartScheduleIn(BaseModel):
+    cron: str
+
+
+@app.post("/config/restart_schedule")
+def set_restart_schedule(body: RestartScheduleIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    # remove old natssh-ws restart cron line, add new
+    sh("crontab -l 2>/dev/null | grep -v 'natssh-ws' | crontab -")
+    sh(f"(crontab -l 2>/dev/null; echo '{body.cron} /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart \"natssh-udpgw@*\" >/dev/null 2>&1') | crontab -")
+    return {"ok": True}
+
+
+@app.get("/logs")
+def logs(file: str = "ws", lines: int = 50, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if file == "audit":
+        path = os.path.join(BASE, "audit_sess.log")
+    else:
+        path = os.path.join(BASE, "ws.log")
+    try:
+        out = sh(f"tail -n {lines} {path}").stdout
+    except Exception:
+        out = ""
+    return {"file": file, "lines": out.splitlines()}
 @app.post("/accounts/{user}/suspend")
 def suspend(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
