@@ -41,10 +41,18 @@ ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | un
             fi
         fi
         if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$limit" ]; then
+            # audit dulu sebelum tendang (tandai killed agar tidak duplikat)
+            eps=""
+            for pid in $(pgrep -u "$user" sshd); do
+                st=$(ps -o lstart= -p "$pid" 2>/dev/null | sed 's/^ *//')
+                [ -z "$st" ] && continue
+                e=$(date -d "$st" +%s 2>/dev/null)
+                [ -n "$e" ] && eps="$eps $e"
+            done
+            printf '%s\n' $eps | "$(dirname "$(readlink -f "$0")")/audit_kill.py" "$user" 2>/dev/null
             pkill -u "$user" sshd
             usermod -L "$user" 2>/dev/null
             echo $(( $(date +%s) + SUSPEND_SEC )) > "$SUSPEND_DIR/$user"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') SELESAI user=$user ip=- edge=- cc=- city=- dur=0m00s up=- down=- ua=autokill" >> "$(dirname "$0")/audit_sess.log"
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang & suspend ${SUSPEND_MINUTES}m: $user ($devices perangkat, batas $limit)" >> "$LOG_FILE"
         fi
     fi
