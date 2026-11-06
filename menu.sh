@@ -461,6 +461,56 @@ backup_ekspor() {
     echo -e "Cara Pakai: pindahkan ke VPS baru lalu jalankan ${CYAN}./backup_akun_ssh.sh${NC}"
 }
 
+backup_config() {
+    local ts=$(date +%Y%m%d_%H%M%S)
+    local out="/root/natssh_config_${ts}.tar.gz"
+    local list=""
+    cd /root/natssh
+    [ -f ip.conf ] && list="$list ip.conf"
+    [ -f host.conf ] && list="$list host.conf"
+    [ -f port.conf ] && list="$list port.conf"
+    [ -f hide_ip.conf ] && list="$list hide_ip.conf"
+    [ -f suspend_minutes.conf ] && list="$list suspend_minutes.conf"
+    [ -d limits ] && list="$list limits"
+    [ -d banners ] && list="$list banners"
+    [ -f /etc/issue.net ] && cp /etc/issue.net /root/natssh/issue.net.bak && list="$list issue.net.bak"
+    [ -f /etc/systemd/system/natssh-ws.service ] && cp /etc/systemd/system/natssh-ws.service /root/natssh/natssh-ws.service.bak && list="$list natssh-ws.service.bak"
+    tar -czf "$out" $list >/dev/null 2>&1
+    echo -e "${GREEN}SUKSES! Konfigurasi dibackup: ${CYAN}$out${NC}"
+    pause
+}
+
+conf_autobackup() {
+    echo -e "${YELLOW}---- AUTO BACKUP KONFIGURASI ----${NC}"
+    if crontab -l 2>/dev/null | grep -q "autobackup.sh"; then
+        echo -e "Status: ${GREEN}AKTIF${NC}"
+        crontab -l | grep autobackup.sh
+    else
+        echo -e "Status: ${YELLOW}NONAKTIF${NC}"
+    fi
+    echo "1. Aktifkan (harian 02:00)"
+    echo "2. Aktifkan (tiap 6 jam)"
+    echo "3. Nonaktifkan"
+    echo "0. Kembali"
+    read -p "Pilih: " a
+    case $a in
+        1)
+            crontab -l 2>/dev/null | grep -v "autobackup.sh" | crontab -
+            (crontab -l 2>/dev/null; echo "0 2 * * * /root/natssh/autobackup.sh") | crontab -
+            echo -e "${GREEN}Auto-backup harian 02:00 diaktifkan.${NC}" ;;
+        2)
+            crontab -l 2>/dev/null | grep -v "autobackup.sh" | crontab -
+            (crontab -l 2>/dev/null; echo "0 */6 * * * /root/natssh/autobackup.sh") | crontab -
+            echo -e "${GREEN}Auto-backup tiap 6 jam diaktifkan.${NC}" ;;
+        3)
+            crontab -l 2>/dev/null | grep -v "autobackup.sh" | crontab -
+            echo -e "${YELLOW}Auto-backup dinonaktifkan.${NC}" ;;
+        0) return ;;
+        *) echo -e "${RED}Tidak valid${NC}" ;;
+    esac
+    pause
+}
+
 menu_backup() {
     while true; do
         clear
@@ -469,10 +519,14 @@ menu_backup() {
         garis
         echo "1. Backup Data Akun (Ekspor Portabel)"
         [ -f /root/backup_akun_ssh.sh ] && echo -e "   (backup terakhir: $(stat -c '%y' /root/backup_akun_ssh.sh | cut -d. -f1))"
+        echo "2. Backup Konfigurasi (tar.gz)"
+        echo "3. Atur Auto-Backup Konfigurasi"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-1): " p || exit 0
+        read -p "Pilih (0-3): " p || exit 0
         case $p in
             1) backup_ekspor ;;
+            2) backup_config ;;
+            3) conf_autobackup ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
