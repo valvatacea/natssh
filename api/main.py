@@ -1,18 +1,34 @@
 from fastapi import FastAPI, Header, HTTPException
-import json, os, subprocess
+from pydantic import BaseModel
+import json, os, subprocess, re
+from datetime import datetime, timedelta
 
-app = FastAPI(title="NATSSH API", version="0.1")
+app = FastAPI(title="NATSSH API", version="0.2")
 TOKEN = os.environ.get("NATSSH_API_TOKEN", "change-me")
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def auth(token: str | None):
+def auth(token):
     if token != TOKEN:
         raise HTTPException(status_code=401, detail="invalid token")
 
 
-def sh(cmd: str):
+def sh(cmd):
     return subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, timeout=30)
+
+
+def valid_user(u):
+    return bool(re.fullmatch(r"[a-zA-Z0-9_]{3,32}", u))
+
+
+class AccountIn(BaseModel):
+    user: str
+    password: str
+    days: int = 30
+
+
+class LimitIn(BaseModel):
+    limit: str
 
 
 @app.get("/status")
@@ -25,6 +41,23 @@ def status(x_api_token: str | None = Header(default=None)):
     except Exception:
         live = 0
     return {"ws": ws, "live_connections": live}
+
+
+@app.get("/info")
+def info(x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    host = ""
+    try:
+        host = open(os.path.join(BASE, "host.conf")).read().strip()
+    except Exception:
+        pass
+    cfport = "2086"
+    try:
+        cfport = open(os.path.join(BASE, "port.conf")).read().strip() or cfport
+    except Exception:
+        pass
+    wsport = sh("port_ws 2>/dev/null || true").stdout.strip()
+    return {"host": host, "cf_port": cfport, "ws_port": wsport}
 
 
 @app.get("/accounts")
@@ -41,10 +74,68 @@ def accounts(x_api_token: str | None = Header(default=None)):
     return {"accounts": res}
 
 
+@app.post("/accounts")
+def create_account(body: AccountIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if not valid_user(body.user):
+        raise HTTPException(400, "invalid user")
+    if len(body.password) < 6:
+        raise HTTPException(400, "password too short")
+    if body.days < 1:
+        raise HTTPException(400, "invalid days")
+    if sh(f"id {body.user}").returncode == 0:
+        raise HTTPException(400, "user exists")
+    exp = (datetime.now() + timedelta(days=body.days)).strftime("%Y-%m-%d")
+    r = sh(f"useradd -e {exp} -m -s /bin/false {body.user}")
+    if r.returncode != 0:
+        raise HTTPException(500, r.stderr)
+    r2 = sh(f"echo '{body.user}:{body.password}' | chpasswd")
+    if r2.returncode != 0:
+        raise HTTPException(500, r2.stderr)
+    return {"ok": True, "user": body.user, "expired": exp}
+
+
+@app.delete("/accounts/{user}")
+def delete_account(user: str, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if not valid_user(user):
+        raise HTTPException(400, "invalid user")
+    sh(f"userdel -r {user} 2>/dev/null; rm -f {BASE}/limits/{user}")
+    return {"ok": True}
+
+
+@app.get("/accounts/{user}/history")
+def history(user: str, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if not valid_user(user):
+        raise HTTPException(400, "invalid user")
+    rows = []
+    try:
+        for line in open(os.path.join(BASE, "audit_sess.log")):
+            if f"user={user} " in line:
+                rows.append(line.strip())
+    except FileNotFoundError:
+        pass
+    return {"user": user, "history": rows[-10:]}
+
+
+@app.post("/accounts/{user}/limit")
+def set_limit(user: str, body: LimitIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if not valid_user(user):
+        raise HTTPException(400, "invalid user")
+    if body.limit != "unlimited" and not body.limit.isdigit():
+        raise HTTPException(400, "invalid limit")
+    os.makedirs(os.path.join(BASE, "limits"), exist_ok=True)
+    with open(os.path.join(BASE, "limits", user), "w") as f:
+        f.write(body.limit)
+    return {"ok": True, "limit": body.limit}
+
+
 @app.post("/accounts/{user}/suspend")
 def suspend(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
-    if not user.isalnum():
+    if not valid_user(user):
         raise HTTPException(400, "invalid user")
     r = sh(f'source {BASE}/menu.sh; do_suspend "{user}"')
     return {"ok": r.returncode == 0, "stdout": r.stdout, "stderr": r.stderr}
@@ -53,7 +144,7 @@ def suspend(user: str, x_api_token: str | None = Header(default=None)):
 @app.post("/accounts/{user}/unsuspend")
 def unsuspend(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
-    if not user.isalnum():
+    if not valid_user(user):
         raise HTTPException(400, "invalid user")
     r = sh(f'source {BASE}/menu.sh; do_unsuspend "{user}"')
     return {"ok": r.returncode == 0, "stdout": r.stdout, "stderr": r.stderr}
