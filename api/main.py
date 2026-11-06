@@ -198,6 +198,38 @@ def set_domain(body: DomainIn, x_api_token: str | None = Header(default=None)):
     return {"ok": True}
 
 
+class SpeedIn(BaseModel):
+    value: str
+
+
+@app.post("/backup")
+def backup(x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    os.makedirs(os.path.join(BASE, "backups"), exist_ok=True)
+    fn = f"backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
+    path = os.path.join(BASE, "backups", fn)
+    r = sh(f"tar -czf {path} -C {BASE} .")
+    return {"ok": r.returncode == 0, "file": fn, "stderr": r.stderr}
+
+
+@app.post("/restore/{filename}")
+def restore(filename: str, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if "/" in filename or ".." in filename:
+        raise HTTPException(400, "invalid filename")
+    path = os.path.join(BASE, "backups", filename)
+    if not os.path.exists(path):
+        raise HTTPException(404, "not found")
+    r = sh(f"tar -xzf {path} -C {BASE}")
+    return {"ok": r.returncode == 0, "stderr": r.stderr}
+
+
+@app.post("/config/speed")
+def set_speed(body: SpeedIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    with open(os.path.join(BASE, "speed.conf"), "w") as f:
+        f.write(body.value)
+    return {"ok": True}
 @app.post("/accounts/{user}/suspend")
 def suspend(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
