@@ -3,6 +3,8 @@ MAX_LOGIN="${MAX_LOGIN:-5}" # batas perangkat global; env MAX_LOGIN disuntik cro
 
 LOG_FILE="/root/autokill.log"
 MAX_LOG_SIZE=512000 # 500KB
+SUSPEND_DIR="/root/natssh/suspended"
+mkdir -p "$SUSPEND_DIR"
 
 # Memastikan ukuran log tidak membengkak
 if [ -f "$LOG_FILE" ]; then
@@ -20,7 +22,7 @@ fi
 # 1 sesi SSH tunnel = 1 proses user-owned ("sshd: user"); pasangan "[priv]" milik ROOT
 # (terbuang oleh grep -v root) -> perangkat = count langsung, JANGAN dibagi 2
 LIMITS_DIR="$(dirname "$(readlink -f "$0")")/limits"
-ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uniq -c | while read count user; do
+ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | uniq -c | while read count user; do
     if id "$user" &>/dev/null; then
         shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
         devices=$count
@@ -37,7 +39,9 @@ ps -ef | grep sshd | grep -v root | grep -v grep | awk '{print $1}' | sort | uni
         fi
         if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$limit" ]; then
             pkill -u "$user" sshd
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang: $user ($devices perangkat, batas $limit)" >> "$LOG_FILE"
+            usermod -L "$user" 2>/dev/null
+            echo $(( $(date +%s) + 900 )) > "$SUSPEND_DIR/$user"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang & suspend 15m: $user ($devices perangkat, batas $limit)" >> "$LOG_FILE"
         fi
     fi
 done

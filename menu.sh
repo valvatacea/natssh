@@ -63,6 +63,8 @@ akun_baru() {
                 echo "IP        : $ipaddr"
             fi
             echo "Port WS   : $cfport (via Cloudflare)"
+            udpgw_ports=$(systemctl list-units 'natssh-udpgw@*.service' --state=active --no-legend 2>/dev/null | awk '{print $1}' | sed 's/natssh-udpgw@//;s/.service//' | paste -sd, -)
+            echo "Port UDPGW: ${udpgw_ports:-7300}"
             echo "Cloudflare: 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
             echo "CloudFront: 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443 (HTTPS)"
             echo "Port NAT  : ${wsport:-20865} (cadangan, koneksi langsung tanpa Cloudflare)"
@@ -226,6 +228,7 @@ do_limit() {
 
 do_suspend() {
     usermod -L "$1"
+    pkill -u "$1" sshd 2>/dev/null
     echo -e "${GREEN}SUKSES! Akun $1 dikunci (suspend) — pelanggan tak bisa login.${NC}"
 }
 
@@ -752,15 +755,15 @@ conf_restart_schedule() {
         echo -e "${RED}0. Batal${NC}"
         read -p "Pilih (0-5): " p
         case $p in
-            1) (crontab -l 2>/dev/null; echo "0 * * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap jam.${NC}";;
-            2) (crontab -l 2>/dev/null; echo "0 */6 * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap 6 jam.${NC}";;
-            3) (crontab -l 2>/dev/null; echo "0 */12 * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap 12 jam.${NC}";;
-            4) (crontab -l 2>/dev/null; echo "0 3 * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap hari jam 03:00.${NC}";;
+            1) (crontab -l 2>/dev/null; echo "0 * * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap jam.${NC}";;
+            2) (crontab -l 2>/dev/null; echo "0 */6 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap 6 jam.${NC}";;
+            3) (crontab -l 2>/dev/null; echo "0 */12 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap 12 jam.${NC}";;
+            4) (crontab -l 2>/dev/null; echo "0 3 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap hari jam 03:00.${NC}";;
             5)
                 read -p "Masukkan cron (contoh: 0 3 * * *): " cron
                 read -p "Lanjut? (y/N): " y
                 if [[ "$y" =~ ^[Yy]$ ]] && [ -n "$cron" ]; then
-                    (crontab -l 2>/dev/null; echo "$cron /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab -
+                    (crontab -l 2>/dev/null; echo "$cron /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab -
                     echo -e "${GREEN}Jadwal custom tersimpan.${NC}"
                 else
                     echo -e "${YELLOW}Dibatalkan.${NC}"
@@ -965,6 +968,57 @@ conf_hide_ip() {
     fi
 }
 
+conf_udpgw() {
+    while true; do
+        clear
+        garis
+        echo -e "${YELLOW}   BADVPN-UDPGW (UDP GATEWAY)${NC}"
+        garis
+        active=""
+        for pp in 7100 7200 7300 7400 7500; do
+            st=$(systemctl is-active natssh-udpgw@${pp} 2>/dev/null)
+            [ "$st" = "active" ] && active="$active $pp"
+        done
+        echo -e "Status : ${GREEN}active${NC}  Port aktif:${YELLOW}${active:- (none)}${NC}"
+        echo -e "Tunnel contoh: ssh -N -L 7300:127.0.0.1:7300 user@host"
+        garis
+        echo "1. Ubah Port (pilih port untuk aktif/nonaktif)"
+        echo -e "${RED}0. Kembali${NC}"
+        read -p "Pilih (0-1): " p || return
+        case $p in
+            1)
+                ports_list="7100 7200 7300 7400 7500"
+                clear
+                garis
+                echo -e "${YELLOW}   KELOLA PORT UDGPW${NC}"
+                garis
+                i=1
+                for pp in $ports_list; do
+                    st=$(systemctl is-active natssh-udpgw@${pp} 2>/dev/null)
+                    echo "$i) $pp  [$st]"
+                    i=$((i+1))
+                done
+                echo "0) Batal"
+                echo -e "${YELLOW}Catatan: pilih port aktif -> nonaktifkan; nonaktif -> aktifkan.${NC}"
+                garis
+                read -p "Pilih nomor port (0 batal): " n
+                [ "$n" = "0" ] && return
+                case $n in
+                    1) pp=7100 ;; 2) pp=7200 ;; 3) pp=7300 ;; 4) pp=7400 ;; 5) pp=7500 ;; *) echo -e "${RED}Tidak valid${NC}"; pause; return ;;
+                esac
+                if systemctl is-active --quiet natssh-udpgw@${pp}; then
+                    systemctl disable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} nonaktif${NC}" || echo -e "${RED}Gagal${NC}"
+                else
+                    systemctl enable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} aktif${NC}" || echo -e "${RED}Gagal${NC}"
+                fi
+                ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+        esac
+        [ "$p" != "0" ] && pause
+    done
+}
+
 menu_conf() {
     while true; do
         clear
@@ -980,8 +1034,9 @@ menu_conf() {
         echo "7. Atur Jadwal Restart Otomatis"
         echo "8. Atur Limit Speed SSH (port 22)"
         echo "9. Hide IP"
+        echo "10. badvpn-udpgw (UDP Gateway)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-9): " p || exit 0
+        read -p "Pilih (0-10): " p || exit 0
         case $p in
             1) conf_maxlogin ;;
             2) conf_port ;;
@@ -992,6 +1047,7 @@ menu_conf() {
             7) conf_restart_schedule ;;
             8) conf_speed ;;
             9) conf_hide_ip ;;
+            10) conf_udpgw ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac

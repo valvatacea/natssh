@@ -25,8 +25,17 @@ rm -f /etc/systemd/system/natssh-ws.service
 systemctl daemon-reload
 echo -e "${GREEN}Service berhasil dihapus.${NC}"
 
-echo -e "
-[*] Menghapus Cronjob Autokill..."
+echo -e "\n[*] Menghentikan dan menghapus Service natssh-udpgw template..."
+for pp in 7100 7200 7300 7400 7500; do
+    systemctl disable --now natssh-udpgw@${pp} 2>/dev/null
+done
+rm -f /etc/systemd/system/natssh-udpgw@.service
+systemctl daemon-reload
+
+crontab -l | grep -v "unsuspend.sh" | crontab - 2>/dev/null
+rm -rf /root/natssh/suspended
+
+echo -e "\n[*] Menghapus Cronjob Autokill..."
 # Membuat backup crontab sementara, menghapus baris autokill, lalu memulihkan
 crontab -l | grep -v "autokill.sh" | crontab -
 echo -e "${GREEN}Cronjob berhasil dihapus.${NC}"
