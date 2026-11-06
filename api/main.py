@@ -362,6 +362,42 @@ def logs(file: str = "ws", lines: int = 50, x_api_token: str | None = Header(def
     except Exception:
         out = ""
     return {"file": file, "lines": out.splitlines()}
+class BannerTemplateIn(BaseModel):
+    name: str
+
+
+class AutoBackupIn(BaseModel):
+    enabled: bool
+
+
+@app.get("/banners")
+def list_banners(x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    d = os.path.join(BASE, "banners")
+    try:
+        return {"banners": sorted(os.listdir(d))}
+    except FileNotFoundError:
+        return {"banners": []}
+
+
+@app.post("/banner/apply")
+def apply_banner(body: BannerTemplateIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    src = os.path.join(BASE, "banners", body.name)
+    if not os.path.exists(src):
+        raise HTTPException(404, "not found")
+    sh(f"cp {src} /etc/issue.net")
+    return {"ok": True}
+
+
+@app.post("/config/autobackup")
+def set_autobackup(body: AutoBackupIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    # remove existing autobackup cron line
+    sh("crontab -l 2>/dev/null | grep -v 'autobackup.sh' | crontab -")
+    if body.enabled:
+        sh("(crontab -l 2>/dev/null; echo '0 2 * * * /root/natssh/autobackup.sh') | crontab -")
+    return {"ok": True}
 @app.post("/accounts/{user}/suspend")
 def suspend(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
