@@ -1027,32 +1027,32 @@ menu_conf() {
         echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
         garis
         echo -e "${CYAN}  -- Port --${NC}"
-        printf "  %-3s %-46s\n" "2." "Ubah Port WebSocket"
-        printf "  %-3s %-46s\n" "3." "Ubah Domain/Host di Kartu Akun"
+        printf "  %-3s %-46s\n" "1." "Ubah Port WebSocket"
+        printf "  %-3s %-46s\n" "2." "Ubah Domain/Host di Kartu Akun"
         echo -e "${CYAN}  -- Batas --${NC}"
-        printf "  %-3s %-46s\n" "1." "Atur Batas Login per Akun (Max Login)"
-        printf "  %-3s %-46s\n" "5." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
-        printf "  %-3s %-46s\n" "8." "Atur Limit Speed SSH (port 22)"
+        printf "  %-3s %-46s\n" "3." "Atur Batas Login per Akun (Max Login)"
+        printf "  %-3s %-46s\n" "4." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
+        printf "  %-3s %-46s\n" "5." "Atur Limit Speed SSH (port 22)"
         echo -e "${CYAN}  -- Layanan --${NC}"
         printf "  %-3s %-46s\n" "6." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
         printf "  %-3s %-46s\n" "7." "Atur Jadwal Restart Otomatis"
-        printf "  %-3s %-46s\n" "10." "badvpn-udpgw (UDP Gateway)"
+        printf "  %-3s %-46s\n" "8." "badvpn-udpgw (UDP Gateway)"
         echo -e "${CYAN}  -- Lainnya --${NC}"
-        printf "  %-3s %-46s\n" "4." "Ubah Banner Pelanggan"
-        printf "  %-3s %-46s\n" "9." "Hide IP"
+        printf "  %-3s %-46s\n" "9." "Ubah Banner Pelanggan"
+        printf "  %-3s %-46s\n" "10." "Hide IP"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-10): " p || exit 0
         case $p in
-            1) conf_maxlogin ;;
-            2) conf_port ;;
-            3) conf_domain ;;
-            4) conf_banner ;;
-            5) conf_maxtotal ;;
+            1) conf_port ;;
+            2) conf_domain ;;
+            3) conf_maxlogin ;;
+            4) conf_maxtotal ;;
+            5) conf_speed ;;
             6) conf_service ;;
             7) conf_restart_schedule ;;
-            8) conf_speed ;;
-            9) conf_hide_ip ;;
-            10) conf_udpgw ;;
+            8) conf_udpgw ;;
+            9) conf_banner ;;
+            10) conf_hide_ip ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
