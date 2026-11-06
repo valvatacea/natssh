@@ -21,6 +21,10 @@ def valid_user(u):
     return bool(re.fullmatch(r"[a-zA-Z0-9_]{3,32}", u))
 
 
+def safe_token(v):
+    return bool(re.fullmatch(r"[a-zA-Z0-9._-]+", v))
+
+
 class AccountIn(BaseModel):
     user: str
     password: str
@@ -105,7 +109,7 @@ def create_account(body: AccountIn, x_api_token: str | None = Header(default=Non
     r = sh(f"useradd -e {exp} -m -s /bin/false {body.user}")
     if r.returncode != 0:
         raise HTTPException(500, r.stderr)
-    r2 = sh(f"echo '{body.user}:{body.password}' | chpasswd")
+    r2 = subprocess.run(["chpasswd"], input=f"{body.user}:{body.password}", text=True, capture_output=True)
     if r2.returncode != 0:
         raise HTTPException(500, r2.stderr)
     return {"ok": True, "user": body.user, "expired": exp}
@@ -162,7 +166,7 @@ def change_password(user: str, body: PasswordIn, x_api_token: str | None = Heade
     auth(x_api_token)
     if not valid_user(user) or len(body.password) < 6:
         raise HTTPException(400, "invalid")
-    r = sh(f"echo '{user}:{body.password}' | chpasswd")
+    r = subprocess.run(["chpasswd"], input=f"{user}:{body.password}", text=True, capture_output=True)
     return {"ok": r.returncode == 0, "stderr": r.stderr}
 
 
@@ -407,6 +411,10 @@ class SpeedApplyIn(BaseModel):
 @app.post("/config/speed/apply")
 def apply_speed(body: SpeedApplyIn, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
+    if not re.fullmatch(r"[a-zA-Z0-9._-]+", body.iface):
+        raise HTTPException(400, "invalid iface")
+    if not re.fullmatch(r"[0-9]+(kbit|mbit|gbit)?", body.up) or not re.fullmatch(r"[0-9]+(kbit|mbit|gbit)?", body.down):
+        raise HTTPException(400, "invalid rate")
     iface = body.iface
     up = body.up
     down = body.down
