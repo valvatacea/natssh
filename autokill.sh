@@ -4,6 +4,9 @@ MAX_LOGIN="${MAX_LOGIN:-5}" # batas perangkat global; env MAX_LOGIN disuntik cro
 LOG_FILE="/root/autokill.log"
 MAX_LOG_SIZE=512000 # 500KB
 SUSPEND_DIR="/root/natssh/suspended"
+SUSPEND_MINUTES=$(cat /root/natssh/suspend_minutes.conf 2>/dev/null)
+SUSPEND_MINUTES=${SUSPEND_MINUTES:-15}
+SUSPEND_SEC=$(( SUSPEND_MINUTES * 60 ))
 mkdir -p "$SUSPEND_DIR"
 
 # Memastikan ukuran log tidak membengkak
@@ -40,9 +43,9 @@ ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | un
         if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$limit" ]; then
             pkill -u "$user" sshd
             usermod -L "$user" 2>/dev/null
-            echo $(( $(date +%s) + 900 )) > "$SUSPEND_DIR/$user"
+            echo $(( $(date +%s) + SUSPEND_SEC )) > "$SUSPEND_DIR/$user"
             echo "$(date '+%Y-%m-%d %H:%M:%S') SELESAI user=$user ip=- edge=- cc=- city=- dur=0m00s up=- down=- ua=autokill" >> "$(dirname "$0")/audit_sess.log"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang & suspend 15m: $user ($devices perangkat, batas $limit)" >> "$LOG_FILE"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang & suspend ${SUSPEND_MINUTES}m: $user ($devices perangkat, batas $limit)" >> "$LOG_FILE"
         fi
     fi
 done

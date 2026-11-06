@@ -969,6 +969,21 @@ conf_hide_ip() {
     fi
 }
 
+conf_suspend_minutes() {
+    local cur=$(cat /root/natssh/suspend_minutes.conf 2>/dev/null)
+    cur=${cur:-15}
+    echo -e "${YELLOW}---- DURASI SUSPEND (autokill) ----${NC}"
+    echo -e "Durasi saat ini: ${GREEN}${cur} menit${NC}"
+    read -p "Durasi baru (1-1440 menit, kosong=batal): " v
+    [ -z "$v" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if ! [[ "$v" =~ ^[0-9]+$ ]] || [ "$v" -lt 1 ] || [ "$v" -gt 1440 ]; then
+        echo -e "${RED}Nilai tidak valid!${NC}"; pause; return
+    fi
+    echo "$v" > /root/natssh/suspend_minutes.conf
+    echo -e "${GREEN}Durasi suspend diubah menjadi ${v} menit.${NC}"
+    pause
+}
+
 conf_udpgw() {
     while true; do
         clear
@@ -1040,8 +1055,9 @@ menu_conf() {
         printf "  %-3s %-46s\n" "9." "Atur Jadwal Restart Otomatis"
         echo -e "${CYAN}  -- Lainnya --${NC}"
         printf "  %-3s %-46s\n" "10." "Ubah Banner Pelanggan"
+        printf "  %-3s %-46s\n" "11." "Ubah Durasi Suspend (menit)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-10): " p || exit 0
+        read -p "Pilih (0-11): " p || exit 0
         case $p in
             1) conf_port ;;
             2) conf_domain ;;
@@ -1053,10 +1069,11 @@ menu_conf() {
             8) conf_udpgw ;;
             9) conf_restart_schedule ;;
             10) conf_banner ;;
+            11) conf_suspend_minutes ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && [ "$p" != "4" ] && [ "$p" != "10" ] && pause
+        [ "$p" != "0" ] && [ "$p" != "4" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && pause
     done
 }
 
