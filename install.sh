@@ -46,10 +46,11 @@ wget -qO menu.sh https://raw.githubusercontent.com/valvatacea/natssh/main/menu.s
 wget -qO ws.py https://raw.githubusercontent.com/valvatacea/natssh/main/ws.py
 wget -qO autokill.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autokill.sh
 wget -qO unsuspend.sh https://raw.githubusercontent.com/valvatacea/natssh/main/unsuspend.sh
+wget -qO autobackup.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autobackup.sh
 wget -qO uninstall.sh https://raw.githubusercontent.com/valvatacea/natssh/main/uninstall.sh
 
 # Unduhan gagal = file kosong -> service crash-loop; cek ukuran
-for f in menu.sh ws.py autokill.sh unsuspend.sh uninstall.sh; do
+for f in menu.sh ws.py autokill.sh unsuspend.sh autobackup.sh uninstall.sh; do
     [ -s "$f" ] || { echo "Gagal mengunduh $f (repo privat/offline?)"; exit 1; }
 done
 echo -e "
@@ -57,7 +58,7 @@ echo -e "
 
 echo -e "
 [*] Mengatur izin eksekusi..."
-chmod +x menu.sh autokill.sh unsuspend.sh uninstall.sh
+chmod +x menu.sh autokill.sh unsuspend.sh autobackup.sh uninstall.sh
 
 echo -e "
 [*] Mengatur Service Systemd untuk WebSocket Proxy (ws.py)..."
