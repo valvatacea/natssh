@@ -48,7 +48,7 @@ for ep in eps:
             if -2<=dsec<=10 and abs(dsec)<bd:
                 bd=abs(dsec); ip=rip; edge=red; ua=rua
         if ip is not None:
-            dur=int(now-ep)
+            dur=int(now-t)
             lines.append("SELESAI user=%s ip=%s edge=%s cc=- city=- dur=%dm%02ds up=- down=- ua=%s" % (user,ip,edge,dur//60,dur%60,ua or "-"))
         continue
     best["_used"]=True
