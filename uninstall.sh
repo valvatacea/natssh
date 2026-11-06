@@ -33,6 +33,7 @@ rm -f /etc/systemd/system/natssh-udpgw@.service
 systemctl daemon-reload
 
 crontab -l | grep -v "unsuspend.sh" | crontab - 2>/dev/null
+crontab -l | grep -v "autobackup.sh" | crontab - 2>/dev/null
 rm -rf /root/natssh/suspended
 
 echo -e "\n[*] Menghapus Cronjob Autokill..."
@@ -51,12 +52,12 @@ echo -e ""
 echo -e "[*] Menghapus file skrip..."
 read -p "Apakah Anda ingin menghapus file menu.sh, ws.py, autokill.sh, dan install.sh? (y/n): " hapus_file
 if [[ "$hapus_file" =~ ^[Yy]$ ]]; then
-    rm -f menu.sh ws.py autokill.sh install.sh autokill_v2.sh
+    rm -f menu.sh ws.py autokill.sh install.sh autokill_v2.sh autobackup.sh unsuspend.sh
     read -p "Hapus juga data (issue.net, ws.log, autokill.log, backup, slot banner, conf)? (y/N): " hapus_data
     if [[ "$hapus_data" =~ ^[Yy]$ ]]; then
         rm -f /etc/issue.net /root/autokill.log /root/backup_akun_ssh.sh
         rm -rf /root/natssh/banners /root/natssh/ws.log
-        rm -f /root/natssh/host.conf /root/natssh/port.conf /root/natssh/ip.conf /root/natssh/hide_ip.conf
+        rm -f /root/natssh/host.conf /root/natssh/port.conf /root/natssh/ip.conf /root/natssh/hide_ip.conf /root/natssh/suspend_minutes.conf
         rm -rf /root/natssh/limits /root/natssh/conns.json /root/natssh/audit_state.json /root/natssh/audit_sess.log
         echo -e "${GREEN}Data banner/log/backup terhapus.${NC}"
     else
