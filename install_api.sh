@@ -4,9 +4,9 @@ if [ ! -d /root/natssh ]; then
     echo "natssh belum terpasang."
     exit 1
 fi
-python3 -m pip install -r /root/natssh/api/requirements.txt
+/usr/bin/python3 -m pip install --break-system-packages --ignore-installed -r /root/natssh/api/requirements.txt
 if [ ! -f /root/natssh/.api_token ]; then
-    python3 -c "import secrets; print(secrets.token_urlsafe(48))" > /root/natssh/.api_token
+    /usr/bin/python3 -c "import secrets; print(secrets.token_urlsafe(48))" > /root/natssh/.api_token
 fi
 TOKEN=$(cat /root/natssh/.api_token)
 cat > /etc/systemd/system/natssh-api.service <<EOF
