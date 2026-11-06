@@ -305,6 +305,38 @@ def set_suspend_minutes(body: SuspendMinutesIn, x_api_token: str | None = Header
     with open(os.path.join(BASE, "suspend_minutes.conf"), "w") as f:
         f.write(str(body.minutes))
     return {"ok": True}
+class MaxTotalIn(BaseModel):
+    value: int
+
+
+class MaxPerIpIn(BaseModel):
+    value: int
+
+
+@app.post("/config/max_total")
+def set_max_total(body: MaxTotalIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if body.value < 1:
+        raise HTTPException(400, "invalid")
+    sh(f"sed -i 's/Environment=NATSSH_MAX_TOTAL=[0-9]*/Environment=NATSSH_MAX_TOTAL={body.value}/' /etc/systemd/system/natssh-ws.service")
+    sh("systemctl daemon-reload && systemctl restart natssh-ws")
+    return {"ok": True}
+
+
+@app.post("/config/max_per_ip")
+def set_max_per_ip(body: MaxPerIpIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if body.value < 1:
+        raise HTTPException(400, "invalid")
+    # max_per_ip not currently in unit; append if missing
+    unit = "/etc/systemd/system/natssh-ws.service"
+    r = sh(f"grep -q 'NATSSH_MAX_PER_IP' {unit}")
+    if r.returncode != 0:
+        sh(f"sed -i '/Environment=NATSSH_WS_PORT=/a Environment=NATSSH_MAX_PER_IP={body.value}' {unit}")
+    else:
+        sh(f"sed -i 's/Environment=NATSSH_MAX_PER_IP=[0-9]*/Environment=NATSSH_MAX_PER_IP={body.value}/' {unit}")
+    sh("systemctl daemon-reload && systemctl restart natssh-ws")
+    return {"ok": True}
 @app.post("/accounts/{user}/suspend")
 def suspend(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
