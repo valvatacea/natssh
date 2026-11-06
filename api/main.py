@@ -398,6 +398,37 @@ def set_autobackup(body: AutoBackupIn, x_api_token: str | None = Header(default=
     if body.enabled:
         sh("(crontab -l 2>/dev/null; echo '0 2 * * * /root/natssh/autobackup.sh') | crontab -")
     return {"ok": True}
+class SpeedApplyIn(BaseModel):
+    iface: str
+    up: str
+    down: str
+
+
+@app.post("/config/speed/apply")
+def apply_speed(body: SpeedApplyIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    iface = body.iface
+    up = body.up
+    down = body.down
+    cmds = f"""
+IFACE={iface}
+tc qdisc del dev $IFACE root 2>/dev/null
+tc qdisc del dev $IFACE ingress 2>/dev/null
+tc qdisc add dev $IFACE root handle 1: htb default 30
+tc class add dev $IFACE parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
+tc class add dev $IFACE parent 1:1 classid 1:10 htb rate {up} ceil {up} prio 1 burst 32k
+tc class add dev $IFACE parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
+tc qdisc add dev $IFACE parent 1:10 handle 10: fq_codel
+tc qdisc add dev $IFACE parent 1:30 handle 30: fq_codel
+tc filter add dev $IFACE parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
+tc filter add dev $IFACE parent 1: protocol ip prio 1 u32 match ip dport 22 0xffff flowid 1:10 2>/dev/null
+echo "IFACE=$IFACE" > /root/natssh/speed.conf
+echo "UP={up}" >> /root/natssh/speed.conf
+echo "DOWN={down}" >> /root/natssh/speed.conf
+echo "MODE=ssh-only" >> /root/natssh/speed.conf
+"""
+    r = sh(cmds)
+    return {"ok": r.returncode == 0, "stderr": r.stderr}
 @app.post("/accounts/{user}/suspend")
 def suspend(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
