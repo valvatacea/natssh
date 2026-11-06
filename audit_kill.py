@@ -42,7 +42,7 @@ for ep in eps:
                 bkey=key; best=c
     if best is None:
         # fallback ws.log
-        bd=99; ip=ua=edge=None
+        bd=99; ip=ua=edge=None; t=0
         for t,rip,red,rua in logconns:
             dsec=ep-t
             if -2<=dsec<=10 and abs(dsec)<bd:
