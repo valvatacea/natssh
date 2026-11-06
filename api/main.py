@@ -244,6 +244,25 @@ def udpgw_toggle(port: int, x_api_token: str | None = Header(default=None)):
         r = sh(f"systemctl enable --now {svc}")
         action = "enabled"
     return {"ok": r.returncode == 0, "action": action, "stderr": r.stderr}
+class BannerIn(BaseModel):
+    text: str
+
+
+@app.get("/banner")
+def get_banner(x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    try:
+        return {"text": open("/etc/issue.net").read()}
+    except FileNotFoundError:
+        return {"text": ""}
+
+
+@app.put("/banner")
+def set_banner(body: BannerIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    with open("/etc/issue.net", "w") as f:
+        f.write(body.text)
+    return {"ok": True}
 @app.post("/accounts/{user}/suspend")
 def suspend(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
