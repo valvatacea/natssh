@@ -1036,8 +1036,8 @@ menu_conf() {
         printf "  %-3s %-46s\n" "6." "Atur Limit Speed SSH (port 22)"
         echo -e "${CYAN}  -- Layanan --${NC}"
         printf "  %-3s %-46s\n" "7." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
-        printf "  %-3s %-46s\n" "8." "Atur Jadwal Restart Otomatis"
-        printf "  %-3s %-46s\n" "9." "badvpn-udpgw (UDP Gateway)"
+        printf "  %-3s %-46s\n" "8." "badvpn-udpgw (UDP Gateway)"
+        printf "  %-3s %-46s\n" "9." "Atur Jadwal Restart Otomatis"
         echo -e "${CYAN}  -- Lainnya --${NC}"
         printf "  %-3s %-46s\n" "10." "Ubah Banner Pelanggan"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
@@ -1050,8 +1050,8 @@ menu_conf() {
             5) conf_maxtotal ;;
             6) conf_speed ;;
             7) conf_service ;;
-            8) conf_restart_schedule ;;
-            9) conf_udpgw ;;
+            8) conf_udpgw ;;
+            9) conf_restart_schedule ;;
             10) conf_banner ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
