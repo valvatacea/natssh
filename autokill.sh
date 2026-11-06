@@ -49,7 +49,7 @@ ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | un
                 e=$(date -d "$st" +%s 2>/dev/null)
                 [ -n "$e" ] && eps="$eps $e"
             done
-            printf '%s\n' $eps | "$(dirname "$(readlink -f "$0")")/audit_kill.py" "$user" 2>/dev/null
+            printf '%s\n' $eps | python3 "$(dirname "$(readlink -f "$0")")/audit_kill.py" "$user" 2>/dev/null
             pkill -u "$user" sshd
             usermod -L "$user" 2>/dev/null
             echo $(( $(date +%s) + SUSPEND_SEC )) > "$SUSPEND_DIR/$user"
