@@ -227,9 +227,17 @@ do_limit() {
 }
 
 do_suspend() {
+    # audit sesi aktif dulu sebelum kill
+    eps=""
+    for pid in $(pgrep -u "$1" sshd); do
+        st=$(ps -o lstart= -p "$pid" 2>/dev/null | sed 's/^ *//')
+        [ -z "$st" ] && continue
+        e=$(date -d "$st" +%s 2>/dev/null)
+        [ -n "$e" ] && eps="$eps $e"
+    done
+    printf '%s\n' $eps | python3 "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/audit_kill.py" "$1" 2>/dev/null
     usermod -L "$1"
     pkill -u "$1" sshd 2>/dev/null
-    echo "$(date '+%Y-%m-%d %H:%M:%S') SELESAI user=$1 ip=- edge=- cc=- city=- dur=0m00s up=- down=- ua=suspend" >> "$(dirname "${BASH_SOURCE[0]}")/audit_sess.log"
     echo -e "${GREEN}SUKSES! Akun $1 dikunci (suspend) — pelanggan tak bisa login.${NC}"
 }
 
