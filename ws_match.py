@@ -125,8 +125,9 @@ def grup_riwayat(user):
     for t, u, ip, edge, cc, city, dur, up, down, ua in rows[-5:]:
         jalur = f" {C_DIM}[{cdn_label(edge)}]{C_RESET}" if edge not in ("-", "") else ""
         geo = f" {C_DIM}{city}{(' ' + cc) if cc != '-' else ''}{C_RESET}" if city != "-" else ""
-        print(f"     {t[11:]}   {ip:<16} {(ua or '-'):<40} {dur:>7} "
+        print(f"     {t[11:]}   {ip:<16} {dur:>7} "
               f"{up}\u2191{down}\u2193{C_RESET}{jalur}{geo}")
+        print(f"              {C_DIM}UA: {ua or '-'}{C_RESET}")
 
 seen: set[int] = set()
 cur = None
@@ -173,8 +174,9 @@ for user, ep in [(u, int(e)) for u, e in raw]:
         geo = ""
         if best.get("city") or best.get("cc"):
             geo = f"  {C_DIM}{best.get('city') or ''}{(' ' + best['cc']) if best.get('cc') else ''}{C_RESET}"
-        line = (f"   {wt} {C_WHITE}{best['ip']:<16}\033[0m{(best['ua'] or '-'):<40}"
+        line = (f"   {wt} {C_WHITE}{best['ip']:<16}\033[0m"
                 f"{durasi:>7} {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193 {status}{jalur}{geo}")
+        extra_ua = best.get('ua') or '-'
     else:
         ip = ua = None
         bd = 99
@@ -185,7 +187,9 @@ for user, ep in [(u, int(e)) for u, e in raw]:
                 ip, ua = rip, rua
         line = (f"   {wt}  {C_WHITE}{(ip or '?-'):<15}\033[0m {(ua or '(tanpa UA)')[:18]:<18}"
                 f"  {C_DIM}(sesi basi/pra-patch: koneksi sudah lepas){C_RESET}")
+        extra_ua = ua or '(tanpa UA)'
     print(line)
+    print(f"              {C_DIM}UA: {extra_ua}{C_RESET}")
 
 recap(cur)
 if cur is not None:
