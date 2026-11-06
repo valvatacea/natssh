@@ -3,9 +3,22 @@ from pydantic import BaseModel
 import json, os, subprocess, re
 from datetime import datetime, timedelta
 
-app = FastAPI(title="NATSSH API", version="0.2")
-TOKEN = os.environ.get("NATSSH_API_TOKEN", "change-me")
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TOKEN = os.environ.get("NATSSH_API_TOKEN", "change-me")
+app = FastAPI(title="NATSSH API", version="0.2")
+
+import logging
+logging.basicConfig(filename=os.path.join(BASE, "api.log"), level=logging.INFO,
+                    format="%(asctime)s %(message)s")
+
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    ip = request.client.host if request.client else "-"
+    token = request.headers.get("x-api-token", "-")
+    response = await call_next(request)
+    logging.info(f"{ip} {request.method} {request.url.path} status={response.status_code} token={token[:6]}...")
+    return response
 
 
 def auth(token):
