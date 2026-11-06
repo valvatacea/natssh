@@ -153,7 +153,7 @@ def handle_client(client_socket, ip):
                or (xff.split(",")[0].strip() if xff else "")
                or ip)
     via_cdn = real_ip != ip
-    ua = _header(request, "User-Agent")[:48]
+    ua = _header(request, "User-Agent")[:200]
     # geo gratis dari CDN: CloudFront -> CloudFront-Viewer-City/Country; Cloudflare -> CF-IPCountry
     city = _header(request, "CloudFront-Viewer-City")[:32]
     cc = _header(request, "CloudFront-Viewer-Country") or _header(request, "CF-IPCountry")
