@@ -41,6 +41,7 @@ ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | un
             pkill -u "$user" sshd
             usermod -L "$user" 2>/dev/null
             echo $(( $(date +%s) + 900 )) > "$SUSPEND_DIR/$user"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') SELESAI user=$user ip=- edge=- cc=- city=- dur=0m00s up=- down=- ua=autokill" >> "$(dirname "$0")/audit_sess.log"
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang & suspend 15m: $user ($devices perangkat, batas $limit)" >> "$LOG_FILE"
         fi
     fi
