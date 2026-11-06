@@ -263,6 +263,48 @@ def set_banner(body: BannerIn, x_api_token: str | None = Header(default=None)):
     with open("/etc/issue.net", "w") as f:
         f.write(body.text)
     return {"ok": True}
+class HostCfIn(BaseModel):
+    domain: str
+
+
+class SuspendMinutesIn(BaseModel):
+    minutes: int
+
+
+@app.get("/config/host_cf")
+def get_host_cf(x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    try:
+        return {"domain": open(os.path.join(BASE, "host_cf.conf")).read().strip()}
+    except FileNotFoundError:
+        return {"domain": ""}
+
+
+@app.post("/config/host_cf")
+def set_host_cf(body: HostCfIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    with open(os.path.join(BASE, "host_cf.conf"), "w") as f:
+        f.write(body.domain)
+    return {"ok": True}
+
+
+@app.get("/config/suspend_minutes")
+def get_suspend_minutes(x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    try:
+        return {"minutes": int(open(os.path.join(BASE, "suspend_minutes.conf")).read().strip())}
+    except Exception:
+        return {"minutes": 15}
+
+
+@app.post("/config/suspend_minutes")
+def set_suspend_minutes(body: SuspendMinutesIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if body.minutes < 1:
+        raise HTTPException(400, "invalid")
+    with open(os.path.join(BASE, "suspend_minutes.conf"), "w") as f:
+        f.write(str(body.minutes))
+    return {"ok": True}
 @app.post("/accounts/{user}/suspend")
 def suspend(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
