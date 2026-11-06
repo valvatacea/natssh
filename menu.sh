@@ -530,7 +530,8 @@ menu_backup() {
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && pause
+        [ "$p" != "0" ] && [ "$p" != "2" ] && [ "$p" != "3" ] && pause
+
     done
 }
 
