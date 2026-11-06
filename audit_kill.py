@@ -5,6 +5,17 @@ DIR=os.path.dirname(os.path.abspath(__file__))
 CONNS=os.path.join(DIR,"conns.json")
 STATE=os.path.join(DIR,"audit_state.json")
 LOG=os.path.join(DIR,"audit_sess.log")
+LOGF=os.path.join(DIR,"ws.log")
+logconns=[]
+try:
+    import re,datetime
+    for line in open(LOGF):
+        m=re.match(r"(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) JEMBAT (\S+) \(edge=(\S+), ua='([^']*)'", line)
+        if m:
+            t=datetime.datetime.strptime(m.group(1),"%Y-%m-%d %H:%M:%S").timestamp()
+            logconns.append((t,m.group(2),m.group(3),m.group(4)))
+except Exception:
+    pass
 user=sys.argv[1]
 eps=[int(x) for x in sys.stdin.read().split() if x.isdigit()]
 try:
@@ -30,6 +41,15 @@ for ep in eps:
             if bkey is None or key<bkey:
                 bkey=key; best=c
     if best is None:
+        # fallback ws.log
+        bd=99; ip=ua=edge=None
+        for t,rip,red,rua in logconns:
+            dsec=ep-t
+            if -2<=dsec<=10 and abs(dsec)<bd:
+                bd=abs(dsec); ip=rip; edge=red; ua=rua
+        if ip is not None:
+            dur=int(now-ep)
+            lines.append("SELESAI user=%s ip=%s edge=%s cc=- city=- dur=%dm%02ds up=- down=- ua=%s" % (user,ip,edge,dur//60,dur%60,ua or "-"))
         continue
     best["_used"]=True
     key=str(best["start"])
