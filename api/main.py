@@ -31,6 +31,22 @@ class LimitIn(BaseModel):
     limit: str
 
 
+class RenewIn(BaseModel):
+    days: int
+
+
+class PasswordIn(BaseModel):
+    password: str
+
+
+class PortIn(BaseModel):
+    port: str
+
+
+class DomainIn(BaseModel):
+    domain: str
+
+
 @app.get("/status")
 def status(x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
@@ -130,6 +146,56 @@ def set_limit(user: str, body: LimitIn, x_api_token: str | None = Header(default
     with open(os.path.join(BASE, "limits", user), "w") as f:
         f.write(body.limit)
     return {"ok": True, "limit": body.limit}
+
+
+@app.post("/accounts/{user}/renew")
+def renew(user: str, body: RenewIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if not valid_user(user) or body.days < 1:
+        raise HTTPException(400, "invalid")
+    r = sh(f"chage -E $(date -d '{body.days} days' +%Y-%m-%d) {user}")
+    return {"ok": r.returncode == 0, "stderr": r.stderr}
+
+
+@app.post("/accounts/{user}/password")
+def change_password(user: str, body: PasswordIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if not valid_user(user) or len(body.password) < 6:
+        raise HTTPException(400, "invalid")
+    r = sh(f"echo '{user}:{body.password}' | chpasswd")
+    return {"ok": r.returncode == 0, "stderr": r.stderr}
+
+
+@app.get("/audit")
+def audit(user: str | None = None, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    rows = []
+    try:
+        for line in open(os.path.join(BASE, "audit_sess.log")):
+            if user and f"user={user} " not in line:
+                continue
+            rows.append(line.strip())
+    except FileNotFoundError:
+        pass
+    return {"rows": rows[-50:]}
+
+
+@app.post("/config/port")
+def set_port(body: PortIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if not body.port.isdigit():
+        raise HTTPException(400, "invalid port")
+    with open(os.path.join(BASE, "port.conf"), "w") as f:
+        f.write(body.port)
+    return {"ok": True}
+
+
+@app.post("/config/domain")
+def set_domain(body: DomainIn, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    with open(os.path.join(BASE, "host.conf"), "w") as f:
+        f.write(body.domain)
+    return {"ok": True}
 
 
 @app.post("/accounts/{user}/suspend")
