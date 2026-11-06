@@ -229,6 +229,7 @@ do_limit() {
 do_suspend() {
     usermod -L "$1"
     pkill -u "$1" sshd 2>/dev/null
+    echo "$(date '+%Y-%m-%d %H:%M:%S') SELESAI user=$1 ip=- edge=- cc=- city=- dur=0m00s up=- down=- ua=suspend" >> "$(dirname "${BASH_SOURCE[0]}")/audit_sess.log"
     echo -e "${GREEN}SUKSES! Akun $1 dikunci (suspend) — pelanggan tak bisa login.${NC}"
 }
 
