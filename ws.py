@@ -215,6 +215,9 @@ def handle_client(client_socket, ip):
                             with open(PENDING_FILE) as f: pending=json.load(f)
                         except Exception:
                             pending=[]
+                    # rotasi: buang pending >5 menit
+                    nowt=time.time()
+                    pending=[p for p in pending if nowt - p.get("start",nowt) <= 300]
                     pending.append({**conn, "end": round(time.time(),3)})
                     pending=pending[-200:]
                     tmp=PENDING_FILE+".tmp"
