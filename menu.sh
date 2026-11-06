@@ -463,7 +463,7 @@ backup_ekspor() {
 
 backup_config() {
     local ts=$(date +%Y%m%d_%H%M%S)
-    local out="/root/natssh_config_${ts}.tar.gz"
+    local out="/root/natssh_config.tar.gz"
     local list=""
     cd /root/natssh
     [ -f ip.conf ] && list="$list ip.conf"
