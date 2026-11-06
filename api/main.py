@@ -230,6 +230,20 @@ def set_speed(body: SpeedIn, x_api_token: str | None = Header(default=None)):
     with open(os.path.join(BASE, "speed.conf"), "w") as f:
         f.write(body.value)
     return {"ok": True}
+@app.post("/udpgw/{port}/toggle")
+def udpgw_toggle(port: int, x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    if port not in (7100, 7200, 7300, 7400, 7500):
+        raise HTTPException(400, "invalid port")
+    svc = f"natssh-udpgw@{port}.service"
+    st = sh(f"systemctl is-active {svc}").stdout.strip()
+    if st == "active":
+        r = sh(f"systemctl disable --now {svc}")
+        action = "disabled"
+    else:
+        r = sh(f"systemctl enable --now {svc}")
+        action = "enabled"
+    return {"ok": r.returncode == 0, "action": action, "stderr": r.stderr}
 @app.post("/accounts/{user}/suspend")
 def suspend(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
