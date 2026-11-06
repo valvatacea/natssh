@@ -74,6 +74,7 @@ _SEQ = itertools.count(1)
 _LAST = collections.deque(maxlen=100)   # 100 koneksi terakhir selesai
 _last_dump = 0.0
 CONNS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "conns.json")
+PENDING_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pending_sess.json")
 
 
 def _dump():
@@ -205,6 +206,18 @@ def handle_client(client_socket, ip):
                 _LAST.append({**conn, "end": round(time.time(), 3)})
                 _CONNS.pop(cid, None)
             _dump()
+            # catat pending untuk audit real-time
+            try:
+                pending=[]
+                if os.path.exists(PENDING_FILE):
+                    with open(PENDING_FILE) as f: pending=json.load(f)
+                pending.append({**conn, "end": round(time.time(),3)})
+                pending=pending[-200:]
+                tmp=PENDING_FILE+".tmp"
+                with open(tmp,"w") as f: json.dump(pending,f)
+                os.replace(tmp,PENDING_FILE)
+            except Exception:
+                pass
         _release(ip, via_cdn)
 
 

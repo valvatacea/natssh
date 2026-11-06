@@ -103,6 +103,29 @@ def main():
                                   "cc": best.get("cc") or "-",
                                   "edge": best.get("edge") or "-"}
 
+    # proses pending (real-time) dulu
+    pending=[]
+    try:
+        pending=json.load(open(os.path.join(DIR,"pending_sess.json")))
+    except (OSError,ValueError):
+        pending=[]
+    for c in pending:
+        key=str(c["start"])
+        v=state.get(key)
+        if isinstance(v,dict): user=v.get("user","-")
+        elif isinstance(v,str): user=v
+        else: user="-"
+        dur=int(c.get("end",now)-c["start"])
+        city=(c.get("city") or "-").replace(" ","-")
+        catat(f"SELESAI user={user} ip={c.get('ip','-')} edge={c.get('edge','-')} cc={c.get('cc','-')} "
+              f"city={city} dur={dur//60}m{dur%60:02d}s "
+              f"up={c.get('up',0)/1048576:.1f} down={c.get('down',0)/1048576:.1f} ua={c.get('ua','-')}")
+        state.pop(key,None)
+    try:
+        with open(os.path.join(DIR,"pending_sess.json"),"w") as f: json.dump([],f)
+    except OSError:
+        pass
+
     # koneksi yang hilang dari live -> SATU baris SELESAI lengkap
     for key in list(state):
         if key in live_starts:
