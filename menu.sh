@@ -783,8 +783,12 @@ conf_speed() {
         read -p "Pilih (0-5): " c || return
         case $c in
             1)
-                read -p "Upload Cloudflare (default 25): " up; [ -z "$up" ] && up="25"
-                read -p "Download Cloudflare (default 25): " down; [ -z "$down" ] && down="25"
+                read -p "Upload Cloudflare (default 25, 0=batal): " up
+                [ "$up" == "0" ] && {{ echo -e "${{YELLOW}}Dibatalkan.${{NC}}"; pause; continue; }}
+                [ -z "$up" ] && up="25"
+                read -p "Download Cloudflare (default 25, 0=batal): " down
+                [ "$down" == "0" ] && {{ echo -e "${{YELLOW}}Dibatalkan.${{NC}}"; pause; continue; }}
+                [ -z "$down" ] && down="25"
                 for v in up down; do
                     val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
                 done
@@ -801,8 +805,12 @@ conf_speed() {
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit Cloudflare diterapkan.${NC}"; pause ;;
             2)
-                read -p "Upload CloudFront (default 25): " up; [ -z "$up" ] && up="25"
-                read -p "Download CloudFront (default 25): " down; [ -z "$down" ] && down="25"
+                read -p "Upload CloudFront (default 25, 0=batal): " up
+                [ "$up" == "0" ] && {{ echo -e "${{YELLOW}}Dibatalkan.${{NC}}"; pause; continue; }}
+                [ -z "$up" ] && up="25"
+                read -p "Download CloudFront (default 25, 0=batal): " down
+                [ "$down" == "0" ] && {{ echo -e "${{YELLOW}}Dibatalkan.${{NC}}"; pause; continue; }}
+                [ -z "$down" ] && down="25"
                 for v in up down; do
                     val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
                 done
@@ -818,10 +826,18 @@ conf_speed() {
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit CloudFront diterapkan.${NC}"; pause ;;
             3)
-                read -p "Upload Cloudflare (default 25): " up_cf; [ -z "$up_cf" ] && up_cf="25"
-                read -p "Download Cloudflare (default 25): " down_cf; [ -z "$down_cf" ] && down_cf="25"
-                read -p "Upload CloudFront (default 25): " up_cfront; [ -z "$up_cfront" ] && up_cfront="25"
-                read -p "Download CloudFront (default 25): " down_cfront; [ -z "$down_cfront" ] && down_cfront="25"
+                read -p "Upload Cloudflare (default 25, 0=batal): " up_cf
+                [ "$up_cf" == "0" ] && {{ echo -e "${{YELLOW}}Dibatalkan.${{NC}}"; pause; continue; }}
+                [ -z "$up_cf" ] && up_cf="25"
+                read -p "Download Cloudflare (default 25, 0=batal): " down_cf
+                [ "$down_cf" == "0" ] && {{ echo -e "${{YELLOW}}Dibatalkan.${{NC}}"; pause; continue; }}
+                [ -z "$down_cf" ] && down_cf="25"
+                read -p "Upload CloudFront (default 25, 0=batal): " up_cfront
+                [ "$up_cfront" == "0" ] && {{ echo -e "${{YELLOW}}Dibatalkan.${{NC}}"; pause; continue; }}
+                [ -z "$up_cfront" ] && up_cfront="25"
+                read -p "Download CloudFront (default 25, 0=batal): " down_cfront
+                [ "$down_cfront" == "0" ] && {{ echo -e "${{YELLOW}}Dibatalkan.${{NC}}"; pause; continue; }}
+                [ -z "$down_cfront" ] && down_cfront="25"
                 for v in up_cf down_cf up_cfront down_cfront; do
                     val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
                 done
