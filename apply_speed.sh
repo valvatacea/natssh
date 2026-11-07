@@ -4,10 +4,10 @@ CONF=/root/natssh/speed.conf
 [ -f "$CONF" ] || exit 0
 source "$CONF"
 IFACE=${IFACE:-eth0}
-UP_CF=${UP_CF:-4mbit}
-DOWN_CF=${DOWN_CF:-4mbit}
-UP_CFRONT=${UP_CFRONT:-4mbit}
-DOWN_CFRONT=${DOWN_CFRONT:-4mbit}
+UP_CF=${UP_CF:-1000mbit}
+DOWN_CF=${DOWN_CF:-1000mbit}
+UP_CFRONT=${UP_CFRONT:-1000mbit}
+DOWN_CFRONT=${DOWN_CFRONT:-1000mbit}
 
 # fetch IP ranges
 CF_IPS=$(curl -fsSL https://www.cloudflare.com/ips-v4 2>/dev/null)
