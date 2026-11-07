@@ -12,5 +12,6 @@ for f in "$SUSPEND_DIR"/*; do
         usermod -U "$user" 2>/dev/null
         rm -f "$f"
         echo "$(date '+%Y-%m-%d %H:%M:%S') - Unsuspend otomatis: $user" >> "$LOG_FILE"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - UNSUSPEND: $user" >> /root/natssh/suspended_history.log
     fi
 done

@@ -27,6 +27,13 @@ fi
 LIMITS_DIR="$(dirname "$(readlink -f "$0")")/limits"
 ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | uniq -c | while read count user; do
     if id "$user" &>/dev/null; then
+        # Jangan reset suspend yang masih berlaku
+        if [ -f "$SUSPEND_DIR/$user" ]; then
+            exp_now=$(cat "$SUSPEND_DIR/$user" 2>/dev/null)
+            if [[ "$exp_now" =~ ^[0-9]+$ ]] && [ "$(date +%s)" -lt "$exp_now" ]; then
+                continue
+            fi
+        fi
         shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
         devices=$count
         # batas khusus per akun (limits/<user>, angka >= 1 bebas) menimpa global
@@ -54,6 +61,7 @@ ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | un
             usermod -L "$user" 2>/dev/null
             echo $(( $(date +%s) + SUSPEND_SEC )) > "$SUSPEND_DIR/$user"
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang & suspend ${SUSPEND_MINUTES}m: $user ($devices perangkat, batas $limit)" >> "$LOG_FILE"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - SUSPEND: $user ($devices perangkat, batas $limit, expired $(date -d @$(( $(date +%s) + SUSPEND_SEC )) '+%Y-%m-%d %H:%M:%S'))" >> /root/natssh/suspended_history.log
         fi
     fi
 done
