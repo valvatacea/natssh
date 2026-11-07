@@ -1,5 +1,6 @@
 #!/bin/bash
 # Buka kunci akun yang masa suspend 15 menitnya habis
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 SUSPEND_DIR="/root/natssh/suspended"
 LOG_FILE="/root/autokill.log"
 [ -d "$SUSPEND_DIR" ] || exit 0
