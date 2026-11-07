@@ -770,8 +770,6 @@ conf_speed() {
         if tc class show dev eth0 2>/dev/null | grep -q "class htb.*1:10"; then
             echo -e "${GREEN}Limit AKTIF:${NC}"
             [ -f /root/natssh/speed.conf ] && grep -E "^(UP|DOWN)_" /root/natssh/speed.conf
-        else
-            echo -e "${YELLOW}Belum ada limit speed${NC}"
         fi
         echo ""
         echo "1. Set limit Cloudflare (upload + download)"
