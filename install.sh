@@ -182,14 +182,23 @@ echo -e "
 [*] Mengatur Banner Pesan SSH..."
 cat > /etc/issue.net <<EOF
 <br>
-<font color="green"><b>======================================</b></font><br>
-<font color="yellow"><b>       SELAMAT DATANG DI PREMIUM VPN  </b></font><br>
-<font color="green"><b>======================================</b></font><br>
-<font color="red"><b> PERINGATAN: </b></font><br>
-<font color="white"> - Dilarang Torrent </font><br>
-<font color="white"> - Dilarang DDOS / Hacking </font><br>
-<font color="white"> - Maksimal ${max_login} Perangkat per Akun (Auto-Kill) </font><br>
-<font color="green"><b>======================================</b></font><br>
+<center>
+<p align="center">
+<font color="cyan">╔═══════════════════════╗</font><br>
+<font color="yellow"><b>⚡ PREMIUM VPN SERVICE ⚡</b></font><br>
+<font color="cyan">╠═══════════════════════╣</font><br>
+<font color="green">✅ KONEKSI BERHASIL</font><br>
+<font color="orange">🌍 Server : Indonesia — Premium</font><br>
+<font color="aqua">🚀 Speed : up 100 Mbps</font><br>
+<font color="lime">📱 Maksimal ${max_login} Perangkat/Akun</font><br>
+<font color="orange">⚔ Auto-Kill AKTIF</font><br>
+<font color="white">──────────────────</font><br>
+<font color="red">⛔ Dilarang: Torrent · DDoS · Data Waster · Hack</font><br>
+<font color="grey">🛡 Support : </font><font color="magenta"><a href="https://wa.me/6281223711096?text=Halo%2C%20saya%20ingin%20membeli%20layanan%20SSH%2FVPN.%20Bisa%20info%20paket%20dan%20harganya%3F" target="_blank" rel="noopener">+6281223711096</a></font><br>
+<font color="cyan">╚═══════════════════════╝</font><br>
+<font color="green"><b>═══ SELAMAT MENIKMATI ═══</b></font><br>
+</p>
+</center>
 EOF
 
 # Aktifkan banner di sshd_config (aman diulang: bila 'Banner' sudah ada, cukup pastikan arahnya benar)
