@@ -769,10 +769,10 @@ conf_speed() {
     ws_port=${ws_port:-22}
     clear
     garis
-    echo -e "${YELLOW}--- ATUR LIMIT SPEED SSH SAJA (HTB) ---${NC}"
+    echo -e "${YELLOW}--- ATUR LIMIT SPEED SSH (WebSocket) ---${NC}"
     garis
     echo -e "Interface: ${GREEN}${iface}${NC}"
-    echo -e "Hanya trafik SSH (port 22) yg dibatasi"
+    echo -e "Hanya trafik SSH (WebSocket) yg dibatasi"
     echo ""
     if tc class show dev $iface 2>/dev/null | grep -q "class htb.*1:10"; then
         echo -e "${GREEN}Limit SSH AKTIF:${NC}"
@@ -1169,7 +1169,7 @@ menu_conf() {
         echo -e "${CYAN}  -- Batas --${NC}"
         printf "  %-3s %-46s\n" "4." "Atur Batas Login per Akun (Max Login)"
         printf "  %-3s %-46s\n" "5." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
-        printf "  %-3s %-46s\n" "6." "Atur Limit Speed SSH (port 22)"
+        printf "  %-3s %-46s\n" "6." "Atur Limit Speed SSH (WebSocket)"
         echo -e "${CYAN}  -- Layanan --${NC}"
         printf "  %-3s %-46s\n" "7." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
         printf "  %-3s %-46s\n" "8." "badvpn-udpgw (UDP Gateway)"
