@@ -764,6 +764,9 @@ conf_service() {
 conf_speed() {
     local iface=$(ip route | grep default | awk '{print $5}' | head -1)
     iface=${iface:-eth0}
+    ws_pid=$(pgrep -f 'ws.py' | head -1)
+    ws_port=$(ss -tlnp 2>/dev/null | grep "pid=${ws_pid}," | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
+    ws_port=${ws_port:-22}
     clear
     garis
     echo -e "${YELLOW}--- ATUR LIMIT SPEED SSH SAJA (HTB) ---${NC}"
@@ -819,8 +822,8 @@ conf_speed() {
             tc class add dev $iface parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
             tc qdisc add dev $iface parent 1:10 handle 10: fq_codel
             tc qdisc add dev $iface parent 1:30 handle 30: fq_codel
-            tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
-            tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip dport 22 0xffff flowid 1:10 2>/dev/null
+            tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip sport $ws_port 0xffff flowid 1:10 2>/dev/null
+            tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip dport $ws_port 0xffff flowid 1:10 2>/dev/null
         fi
         if [ -n "$down" ]; then
             modprobe ifb 2>/dev/null
@@ -830,7 +833,7 @@ conf_speed() {
             ip link set dev ifb0 up 2>/dev/null
             tc qdisc del dev $iface ingress 2>/dev/null
             tc qdisc add dev $iface ingress handle ffff:
-            tc filter add dev $iface parent ffff: protocol ip prio 1 u32 match ip dport 22 0xffff action mirred egress redirect dev ifb0 2>/dev/null
+            tc filter add dev $iface parent ffff: protocol ip prio 1 u32 match ip dport $ws_port 0xffff action mirred egress redirect dev ifb0 2>/dev/null
             tc qdisc del dev ifb0 root 2>/dev/null
             tc qdisc add dev ifb0 root handle 1: htb default 30
             tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
@@ -838,12 +841,13 @@ conf_speed() {
             tc class add dev ifb0 parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
             tc qdisc add dev ifb0 parent 1:10 handle 10: fq_codel
             tc qdisc add dev ifb0 parent 1:30 handle 30: fq_codel
-            tc filter add dev ifb0 parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
+            tc filter add dev ifb0 parent 1: protocol ip prio 1 u32 match ip sport $ws_port 0xffff flowid 1:10 2>/dev/null
         fi
         echo "IFACE=$iface" > /root/natssh/speed.conf
         [ -n "$up" ] && echo "UP=$up" >> /root/natssh/speed.conf
         [ -n "$down" ] && echo "DOWN=$down" >> /root/natssh/speed.conf
         echo "MODE=ssh-only" >> /root/natssh/speed.conf
+        echo "WS_PORT=$ws_port" >> /root/natssh/speed.conf
         systemctl enable --now natssh-speed.service 2>/dev/null
         echo -e "${GREEN}Limit speed SSH berhasil diterapkan!${NC}"
     fi
