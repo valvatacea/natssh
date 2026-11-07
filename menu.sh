@@ -764,20 +764,17 @@ conf_service() {
 conf_speed() {
     local iface=$(ip route | grep default | awk '{print $5}' | head -1)
     iface=${iface:-eth0}
-    ws_pid=$(pgrep -f 'ws.py' | head -1)
-    ws_port=$(ss -tlnp 2>/dev/null | grep "pid=${ws_pid}," | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
-    ws_port=${ws_port:-22}
     clear
     garis
-    echo -e "${YELLOW}--- ATUR LIMIT SPEED SSH (WebSocket) ---${NC}"
+    echo -e "${YELLOW}--- ATUR LIMIT SPEED per CDN (Cloudflare vs CloudFront) ---${NC}"
     garis
     echo -e "Interface: ${GREEN}${iface}${NC}"
-    echo -e "Hanya trafik SSH (WebSocket) yg dibatasi"
+    echo -e "Limit berdasarkan sumber IP (iptables mark): CF=1, CFront=2"
     echo ""
     if tc class show dev $iface 2>/dev/null | grep -q "class htb.*1:10"; then
-        echo -e "${GREEN}Limit SSH AKTIF:${NC}"
+        echo -e "${GREEN}Limit AKTIF:${NC}"
         if [ -f /root/natssh/speed.conf ]; then
-            grep -E "^UP=|^DOWN=" /root/natssh/speed.conf | sed 's/UP=/  Upload: /;s/DOWN=/  Download: /'
+            grep -E "^(UP|DOWN)_" /root/natssh/speed.conf
         fi
         echo ""
         read -p "Hapus limit speed? (y/N): " h
@@ -790,67 +787,38 @@ conf_speed() {
             systemctl disable --now natssh-speed.service 2>/dev/null
             echo -e "${GREEN}Limit speed dihapus.${NC}"
         fi
+        pause
+        return
     else
         echo -e "${YELLOW}Belum ada limit speed${NC}"
         echo ""
         echo "Format: bisa cuma angka (otomatis jadi Mbps) atau pakai unit (kbit/mbit/gbit)"
-        echo "Contoh: 25, 5, .5, 10mbit"
         echo ""
-        read -p "Limit Upload (kosong = skip, 0 = batal, default 25): " up
-        [ "$up" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
-        [ -z "$up" ] && up="25"
-        if [[ "$up" =~ ^[0-9]+$ ]] || [[ "$up" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$up" =~ ^\.[0-9]+$ ]]; then
-            up="${up}mbit"
-        fi
-        read -p "Limit Download (kosong = skip, default 25): " down
-        [ -z "$down" ] && down="25"
-        if [[ "$down" =~ ^[0-9]+$ ]] || [[ "$down" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$down" =~ ^\.[0-9]+$ ]]; then
-            down="${down}mbit"
-        fi
-        if [ -z "$up" ] && [ -z "$down" ]; then
-            echo -e "${RED}Minimal isi salah satu!${NC}"
-            return
-        fi
-        tc qdisc del dev $iface root 2>/dev/null
-        tc qdisc del dev $iface ingress 2>/dev/null
-        ip link set dev ifb0 down 2>/dev/null
-        ip link del ifb0 2>/dev/null
-        if [ -n "$up" ]; then
-            tc qdisc add dev $iface root handle 1: htb default 30
-            tc class add dev $iface parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
-            tc class add dev $iface parent 1:1 classid 1:10 htb rate $up ceil $up prio 1 burst 32k
-            tc class add dev $iface parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
-            tc qdisc add dev $iface parent 1:10 handle 10: fq_codel
-            tc qdisc add dev $iface parent 1:30 handle 30: fq_codel
-            tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip sport $ws_port 0xffff flowid 1:10 2>/dev/null
-            tc filter add dev $iface parent 1: protocol ip prio 1 u32 match ip dport $ws_port 0xffff flowid 1:10 2>/dev/null
-        fi
-        if [ -n "$down" ]; then
-            modprobe ifb 2>/dev/null
-            if ! ip link show ifb0 >/dev/null 2>&1; then
-                ip link add ifb0 type ifb 2>/dev/null
+        read -p "Upload Cloudflare (default 25): " up_cf
+        [ -z "$up_cf" ] && up_cf="25"
+        read -p "Download Cloudflare (default 25): " down_cf
+        [ -z "$down_cf" ] && down_cf="25"
+        read -p "Upload CloudFront (default 25): " up_cfront
+        [ -z "$up_cfront" ] && up_cfront="25"
+        read -p "Download CloudFront (default 25): " down_cfront
+        [ -z "$down_cfront" ] && down_cfront="25"
+        for v in up_cf down_cf up_cfront down_cfront; do
+            val=${!v}
+            if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then
+                declare "$v=${val}mbit"
             fi
-            ip link set dev ifb0 up 2>/dev/null
-            tc qdisc del dev $iface ingress 2>/dev/null
-            tc qdisc add dev $iface ingress handle ffff:
-            tc filter add dev $iface parent ffff: protocol ip prio 1 u32 match ip dport $ws_port 0xffff action mirred egress redirect dev ifb0 2>/dev/null
-            tc qdisc del dev ifb0 root 2>/dev/null
-            tc qdisc add dev ifb0 root handle 1: htb default 30
-            tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
-            tc class add dev ifb0 parent 1:1 classid 1:10 htb rate $down ceil $down prio 1 burst 32k
-            tc class add dev ifb0 parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
-            tc qdisc add dev ifb0 parent 1:10 handle 10: fq_codel
-            tc qdisc add dev ifb0 parent 1:30 handle 30: fq_codel
-            tc filter add dev ifb0 parent 1: protocol ip prio 1 u32 match ip sport $ws_port 0xffff flowid 1:10 2>/dev/null
-        fi
+        done
         echo "IFACE=$iface" > /root/natssh/speed.conf
-        [ -n "$up" ] && echo "UP=$up" >> /root/natssh/speed.conf
-        [ -n "$down" ] && echo "DOWN=$down" >> /root/natssh/speed.conf
-        echo "MODE=ssh-only" >> /root/natssh/speed.conf
-        echo "WS_PORT=$ws_port" >> /root/natssh/speed.conf
+        echo "UP_CF=$up_cf" >> /root/natssh/speed.conf
+        echo "DOWN_CF=$down_cf" >> /root/natssh/speed.conf
+        echo "UP_CFRONT=$up_cfront" >> /root/natssh/speed.conf
+        echo "DOWN_CFRONT=$down_cfront" >> /root/natssh/speed.conf
+        echo "MODE=cdn-split" >> /root/natssh/speed.conf
+        bash /root/natssh/apply_speed.sh
         systemctl enable --now natssh-speed.service 2>/dev/null
-        echo -e "${GREEN}Limit speed SSH berhasil diterapkan!${NC}"
+        echo -e "${GREEN}Limit speed per CDN berhasil diterapkan!${NC}"
     fi
+    pause
 }
 
 conf_restart_schedule() {
@@ -1169,7 +1137,7 @@ menu_conf() {
         echo -e "${CYAN}  -- Batas --${NC}"
         printf "  %-3s %-46s\n" "4." "Atur Batas Login per Akun (Max Login)"
         printf "  %-3s %-46s\n" "5." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
-        printf "  %-3s %-46s\n" "6." "Atur Limit Speed SSH (WebSocket)"
+        printf "  %-3s %-46s\n" "6." "Atur Limit Speed per CDN (CF/CFront)"
         echo -e "${CYAN}  -- Layanan --${NC}"
         printf "  %-3s %-46s\n" "7." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
         printf "  %-3s %-46s\n" "8." "badvpn-udpgw (UDP Gateway)"
