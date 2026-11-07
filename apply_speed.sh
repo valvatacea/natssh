@@ -20,7 +20,7 @@ ip link set dev ifb0 down 2>/dev/null
 ip link del ifb0 2>/dev/null
 
 # egress qdisc
-tc qdisc add dev $IFACE root handle 1: htb default 30 r2q 10
+tc qdisc add dev $IFACE root handle 1: htb default 30 r2q 1000
 tc class add dev $IFACE parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
 tc class add dev $IFACE parent 1:1 classid 1:10 htb rate $UP_CF ceil $UP_CF prio 1 burst 32k
 tc class add dev $IFACE parent 1:1 classid 1:20 htb rate $UP_CFRONT ceil $UP_CFRONT prio 1 burst 32k
@@ -52,7 +52,7 @@ for ip in $CFRONT_IPS; do
 done
 
 # ifb qdisc
-tc qdisc add dev ifb0 root handle 1: htb default 30 r2q 10
+tc qdisc add dev ifb0 root handle 1: htb default 30 r2q 1000
 tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
 tc class add dev ifb0 parent 1:1 classid 1:10 htb rate $DOWN_CF ceil $DOWN_CF prio 1 burst 32k
 tc class add dev ifb0 parent 1:1 classid 1:20 htb rate $DOWN_CFRONT ceil $DOWN_CFRONT prio 1 burst 32k

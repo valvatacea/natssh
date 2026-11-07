@@ -805,7 +805,7 @@ conf_speed() {
                 sed -i "s/^IFACE=.*/IFACE=$iface/" /root/natssh/speed.conf
                 sed -i "s/^UP_CF=.*/UP_CF=$up/" /root/natssh/speed.conf
                 sed -i "s/^DOWN_CF=.*/DOWN_CF=$down/" /root/natssh/speed.conf
-                bash /root/natssh/apply_speed.sh
+                bash /root/natssh/apply_speed.sh 2>/dev/null
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit Cloudflare diterapkan.${NC}"; pause ;;
             2)
@@ -830,7 +830,7 @@ conf_speed() {
                 sed -i "s/^IFACE=.*/IFACE=$iface/" /root/natssh/speed.conf
                 sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up/" /root/natssh/speed.conf
                 sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down/" /root/natssh/speed.conf
-                bash /root/natssh/apply_speed.sh
+                bash /root/natssh/apply_speed.sh 2>/dev/null
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit CloudFront diterapkan.${NC}"; pause ;;
             3)
@@ -856,7 +856,7 @@ conf_speed() {
                 echo "UP_CFRONT=$up_cfront" >> /root/natssh/speed.conf
                 echo "DOWN_CFRONT=$down_cfront" >> /root/natssh/speed.conf
                 echo "MODE=cdn-split" >> /root/natssh/speed.conf
-                bash /root/natssh/apply_speed.sh
+                bash /root/natssh/apply_speed.sh 2>/dev/null
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit semua CDN diterapkan.${NC}"; pause ;;
             4)
