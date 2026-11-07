@@ -795,6 +795,8 @@ conf_speed() {
                 # update only CF fields in speed.conf
                 if [ ! -f /root/natssh/speed.conf ]; then
                     echo "IFACE=eth0" > /root/natssh/speed.conf
+                    echo "UP_CF=25mbit" >> /root/natssh/speed.conf
+                    echo "DOWN_CF=25mbit" >> /root/natssh/speed.conf
                     echo "UP_CFRONT=25mbit" >> /root/natssh/speed.conf
                     echo "DOWN_CFRONT=25mbit" >> /root/natssh/speed.conf
                     echo "MODE=cdn-split" >> /root/natssh/speed.conf
@@ -818,6 +820,8 @@ conf_speed() {
                     echo "IFACE=eth0" > /root/natssh/speed.conf
                     echo "UP_CF=25mbit" >> /root/natssh/speed.conf
                     echo "DOWN_CF=25mbit" >> /root/natssh/speed.conf
+                    echo "UP_CFRONT=25mbit" >> /root/natssh/speed.conf
+                    echo "DOWN_CFRONT=25mbit" >> /root/natssh/speed.conf
                     echo "MODE=cdn-split" >> /root/natssh/speed.conf
                 fi
                 sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up/" /root/natssh/speed.conf
