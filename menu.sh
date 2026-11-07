@@ -768,8 +768,11 @@ conf_speed() {
         echo -e "${YELLOW}--- ATUR LIMIT SPEED per CDN ---${NC}"
         garis
         if tc class show dev eth0 2>/dev/null | grep -q "class htb.*1:10"; then
-            echo -e "${GREEN}Limit AKTIF:${NC}"
-            [ -f /root/natssh/speed.conf ] && grep -E "^(UP|DOWN)_" /root/natssh/speed.conf
+            _limits=$(grep -E "^(UP|DOWN)_" /root/natssh/speed.conf 2>/dev/null | grep -v "25mbit")
+            if [ -n "$_limits" ]; then
+                echo -e "${GREEN}Limit AKTIF:${NC}"
+                echo "$_limits"
+            fi
         fi
         echo ""
         echo "1. Set limit Cloudflare (upload + download)"
