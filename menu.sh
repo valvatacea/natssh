@@ -805,7 +805,6 @@ conf_speed() {
                 grep -q "^DOWN_CF=" /root/natssh/speed.conf || echo "DOWN_CF=25mbit" >> /root/natssh/speed.conf
                 sed -i "s/^UP_CF=.*/UP_CF=$up/" /root/natssh/speed.conf
                 sed -i "s/^DOWN_CF=.*/DOWN_CF=$down/" /root/natssh/speed.conf
-                sed -i "s/^DOWN_CF=.*/DOWN_CF=$down/" /root/natssh/speed.conf
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit Cloudflare diterapkan.${NC}"; pause ;;
@@ -828,7 +827,6 @@ conf_speed() {
                 grep -q "^UP_CFRONT=" /root/natssh/speed.conf || echo "UP_CFRONT=25mbit" >> /root/natssh/speed.conf
                 grep -q "^DOWN_CFRONT=" /root/natssh/speed.conf || echo "DOWN_CFRONT=25mbit" >> /root/natssh/speed.conf
                 sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up/" /root/natssh/speed.conf
-                sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down/" /root/natssh/speed.conf
                 sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down/" /root/natssh/speed.conf
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 systemctl enable --now natssh-speed.service 2>/dev/null
