@@ -199,6 +199,12 @@ systemctl daemon-reload
 echo -e "${GREEN}Service natssh-speed disiapkan (belum diaktifkan). Aktif setelah konfigurasi limit speed.${NC}"
 
 echo -e "
+[*] Mengatur Cronjob refresh IP Cloudflare/CloudFront + apply speed (harian)..."
+if ! crontab -l 2>/dev/null | grep -q "apply_speed.sh"; then
+    (crontab -l 2>/dev/null; echo "0 3 * * * /root/natssh/apply_speed.sh >/dev/null 2>&1") | crontab -
+fi
+
+echo -e "
 [*] Mengatur Cronjob untuk Autokill..."
 # Cek apakah cronjob sudah ada agar tidak duplikat
 if ! crontab -l | grep -q "autokill.sh"; then
