@@ -101,6 +101,31 @@ def status(x_api_token: str | None = Header(default=None)):
     return {"ws": ws, "live_connections": live}
 
 
+@app.get("/system")
+def system(x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    ram = sh("free -h | awk 'NR==2{print $3\"/\"$2}'").stdout.strip()
+    cpu = sh("top -bn1 | grep 'Cpu(s)' | awk '{print $2+$4}'").stdout.strip()
+    disk = sh("df -h / | awk 'NR==2{print $3\"/\"$2\" (\"$5\")\"}'").stdout.strip()
+    return {"ram": ram, "cpu": cpu + "%", "disk": disk}
+
+
+@app.get("/ws_peak")
+def ws_peak(x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    peak = "0"
+    tolak = "0"
+    try:
+        peak = sh("grep -o 'total=[0-9]*' /root/natssh/ws.log | cut -d= -f2 | sort -n | tail -1").stdout.strip() or "0"
+        tolak = sh("grep -c 'TOLAK' /root/natssh/ws.log").stdout.strip() or "0"
+    except Exception:
+        pass
+    cur_max = "30"
+    try:
+        cur_max = sh("systemctl show natssh-ws -p Environment --value 2>/dev/null | grep -o 'NATSSH_MAX_TOTAL=[0-9]*' | cut -d= -f2").stdout.strip() or "30"
+    except Exception:
+        pass
+    return {"peak": peak, "tolak": tolak, "max_total": cur_max}
 @app.get("/info")
 def info(x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
@@ -109,12 +134,19 @@ def info(x_api_token: str | None = Header(default=None)):
         host = open(os.path.join(BASE, "host.conf")).read().strip()
     except Exception:
         pass
+    wsport = ""
+    try:
+        wpid = sh("pgrep -f 'ws.py' | head -1").stdout.strip()
+        if wpid:
+            wsport = sh(f"ss -tlnp 2>/dev/null | grep 'pid={wpid},' | awk '{{print $4}}' | awk -F: '{{print $NF}}' | head -1").stdout.strip()
+    except Exception:
+        pass
     cfport = "2086"
     try:
         cfport = open(os.path.join(BASE, "port.conf")).read().strip() or cfport
     except Exception:
         pass
-    wsport = sh("port_ws 2>/dev/null || true").stdout.strip()
+    # fallback: port.conf mungkin tidak ada; coba baca dari ... (tetap default)
     return {"host": host, "cf_port": cfport, "ws_port": wsport}
 
 
