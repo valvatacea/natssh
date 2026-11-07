@@ -25,6 +25,12 @@ rm -f /etc/systemd/system/natssh-ws.service
 systemctl daemon-reload
 echo -e "${GREEN}Service berhasil dihapus.${NC}"
 
+echo -e "\n[*] Menghentikan dan menghapus Service natssh-speed..."
+systemctl disable --now natssh-speed.service 2>/dev/null
+rm -f /etc/systemd/system/natssh-speed.service
+rm -f /root/natssh/apply_speed.sh
+systemctl daemon-reload
+
 echo -e "\n[*] Menghentikan dan menghapus Service natssh-udpgw template..."
 for pp in 7100 7200 7300 7400 7500; do
     systemctl disable --now natssh-udpgw@${pp} 2>/dev/null

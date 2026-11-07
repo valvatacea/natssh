@@ -130,6 +130,60 @@ for pp in $udpgw_ports; do
 done
 echo -e "${GREEN}Service natssh-udpgw aktif di: ${udpgw_ports} (localhost only).${NC}"
 
+echo -e "\n[*] Menyiapkan service NATSSH speed limit (tidak diaktifkan otomatis)..."
+cat > /root/natssh/apply_speed.sh <<'APPLY'
+#!/bin/bash
+CONF=/root/natssh/speed.conf
+[ -f "$CONF" ] || exit 0
+source "$CONF"
+IFACE=${IFACE:-eth0}
+[ -z "$UP" ] && [ -z "$DOWN" ] && exit 0
+tc qdisc del dev $IFACE root 2>/dev/null
+tc qdisc del dev $IFACE ingress 2>/dev/null
+ip link set dev ifb0 down 2>/dev/null
+ip link del ifb0 2>/dev/null
+if [ -n "$UP" ]; then
+    tc qdisc add dev $IFACE root handle 1: htb default 30
+    tc class add dev $IFACE parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
+    tc class add dev $IFACE parent 1:1 classid 1:10 htb rate $UP ceil $UP prio 1 burst 32k
+    tc class add dev $IFACE parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
+    tc qdisc add dev $IFACE parent 1:10 handle 10: fq_codel
+    tc qdisc add dev $IFACE parent 1:30 handle 30: fq_codel
+    tc filter add dev $IFACE parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
+    tc filter add dev $IFACE parent 1: protocol ip prio 1 u32 match ip dport 22 0xffff flowid 1:10 2>/dev/null
+fi
+if [ -n "$DOWN" ]; then
+    modprobe ifb 2>/dev/null
+    ip link show ifb0 >/dev/null 2>&1 || ip link add ifb0 type ifb 2>/dev/null
+    ip link set dev ifb0 up 2>/dev/null
+    tc qdisc add dev $IFACE ingress handle ffff:
+    tc filter add dev $IFACE parent ffff: protocol ip prio 1 u32 match ip dport 22 0xffff action mirred egress redirect dev ifb0 2>/dev/null
+    tc qdisc add dev ifb0 root handle 1: htb default 30
+    tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
+    tc class add dev ifb0 parent 1:1 classid 1:10 htb rate $DOWN ceil $DOWN prio 1 burst 32k
+    tc class add dev ifb0 parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
+    tc qdisc add dev ifb0 parent 1:10 handle 10: fq_codel
+    tc qdisc add dev ifb0 parent 1:30 handle 30: fq_codel
+    tc filter add dev ifb0 parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
+fi
+APPLY
+chmod +x /root/natssh/apply_speed.sh
+cat > /etc/systemd/system/natssh-speed.service <<'EOF'
+[Unit]
+Description=NATSSH SSH speed limit (tc)
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/natssh/apply_speed.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+echo -e "${GREEN}Service natssh-speed disiapkan (belum diaktifkan). Aktif setelah konfigurasi limit speed.${NC}"
+
 echo -e "
 [*] Mengatur Cronjob untuk Autokill..."
 # Cek apakah cronjob sudah ada agar tidak duplikat
