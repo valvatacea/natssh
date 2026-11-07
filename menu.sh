@@ -158,6 +158,28 @@ do_perpanjang() {
     echo -e "${GREEN}SUKSES! Masa aktif $user diperpanjang hingga $exp.${NC}"
 }
 
+do_ganti_password() {
+    local user="$1"
+    read -s -p "Password baru (kosong = batal): " p1; echo ""
+    [ -z "$p1" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    read -s -p "Ulangi password (kosong = batal): " p2; echo ""
+    [ -z "$p2" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if [ "$p1" != "$p2" ]; then
+        echo -e "${RED}Password tidak cocok.${NC}"
+        return
+    fi
+    if [ ${#p1} -lt 6 ]; then
+        echo -e "${RED}Password minimal 6 karakter.${NC}"
+        return
+    fi
+    echo "$user:$p1" | chpasswd
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}SUKSES! Password $user berhasil diubah.${NC}"
+    else
+        echo -e "${RED}Gagal mengubah password.${NC}"
+    fi
+}
+
 akun_daftar() {
     # Pusat kelola: daftar bernomor -> pilih akun -> aksi suspend/unsuspend/perpanjang/hapus
     while true; do
@@ -175,14 +197,16 @@ akun_daftar() {
         echo "3. Perpanjang"
         echo "4. Hapus"
         echo "5. Batas Login Khusus Akun Ini"
+        echo "6. Ganti Password"
         echo -e "${RED}0. Kembali ke daftar${NC}"
-        read -p "Aksi (0-5): " a || exit 0
+        read -p "Aksi (0-6): " a || exit 0
         case $a in
             1) do_suspend "$user"; pause; continue ;;
             2) do_unsuspend "$user"; pause; continue ;;
             3) do_perpanjang "$user"; pause; continue ;;
             4) do_hapus "$user"; pause; continue ;;
             5) do_limit "$user"; pause; continue ;;
+            6) do_ganti_password "$user"; pause; continue ;;
             0) continue ;;   # kembali ke DAFTAR (label), bukan keluar browser
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
@@ -265,6 +289,27 @@ akun_autoclean() {
     echo -e "${GREEN}Selesai! $count akun kedaluwarsa dihapus (tercatat di /root/autokill.log).${NC}"
 }
 
+akun_ganti_password() {
+    read -p "Username (0 = batal): " user
+    [ "$user" == "0" ] && return
+    if ! id "$user" &>/dev/null; then
+        echo -e "${RED}User tidak ditemukan.${NC}"
+        return
+    fi
+    read -s -p "Password baru (0 = batal): " pass; echo ""
+    [ "$pass" == "0" ] && return
+    if [ ${#pass} -lt 6 ]; then
+        echo -e "${RED}Password minimal 6 karakter.${NC}"
+        return
+    fi
+    echo "$user:$pass" | chpasswd
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}SUKSES! Password $user berhasil diubah.${NC}"
+    else
+        echo -e "${RED}Gagal mengubah password.${NC}"
+    fi
+}
+
 menu_akun() {
     while true; do
         clear
@@ -274,12 +319,14 @@ menu_akun() {
         echo "1. Buat Akun SSH Baru"
         echo "2. Daftar Akun (kelola: suspend/unsuspend/perpanjang/hapus)"
         echo "3. Bersihkan Akun Kedaluwarsa (Auto-Clean)"
+        echo "4. Ganti Password Akun"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-3): " p || exit 0
+        read -p "Pilih (0-4): " p || exit 0
         case $p in
             1) akun_baru ;;
             2) akun_daftar ;;
             3) akun_autoclean ;;
+            4) akun_ganti_password ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
