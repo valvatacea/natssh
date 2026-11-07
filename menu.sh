@@ -793,14 +793,16 @@ conf_speed() {
                     val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
                 done
                 # update only CF fields in speed.conf
+                iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
                 if [ ! -f /root/natssh/speed.conf ]; then
-                    echo "IFACE=eth0" > /root/natssh/speed.conf
+                    echo "IFACE=$iface" > /root/natssh/speed.conf
                     echo "UP_CF=25mbit" >> /root/natssh/speed.conf
                     echo "DOWN_CF=25mbit" >> /root/natssh/speed.conf
                     echo "UP_CFRONT=25mbit" >> /root/natssh/speed.conf
                     echo "DOWN_CFRONT=25mbit" >> /root/natssh/speed.conf
                     echo "MODE=cdn-split" >> /root/natssh/speed.conf
                 fi
+                sed -i "s/^IFACE=.*/IFACE=$iface/" /root/natssh/speed.conf
                 sed -i "s/^UP_CF=.*/UP_CF=$up/" /root/natssh/speed.conf
                 sed -i "s/^DOWN_CF=.*/DOWN_CF=$down/" /root/natssh/speed.conf
                 bash /root/natssh/apply_speed.sh
@@ -816,14 +818,16 @@ conf_speed() {
                 for v in up down; do
                     val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
                 done
+                iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
                 if [ ! -f /root/natssh/speed.conf ]; then
-                    echo "IFACE=eth0" > /root/natssh/speed.conf
+                    echo "IFACE=$iface" > /root/natssh/speed.conf
                     echo "UP_CF=25mbit" >> /root/natssh/speed.conf
                     echo "DOWN_CF=25mbit" >> /root/natssh/speed.conf
                     echo "UP_CFRONT=25mbit" >> /root/natssh/speed.conf
                     echo "DOWN_CFRONT=25mbit" >> /root/natssh/speed.conf
                     echo "MODE=cdn-split" >> /root/natssh/speed.conf
                 fi
+                sed -i "s/^IFACE=.*/IFACE=$iface/" /root/natssh/speed.conf
                 sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up/" /root/natssh/speed.conf
                 sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down/" /root/natssh/speed.conf
                 bash /root/natssh/apply_speed.sh
@@ -864,9 +868,10 @@ conf_speed() {
                 systemctl disable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit speed dihapus.${NC}"; pause ;;
             5)
-                echo "--- tc classes eth0 ---"; tc class show dev eth0
-                echo "--- tc filters eth0 ---"; tc filter show dev eth0 parent 1:
-                echo "--- ingress ---"; tc filter show dev eth0 parent ffff:
+                iface=$(grep "^IFACE=" /root/natssh/speed.conf 2>/dev/null | cut -d= -f2); iface=${iface:-eth0}
+                echo "--- tc classes $iface ---"; tc class show dev $iface
+                echo "--- tc filters $iface ---"; tc filter show dev $iface parent 1:
+                echo "--- ingress ---"; tc filter show dev $iface parent ffff:
                 pause ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
