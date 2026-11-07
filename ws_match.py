@@ -147,6 +147,19 @@ def grup_riwayat(user):
         print(f"   {C_DIM}── suspend/unsuspend {user}: {len(evs)} kejadian (5 terakhir) ──{C_RESET}")
         for t, kind in evs[-5:]:
             print(f"     {t[11:]}   {kind}")
+            # tampilkan detail sesi terkait dari audit_sess.log (jika ada)
+            try:
+                ev_ts = datetime.datetime.strptime(t, "%Y-%m-%d %H:%M:%S").timestamp()
+            except ValueError:
+                ev_ts = None
+            if ev_ts is not None:
+                for r in groups.get(user, []):
+                    try:
+                        r_ts = datetime.datetime.strptime(r[0], "%Y-%m-%d %H:%M:%S").timestamp()
+                    except ValueError:
+                        continue
+                    if abs(r_ts - ev_ts) <= 120:
+                        print(f"       {C_DIM}-> {r[2]} {r[9][:40]} dur={r[6]} up={r[7]} down={r[8]}{C_RESET}")
 
 seen: set[int] = set()
 cur = None
