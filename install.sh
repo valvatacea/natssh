@@ -48,9 +48,11 @@ wget -qO autokill.sh https://raw.githubusercontent.com/valvatacea/natssh/main/au
 wget -qO unsuspend.sh https://raw.githubusercontent.com/valvatacea/natssh/main/unsuspend.sh
 wget -qO autobackup.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autobackup.sh
 wget -qO uninstall.sh https://raw.githubusercontent.com/valvatacea/natssh/main/uninstall.sh
+wget -qO apply_speed.sh https://raw.githubusercontent.com/valvatacea/natssh/main/apply_speed.sh
+wget -qO apply_cf_marks.sh https://raw.githubusercontent.com/valvatacea/natssh/main/apply_cf_marks.sh
 
 # Unduhan gagal = file kosong -> service crash-loop; cek ukuran
-for f in menu.sh ws.py autokill.sh unsuspend.sh autobackup.sh uninstall.sh; do
+for f in menu.sh ws.py autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh apply_cf_marks.sh; do
     [ -s "$f" ] || { echo "Gagal mengunduh $f (repo privat/offline?)"; exit 1; }
 done
 echo -e "
@@ -58,7 +60,7 @@ echo -e "
 
 echo -e "
 [*] Mengatur izin eksekusi..."
-chmod +x menu.sh autokill.sh unsuspend.sh autobackup.sh uninstall.sh
+chmod +x menu.sh autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh apply_cf_marks.sh
 
 echo -e "
 [*] Mengatur Service Systemd untuk WebSocket Proxy (ws.py)..."
@@ -130,58 +132,14 @@ for pp in $udpgw_ports; do
 done
 echo -e "${GREEN}Service natssh-udpgw aktif di: ${udpgw_ports} (localhost only).${NC}"
 
-echo -e "\n[*] Menyiapkan service NATSSH speed limit (tidak diaktifkan otomatis)..."
-cat > /root/natssh/apply_speed.sh <<'APPLY'
-#!/bin/bash
-CONF=/root/natssh/speed.conf
-[ -f "$CONF" ] || exit 0
-source "$CONF"
-IFACE=${IFACE:-eth0}
-[ -z "$UP" ] && [ -z "$DOWN" ] && exit 0
-tc qdisc del dev $IFACE root 2>/dev/null
-tc qdisc del dev $IFACE ingress 2>/dev/null
-ip link set dev ifb0 down 2>/dev/null
-ip link del ifb0 2>/dev/null
-if [ -n "$UP" ]; then
-    tc qdisc add dev $IFACE root handle 1: htb default 30
-    tc class add dev $IFACE parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
-    tc class add dev $IFACE parent 1:1 classid 1:10 htb rate $UP ceil $UP prio 1 burst 32k
-    tc class add dev $IFACE parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
-    tc qdisc add dev $IFACE parent 1:10 handle 10: fq_codel
-    tc qdisc add dev $IFACE parent 1:30 handle 30: fq_codel
-    tc filter add dev $IFACE parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
-    tc filter add dev $IFACE parent 1: protocol ip prio 1 u32 match ip dport 22 0xffff flowid 1:10 2>/dev/null
-fi
-if [ -n "$DOWN" ]; then
-    modprobe ifb 2>/dev/null
-    ip link show ifb0 >/dev/null 2>&1 || ip link add ifb0 type ifb 2>/dev/null
-    ip link set dev ifb0 up 2>/dev/null
-    tc qdisc add dev $IFACE ingress handle ffff:
-    tc filter add dev $IFACE parent ffff: protocol ip prio 1 u32 match ip dport 22 0xffff action mirred egress redirect dev ifb0 2>/dev/null
-    tc qdisc add dev ifb0 root handle 1: htb default 30
-    tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
-    tc class add dev ifb0 parent 1:1 classid 1:10 htb rate $DOWN ceil $DOWN prio 1 burst 32k
-    tc class add dev ifb0 parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
-    tc qdisc add dev ifb0 parent 1:10 handle 10: fq_codel
-    tc qdisc add dev ifb0 parent 1:30 handle 30: fq_codel
-    tc filter add dev ifb0 parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
-fi
-APPLY
-chmod +x /root/natssh/apply_speed.sh
 
-echo -e "\n[*] Menyiapkan script penanda IP Cloudflare/CloudFront (iptables)..."
-cat > /root/natssh/apply_cf_marks.sh <<'APPLYCF'
-#!/bin/bash
-set -e
-IPT=iptables
-CF_IPS=$(curl -fsSL https://www.cloudflare.com/ips-v4 2>/dev/null)
-CFRONT_IPS=$(curl -fsSL https://ip-ranges.amazonaws.com/ip-ranges.json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('\n'.join(p['ip_prefix'] for p in d['prefixes'] if p.get('service')=='CLOUDFRONT'))")
-$IPT -t mangle -F PREROUTING 2>/dev/null || true
-for ip in $CF_IPS; do $IPT -t mangle -A PREROUTING -s $ip -j MARK --set-mark 1 2>/dev/null || true; done
-for ip in $CFRONT_IPS; do $IPT -t mangle -A PREROUTING -s $ip -j MARK --set-mark 2 2>/dev/null || true; done
-APPLYCF
-chmod +x /root/natssh/apply_cf_marks.sh
-echo -e "${GREEN}Script penanda IP disiapkan.${NC}"
+echo -e "
+[*] Mengatur Cronjob refresh IP Cloudflare/CloudFront + apply speed (harian)..."
+if ! crontab -l 2>/dev/null | grep -q "apply_speed.sh"; then
+    (crontab -l 2>/dev/null; echo "0 3 * * * /root/natssh/apply_speed.sh >/dev/null 2>&1") | crontab -
+fi
+
+echo -e "\n[*] Menyiapkan service NATSSH speed limit (tidak diaktifkan otomatis)..."
 cat > /etc/systemd/system/natssh-speed.service <<'EOF'
 [Unit]
 Description=NATSSH SSH speed limit (tc)
@@ -197,12 +155,6 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 echo -e "${GREEN}Service natssh-speed disiapkan (belum diaktifkan). Aktif setelah konfigurasi limit speed.${NC}"
-
-echo -e "
-[*] Mengatur Cronjob refresh IP Cloudflare/CloudFront + apply speed (harian)..."
-if ! crontab -l 2>/dev/null | grep -q "apply_speed.sh"; then
-    (crontab -l 2>/dev/null; echo "0 3 * * * /root/natssh/apply_speed.sh >/dev/null 2>&1") | crontab -
-fi
 
 echo -e "
 [*] Mengatur Cronjob untuk Autokill..."
