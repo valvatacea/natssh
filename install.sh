@@ -168,6 +168,20 @@ if [ -n "$DOWN" ]; then
 fi
 APPLY
 chmod +x /root/natssh/apply_speed.sh
+
+echo -e "\n[*] Menyiapkan script penanda IP Cloudflare/CloudFront (iptables)..."
+cat > /root/natssh/apply_cf_marks.sh <<'APPLYCF'
+#!/bin/bash
+set -e
+IPT=iptables
+CF_IPS=$(curl -fsSL https://www.cloudflare.com/ips-v4 2>/dev/null)
+CFRONT_IPS=$(curl -fsSL https://ip-ranges.amazonaws.com/ip-ranges.json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('\n'.join(p['ip_prefix'] for p in d['prefixes'] if p.get('service')=='CLOUDFRONT'))")
+$IPT -t mangle -F PREROUTING 2>/dev/null || true
+for ip in $CF_IPS; do $IPT -t mangle -A PREROUTING -s $ip -j MARK --set-mark 1 2>/dev/null || true; done
+for ip in $CFRONT_IPS; do $IPT -t mangle -A PREROUTING -s $ip -j MARK --set-mark 2 2>/dev/null || true; done
+APPLYCF
+chmod +x /root/natssh/apply_cf_marks.sh
+echo -e "${GREEN}Script penanda IP disiapkan.${NC}"
 cat > /etc/systemd/system/natssh-speed.service <<'EOF'
 [Unit]
 Description=NATSSH SSH speed limit (tc)

@@ -29,6 +29,7 @@ echo -e "\n[*] Menghentikan dan menghapus Service natssh-speed..."
 systemctl disable --now natssh-speed.service 2>/dev/null
 rm -f /etc/systemd/system/natssh-speed.service
 rm -f /root/natssh/apply_speed.sh
+rm -f /root/natssh/apply_cf_marks.sh
 systemctl daemon-reload
 
 echo -e "\n[*] Menghentikan dan menghapus Service natssh-udpgw template..."
