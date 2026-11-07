@@ -452,7 +452,7 @@ ws_peruser() {
         return
     fi
     echo -e "${YELLOW}--- PERANGKAT PER AKUN (korelasi waktu) ---${NC}"
-    printf '%b' "$rows" | python3 "$dir/ws_match.py" "$dir/conns.json" "$dir/ws.log" "$dir/audit_sess.log"
+    printf '%b' "$rows" | python3 "$dir/ws_match.py" "$dir/conns.json" "$dir/ws.log" "$dir/audit_sess.log" "$dir/suspended_history.log"
 }
 
 menu_monitor() {
@@ -950,21 +950,19 @@ conf_banner() {
                 maxlog=${maxlog:-5}
                 cat > /etc/issue.net <<BEOF
 <br>
-<center>
-<font color="cyan">　　　　　　　　　　╔══════════════════════════════════╗</font><br>
-<font color="yellow"><b>　　　　　　　　　　 ⚡ PREMIUM VPN SERVICE ⚡</b></font><br>
-<font color="cyan">　　　　　　　　　　╠══════════════════════════════════╣</font><br>
-<font color="green">　　　　　　　　　　 ✅ KONEKSI BERHASIL</font><br>
-<font color="orange">　　　　　　　　　　 🌍 Server : Indonesia — Premium</font><br>
-<font color="aqua">　　　　　　　　　　 🚀 Speed : up 100 Mbps</font><br>
-<font color="lime">　　　　　　　　　　 📱 Maksimal ${maxlog} Perangkat/Akun</font><br>
-<font color="orange">　　　　　　　　　　 ⚔ Auto-Kill AKTIF</font><br>
-<font color="white">　　　　　　　　　　 ─────────────────────────────</font><br>
-<font color="red">　　　　　　　　　　 ⛔ Dilarang: Torrent · DDoS · Hack</font><br>
-<font color="grey">　　　　　　　　　　 🛡 Support : Hubungi Admin</font><br>
-<font color="cyan">　　　　　　　　　　╚══════════════════════════════════╝</font><br>
-<font color="green"><b>　　　　　　　　　　  ═══ SELAMAT MENIKMATI ═══</b></font><br>
-</center>
+<center><font color="cyan">╔═════════════════════════╗</font></center><br>
+<center><font color="yellow"><b>⚡ PREMIUM VPN SERVICE ⚡</b></font></center><br>
+<center><font color="cyan">╠═════════════════════════╣</font></center><br>
+<center><font color="green">✅ KONEKSI BERHASIL</font></center><br>
+<center><font color="orange">🌍 Server : Indonesia — Premium</font></center><br>
+<center><font color="aqua">🚀 Speed : up 100 Mbps</font></center><br>
+<center><font color="lime">📱 Maksimal 4 Perangkat/Akun</font></center><br>
+<center><font color="orange">⚔ Auto-Kill AKTIF</font></center><br>
+<center><font color="white">────────────────────</font></center><br>
+<center><font color="red">⛔ Dilarang: Torrent · DDoS · Hack</font></center><br>
+<center><font color="grey">🛡 Support : </font><font color="magenta"><a href="https://wa.me/6281223711096?text=Halo%2C%20saya%20ingin%20membeli%20layanan%20SSH%2FVPN.%20Bisa%20info%20paket%20dan%20harganya%3F" target="_blank" rel="noopener">+6281223711096</a></font></center><br>
+<center><font color="cyan">╚═════════════════════════╝</font></center><br>
+<center><font color="green"><b>═══ SELAMAT MENIKMATI ═══</b></font></center><br>
 BEOF
                 echo -e "${GREEN}Banner direset ke bawaan (limit ${maxlog} perangkat).${NC}"
                 pause

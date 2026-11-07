@@ -26,6 +26,7 @@ C_RESET = "\033[0m"
 now = time.time()
 conn_file, log_file = sys.argv[1], sys.argv[2]
 audit_file = sys.argv[3] if len(sys.argv) > 3 else None
+suspend_file = sys.argv[4] if len(sys.argv) > 4 else "/root/natssh/suspended_history.log"
 
 pool = []
 try:
@@ -116,18 +117,36 @@ groups: dict[str, list] = {}   # riwayat dikelompokkan per akun
 for r in riwayat:
     groups.setdefault(r[1], []).append(r)
 
+# riwayat suspend/unsuspend per akun
+suspend_events: dict[str, list] = {}
+try:
+    for ln in open(suspend_file):
+        m = re.match(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) - (SUSPEND|UNSPEND): (\S+)", ln)
+        if m:
+            suspend_events.setdefault(m.group(3), []).append((m.group(1), m.group(2)))
+except OSError:
+    pass
+
 
 def grup_riwayat(user):
     rows = groups.get(user)
     if not rows:
-        return
-    print(f"   {C_DIM}── riwayat {user}: {len(rows)} sesi (5 terakhir) ──{C_RESET}")
-    for t, u, ip, edge, cc, city, dur, up, down, ua in rows[-5:]:
-        jalur = f" {C_DIM}[{cdn_label(edge)}]{C_RESET}" if edge not in ("-", "") else ""
-        geo = f" {C_DIM}{city}{(' ' + cc) if cc != '-' else ''}{C_RESET}" if city != "-" else ""
-        print(f"     {t[11:]}   {ip:<16} {dur:>7} "
-              f"{up}\u2191{down}\u2193{C_RESET}{jalur}{geo}")
-        print(f"              {C_DIM}UA: {ua or '-'}{C_RESET}")
+        pass
+    # print session rows if any
+    if rows:
+        print(f"   {C_DIM}── riwayat {user}: {len(rows)} sesi (5 terakhir) ──{C_RESET}")
+        for t, u, ip, edge, cc, city, dur, up, down, ua in rows[-5:]:
+            jalur = f" {C_DIM}[{cdn_label(edge)}]{C_RESET}" if edge not in ("-", "") else ""
+            geo = f" {C_DIM}{city}{(' ' + cc) if cc != '-' else ''}{C_RESET}" if city != "-" else ""
+            print(f"     {t[11:]}   {ip:<16} {dur:>7} "
+                  f"{up}\u2191{down}\u2193{C_RESET}{jalur}{geo}")
+            print(f"              {C_DIM}UA: {ua or '-'}{C_RESET}")
+    # suspend/unsuspend events
+    evs = suspend_events.get(user)
+    if evs:
+        print(f"   {C_DIM}── suspend/unsuspend {user}: {len(evs)} kejadian (5 terakhir) ──{C_RESET}")
+        for t, kind in evs[-5:]:
+            print(f"     {t[11:]}   {kind}")
 
 seen: set[int] = set()
 cur = None
