@@ -20,6 +20,7 @@ SSH_PORT = int(os.environ.get("NATSSH_SSH_PORT", "22"))   # sshd lokal
 MAX_PER_IP = int(os.environ.get("NATSSH_MAX_PER_IP", "10"))
 MAX_TOTAL = int(os.environ.get("NATSSH_MAX_TOTAL", "30"))
 IDLE_TIMEOUT = int(os.environ.get("NATSSH_IDLE_TIMEOUT", "300"))  # detik tanpa data -> putuskan
+TCP_KEEPALIVE = os.environ.get("NATSSH_TCP_KEEPALIVE", "1") == "1"  # heartbeat TCP
 MAX_LOG_SIZE = 512_000  # 500 KB, selaras autokill.sh
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ws.log")
@@ -183,17 +184,18 @@ def handle_client(client_socket, ip):
         client_socket.settimeout(IDLE_TIMEOUT)
         ssh_socket.settimeout(IDLE_TIMEOUT)
         # TCP keepalive: bantu mencegah idle drop di jaringan/edge
-        for sock in (client_socket, ssh_socket):
-            try:
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-                if hasattr(socket, "TCP_KEEPIDLE"):
-                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 30)
-                if hasattr(socket, "TCP_KEEPINTVL"):
-                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
-                if hasattr(socket, "TCP_KEEPCNT"):
-                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
-            except OSError:
-                pass
+        if TCP_KEEPALIVE:
+            for sock in (client_socket, ssh_socket):
+                try:
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                    if hasattr(socket, "TCP_KEEPIDLE"):
+                        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 30)
+                    if hasattr(socket, "TCP_KEEPINTVL"):
+                        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
+                    if hasattr(socket, "TCP_KEEPCNT"):
+                        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+                except OSError:
+                    pass
         _log(f"JEMBAT {real_ip} (edge={ip}, ua='{ua}', total={_total})")
         conn = {"start": round(time.time(), 3), "ip": real_ip, "edge": ip,
                 "ua": ua, "city": city, "cc": cc, "up": 0, "down": 0}

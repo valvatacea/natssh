@@ -1232,6 +1232,60 @@ conf_udpgw() {
     done
 }
 
+conf_keepalive() {
+    clear; garis
+    echo -e "${YELLOW}   TOGGLE KEEPALIVE SSH${NC}"; garis
+    if grep -qE "^[[:space:]]*ClientAliveInterval" /etc/ssh/sshd_config; then echo -e "Status: ${GREEN}AKTIF${NC}"; else echo -e "Status: ${RED}NONAKTIF${NC}"; fi
+    echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo "0. Kembali"
+    read -p "Pilih (0-2): " k || return
+    case $k in
+        1)
+            grep -qE "^[#[:space:]]*ClientAliveInterval" /etc/ssh/sshd_config && sed -i 's/^[#[:space:]]*ClientAliveInterval.*/ClientAliveInterval 30/' /etc/ssh/sshd_config || echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config
+            grep -qE "^[#[:space:]]*ClientAliveCountMax" /etc/ssh/sshd_config && sed -i 's/^[#[:space:]]*ClientAliveCountMax.*/ClientAliveCountMax 3/' /etc/ssh/sshd_config || echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config
+            systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+            echo -e "${GREEN}Keepalive SSH AKTIF.${NC}" ;;
+        2)
+            sed -i "/^[#[:space:]]*ClientAliveInterval/d" /etc/ssh/sshd_config
+            sed -i "/^[#[:space:]]*ClientAliveCountMax/d" /etc/ssh/sshd_config
+            systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+            echo -e "${YELLOW}Keepalive SSH NONAKTIF.${NC}" ;;
+        0) return ;;
+        *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+    esac
+    pause
+}
+
+conf_heartbeat() {
+    clear; garis
+    echo -e "${YELLOW}   TOGGLE HEARTBEAT WS (TCP keepalive)${NC}"; garis
+    if grep -q "NATSSH_TCP_KEEPALIVE=0" /etc/systemd/system/natssh-ws.service; then echo -e "Status: ${RED}NONAKTIF${NC}"; else echo -e "Status: ${GREEN}AKTIF (default)${NC}"; fi
+    echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo "0. Kembali"
+    read -p "Pilih (0-2): " k || return
+    case $k in
+        1)
+            if grep -q "NATSSH_TCP_KEEPALIVE=" /etc/systemd/system/natssh-ws.service; then
+                sed -i 's/NATSSH_TCP_KEEPALIVE=[01]/NATSSH_TCP_KEEPALIVE=1/' /etc/systemd/system/natssh-ws.service
+            else
+                sed -i '/ExecStart=/i Environment=NATSSH_TCP_KEEPALIVE=1' /etc/systemd/system/natssh-ws.service
+            fi
+            systemctl daemon-reload
+            systemctl restart natssh-ws.service
+            echo -e "${GREEN}Heartbeat WS AKTIF.${NC}" ;;
+        2)
+            if grep -q "NATSSH_TCP_KEEPALIVE=" /etc/systemd/system/natssh-ws.service; then
+                sed -i 's/NATSSH_TCP_KEEPALIVE=[01]/NATSSH_TCP_KEEPALIVE=0/' /etc/systemd/system/natssh-ws.service
+            else
+                sed -i '/ExecStart=/i Environment=NATSSH_TCP_KEEPALIVE=0' /etc/systemd/system/natssh-ws.service
+            fi
+            systemctl daemon-reload
+            systemctl restart natssh-ws.service
+            echo -e "${YELLOW}Heartbeat WS NONAKTIF.${NC}" ;;
+        0) return ;;
+        *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+    esac
+    pause
+}
+
 menu_conf() {
     while true; do
         clear
@@ -1254,7 +1308,9 @@ menu_conf() {
         printf "  %-3s %-46s\n" "10." "Ubah Banner Pelanggan"
         printf "  %-3s %-46s\n" "11." "Ubah Durasi Suspend (menit)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-11): " p || exit 0
+        echo -e "  12. Toggle Keepalive SSH"
+        echo -e "  13. Toggle Heartbeat WS"
+        read -p "Pilih (0-13): " p || exit 0
         case $p in
             1) conf_port ;;
             2) conf_domain ;;
@@ -1267,6 +1323,8 @@ menu_conf() {
             9) conf_restart_schedule ;;
             10) conf_banner ;;
             11) conf_suspend_minutes ;;
+            12) conf_keepalive ;;
+            13) conf_heartbeat ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
