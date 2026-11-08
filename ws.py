@@ -182,6 +182,18 @@ def handle_client(client_socket, ip):
         # idle-timeout dua arah: soket diem IDLE_TIMEOUT detik -> putus, slot lepas
         client_socket.settimeout(IDLE_TIMEOUT)
         ssh_socket.settimeout(IDLE_TIMEOUT)
+        # TCP keepalive: bantu mencegah idle drop di jaringan/edge
+        for sock in (client_socket, ssh_socket):
+            try:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                if hasattr(socket, "TCP_KEEPIDLE"):
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 30)
+                if hasattr(socket, "TCP_KEEPINTVL"):
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
+                if hasattr(socket, "TCP_KEEPCNT"):
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+            except OSError:
+                pass
         _log(f"JEMBAT {real_ip} (edge={ip}, ua='{ua}', total={_total})")
         conn = {"start": round(time.time(), 3), "ip": real_ip, "edge": ip,
                 "ua": ua, "city": city, "cc": cc, "up": 0, "down": 0}
