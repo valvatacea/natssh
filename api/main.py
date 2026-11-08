@@ -100,6 +100,16 @@ def status(x_api_token: str | None = Header(default=None)):
         live = 0
     return {"ws": ws, "live_connections": live}
 
+@app.get("/live")
+def live_sessions(x_api_token: str | None = Header(default=None)):
+    auth(x_api_token)
+    try:
+        conns = json.load(open(os.path.join(BASE, "conns.json")))
+        rows = conns.get("live", [])
+    except Exception:
+        rows = []
+    return {"live": rows}
+
 
 @app.get("/system")
 def system(x_api_token: str | None = Header(default=None)):
@@ -190,7 +200,7 @@ def delete_account(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
     if not valid_user(user):
         raise HTTPException(400, "invalid user")
-    sh(f"userdel -r {user} 2>/dev/null; rm -f {BASE}/limits/{user}")
+    sh(f"pkill -KILL -u {user} 2>/dev/null; sleep 0.5; userdel -r {user} 2>/dev/null; rm -f {BASE}/limits/{user}")
     return {"ok": True}
 
 

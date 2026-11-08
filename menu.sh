@@ -85,6 +85,8 @@ do_hapus() {
     echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: ${online} perangkat)"
     read -p "Yakin hapus? (y/N): " yakin
     if [[ "$yakin" =~ ^[Yy]$ ]]; then
+        pkill -KILL -u "$user" 2>/dev/null
+        sleep 0.5
         res=$(userdel -r "$user" 2>&1); rc=$?
         # "mail spool not found" hanya notice (tak ada mailbox), bukan error — disembunyikan
         warn=$(echo "$res" | grep -v "mail spool" || true)
@@ -279,6 +281,8 @@ akun_autoclean() {
         if [ -n "$exp_date" ] && [ "$exp_date" != "never" ]; then
             exp_sec=$(date -d "$exp_date" +%s 2>/dev/null) || continue
             if [ "$today" -ge "$exp_sec" ]; then
+                pkill -KILL -u "$user" 2>/dev/null
+                sleep 0.5
                 userdel -r "$user"
                 echo -e "Menghapus akun ${RED}$user${NC} (Kedaluwarsa: $exp_date)"
                 echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO-CLEAN hapus $user (kedaluwarsa: $exp_date)" >> /root/autokill.log
