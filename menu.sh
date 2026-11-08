@@ -81,17 +81,16 @@ akun_baru() {
 do_hapus() {
     local user="$1"
     local exp=$(chage -l "$user" | grep "Account expires" | awk -F": " '{print $2}')
-    local online=$(ps -eo user:40=,comm= | awk '$2=="sshd" && $1=="'"$user"'" {print}' | wc -l)
-    echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: ${online} perangkat)"
-    read -p "Yakin hapus? (y/N): " yakin
+    online=$(ps -eo user:40=,comm= | awk '$2=="sshd" && $1=="'"$user"'" {print}' | wc -l)
+    if [ "$online" -gt 0 ]; then
+        echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: ${online} perangkat)"
+        read -p "Yakin hapus akun + putus $online sesi aktif? (y/N): " yakin
+    else
+        echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: 0 perangkat)"
+        read -p "Yakin hapus? (y/N): " yakin
+    fi
     if [[ "$yakin" =~ ^[Yy]$ ]]; then
-        online=$(ps -eo user:40=,comm= | awk '$2=="sshd" && $1=="'"$user"'" {print}' | wc -l)
         if [ "$online" -gt 0 ]; then
-            read -p "Ada $online sesi aktif. Putuskan sesi lalu hapus? (y/N): " kill_ok
-            if [[ ! "$kill_ok" =~ ^[Yy]$ ]]; then
-                echo -e "${YELLOW}Dibatalkan. Sesi aktif tidak diputus.${NC}"
-                return
-            fi
             loginctl terminate-user "$user" 2>/dev/null
             pkill -KILL -u "$user" 2>/dev/null
             for i in {1..10}; do
