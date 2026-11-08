@@ -807,8 +807,8 @@ conf_service() {
                 fi
                 pause
                 ;;
-            4) conf_keepalive; pause; continue ;;
-            5) conf_heartbeat; pause; continue ;;
+            4) conf_keepalive; continue ;;
+            5) conf_heartbeat; continue ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
         esac
