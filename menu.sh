@@ -85,8 +85,15 @@ do_hapus() {
     echo -e "${YELLOW}Akan dihapus: ${CYAN}$user${NC} (Expired: $exp, online: ${online} perangkat)"
     read -p "Yakin hapus? (y/N): " yakin
     if [[ "$yakin" =~ ^[Yy]$ ]]; then
-        pkill -KILL -u "$user" 2>/dev/null
-        sleep 0.5
+        if [ "$online" -gt 0 ]; then
+            read -p "Ada $online sesi aktif. Putuskan sesi lalu hapus? (y/N): " kill_ok
+            if [[ ! "$kill_ok" =~ ^[Yy]$ ]]; then
+                echo -e "${YELLOW}Dibatalkan. Sesi aktif tidak diputus.${NC}"
+                return
+            fi
+            pkill -KILL -u "$user" 2>/dev/null
+            sleep 0.5
+        fi
         res=$(userdel -r "$user" 2>&1); rc=$?
         # "mail spool not found" hanya notice (tak ada mailbox), bukan error — disembunyikan
         warn=$(echo "$res" | grep -v "mail spool" || true)
