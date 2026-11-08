@@ -10,8 +10,23 @@ UP_CFRONT=${UP_CFRONT:-1000mbit}
 DOWN_CFRONT=${DOWN_CFRONT:-1000mbit}
 
 # fetch IP ranges
+CF_CACHE=/root/natssh/cf_ips.cache
+CFRONT_CACHE=/root/natssh/cfront_ips.cache
+
 CF_IPS=$(curl -fsSL https://www.cloudflare.com/ips-v4 2>/dev/null)
-CFRONT_IPS=$(curl -fsSL https://ip-ranges.amazonaws.com/ip-ranges.json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('\n'.join(p['ip_prefix'] for p in d['prefixes'] if p.get('service')=='CLOUDFRONT'))")
+if [ -n "$CF_IPS" ]; then
+    printf '%s\n' "$CF_IPS" > "$CF_CACHE"
+else
+    CF_IPS=$(cat "$CF_CACHE" 2>/dev/null)
+fi
+
+CFRONT_RAW=$(curl -fsSL https://ip-ranges.amazonaws.com/ip-ranges.json 2>/dev/null)
+if [ -n "$CFRONT_RAW" ]; then
+    CFRONT_IPS=$(printf '%s' "$CFRONT_RAW" | python3 -c "import sys,json; d=json.load(sys.stdin); print('\n'.join(p['ip_prefix'] for p in d['prefixes'] if p.get('service')=='CLOUDFRONT'))")
+    [ -n "$CFRONT_IPS" ] && printf '%s\n' "$CFRONT_IPS" > "$CFRONT_CACHE"
+else
+    CFRONT_IPS=$(cat "$CFRONT_CACHE" 2>/dev/null)
+fi
 
 # cleanup
 tc qdisc del dev $IFACE root 2>/dev/null
