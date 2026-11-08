@@ -215,6 +215,18 @@ if grep -qE "^[#[:space:]]*AllowTcpForwarding" /etc/ssh/sshd_config; then
 else
     echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config
 fi
+# Aktifkan keepalive SSH (server-side) agar sesi tidak idle/putus
+if grep -qE "^[#[:space:]]*ClientAliveInterval" /etc/ssh/sshd_config; then
+    sed -i 's/^[#[:space:]]*ClientAliveInterval.*/ClientAliveInterval 30/' /etc/ssh/sshd_config
+else
+    echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config
+fi
+if grep -qE "^[#[:space:]]*ClientAliveCountMax" /etc/ssh/sshd_config; then
+    sed -i 's/^[#[:space:]]*ClientAliveCountMax.*/ClientAliveCountMax 3/' /etc/ssh/sshd_config
+else
+    echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config
+fi
+systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 
 echo -e "

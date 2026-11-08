@@ -56,6 +56,12 @@ if grep -qE "^\s*Banner" /etc/ssh/sshd_config; then
 fi
 echo -e "${GREEN}Banner SSH dinonaktifkan.${NC}"
 
+echo -e "[*] Menonaktifkan Keepalive SSH..."
+sed -i "/^[#[:space:]]*ClientAliveInterval/d" /etc/ssh/sshd_config
+sed -i "/^[#[:space:]]*ClientAliveCountMax/d" /etc/ssh/sshd_config
+systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+echo -e "${GREEN}Keepalive SSH dinonaktifkan.${NC}"
+
 echo -e ""
 echo -e "[*] Menghapus file skrip..."
 read -p "Apakah Anda ingin menghapus file menu.sh, ws.py, autokill.sh, dan install.sh? (y/n): " hapus_file
