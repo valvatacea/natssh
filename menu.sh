@@ -769,8 +769,10 @@ conf_service() {
         echo "1. Start"
         echo "2. Stop"
         echo "3. Restart"
+        echo "4. Toggle Keepalive SSH"
+        echo "5. Toggle Heartbeat WS"
         echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-3): " p || exit 0
+        read -p "Pilih (0-5): " p || exit 0
         case $p in
             1)
                 echo -e "${YELLOW}Menjalankan natssh-ws...${NC}"
@@ -805,6 +807,8 @@ conf_service() {
                 fi
                 pause
                 ;;
+            4) conf_keepalive; pause; continue ;;
+            5) conf_heartbeat; pause; continue ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
         esac
@@ -1308,9 +1312,7 @@ menu_conf() {
         printf "  %-3s %-46s\n" "10." "Ubah Banner Pelanggan"
         printf "  %-3s %-46s\n" "11." "Ubah Durasi Suspend (menit)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        echo -e "  12. Toggle Keepalive SSH"
-        echo -e "  13. Toggle Heartbeat WS"
-        read -p "Pilih (0-13): " p || exit 0
+        read -p "Pilih (0-11): " p || exit 0
         case $p in
             1) conf_port ;;
             2) conf_domain ;;
@@ -1323,8 +1325,6 @@ menu_conf() {
             9) conf_restart_schedule ;;
             10) conf_banner ;;
             11) conf_suspend_minutes ;;
-            12) conf_keepalive ;;
-            13) conf_heartbeat ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
