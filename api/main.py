@@ -200,6 +200,7 @@ def delete_account(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
     if not valid_user(user):
         raise HTTPException(400, "invalid user")
+    sh(f"loginctl terminate-user {user} 2>/dev/null")
     sh(f"pkill -KILL -u {user} 2>/dev/null")
     # tunggu sampai tidak ada proses user
     import time

@@ -92,6 +92,7 @@ do_hapus() {
                 echo -e "${YELLOW}Dibatalkan. Sesi aktif tidak diputus.${NC}"
                 return
             fi
+            loginctl terminate-user "$user" 2>/dev/null
             pkill -KILL -u "$user" 2>/dev/null
             for i in {1..10}; do
                 pgrep -u "$user" >/dev/null 2>&1 || break
@@ -297,8 +298,12 @@ akun_autoclean() {
         if [ -n "$exp_date" ] && [ "$exp_date" != "never" ]; then
             exp_sec=$(date -d "$exp_date" +%s 2>/dev/null) || continue
             if [ "$today" -ge "$exp_sec" ]; then
+                loginctl terminate-user "$user" 2>/dev/null
                 pkill -KILL -u "$user" 2>/dev/null
-                sleep 0.5
+                for i in {1..10}; do
+                    pgrep -u "$user" >/dev/null 2>&1 || break
+                    sleep 0.5
+                done
                 userdel -r "$user"
                 echo -e "Menghapus akun ${RED}$user${NC} (Kedaluwarsa: $exp_date)"
                 echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO-CLEAN hapus $user (kedaluwarsa: $exp_date)" >> /root/autokill.log
