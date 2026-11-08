@@ -103,7 +103,21 @@ do_hapus() {
                 return
             fi
         fi
-        res=$(userdel -r "$user" 2>&1); rc=$?
+        rc=1
+        for attempt in 1 2 3; do
+            res=$(userdel -r "$user" 2>&1); rc=$?
+            if [ $rc -eq 0 ]; then break; fi
+            # jika masih ada proses, kill lagi lalu tunggu
+            if pgrep -u "$user" >/dev/null 2>&1; then
+                loginctl terminate-user "$user" 2>/dev/null
+                pkill -9 -u "$user" 2>/dev/null
+                for i in {1..10}; do
+                    pgrep -u "$user" >/dev/null 2>&1 || break
+                    sleep 0.5
+                done
+            fi
+            sleep 1
+        done
         # "mail spool not found" hanya notice (tak ada mailbox), bukan error — disembunyikan
         warn=$(echo "$res" | grep -v "mail spool" || true)
         [ -n "$warn" ] && echo -e "${YELLOW}Peringatan: $warn${NC}"
@@ -303,7 +317,13 @@ akun_autoclean() {
                     pgrep -u "$user" >/dev/null 2>&1 || break
                     sleep 0.5
                 done
-                userdel -r "$user"
+                loginctl terminate-user "$user" 2>/dev/null
+                pkill -9 -u "$user" 2>/dev/null
+                for i in {1..10}; do
+                    pgrep -u "$user" >/dev/null 2>&1 || break
+                    sleep 0.5
+                done
+                userdel -r "$user" 2>/dev/null || true
                 echo -e "Menghapus akun ${RED}$user${NC} (Kedaluwarsa: $exp_date)"
                 echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO-CLEAN hapus $user (kedaluwarsa: $exp_date)" >> /root/autokill.log
                 ((count++))

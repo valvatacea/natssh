@@ -213,6 +213,15 @@ def delete_account(user: str, x_api_token: str | None = Header(default=None)):
     r = sh(f"pgrep -u {user}")
     if r.stdout.strip():
         raise HTTPException(409, "user has active sessions")
+    for _ in range(3):
+        r = sh(f"pgrep -u {user}")
+        if r.stdout.strip():
+            sh(f"loginctl terminate-user {user} 2>/dev/null")
+            sh(f"pkill -9 -u {user} 2>/dev/null")
+            time.sleep(1)
+        r = sh(f"pgrep -u {user}")
+        if not r.stdout.strip():
+            break
     sh(f"userdel -r {user} 2>/dev/null; rm -f {BASE}/limits/{user}")
     return {"ok": True}
 
