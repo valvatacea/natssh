@@ -200,7 +200,19 @@ def delete_account(user: str, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
     if not valid_user(user):
         raise HTTPException(400, "invalid user")
-    sh(f"pkill -KILL -u {user} 2>/dev/null; sleep 0.5; userdel -r {user} 2>/dev/null; rm -f {BASE}/limits/{user}")
+    sh(f"pkill -KILL -u {user} 2>/dev/null")
+    # tunggu sampai tidak ada proses user
+    import time
+    for _ in range(10):
+        r = sh(f"pgrep -u {user}")
+        if not r.stdout.strip():
+            break
+        time.sleep(0.5)
+    # jika masih ada proses, tolak
+    r = sh(f"pgrep -u {user}")
+    if r.stdout.strip():
+        raise HTTPException(409, "user has active sessions")
+    sh(f"userdel -r {user} 2>/dev/null; rm -f {BASE}/limits/{user}")
     return {"ok": True}
 
 
