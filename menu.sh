@@ -118,10 +118,16 @@ do_hapus() {
             fi
             sleep 1
         done
-        # "mail spool not found" hanya notice (tak ada mailbox), bukan error — disembunyikan
         warn=$(echo "$res" | grep -v "mail spool" || true)
         [ -n "$warn" ] && echo -e "${YELLOW}Peringatan: $warn${NC}"
+        # verifikasi pasca-hapus
+        if getent passwd "$user" >/dev/null 2>&1; then
+            rc=1
+            echo -e "${RED}Gagal: akun masih ada setelah userdel. Proses penghalang:${NC}"
+            ps -eo pid,user,comm | awk '$2=="'"$user"'" {print}'
+        fi
         if [ $rc -eq 0 ]; then
+            rm -f /root/natssh/limits/"$user"
             echo "$(date '+%Y-%m-%d %H:%M:%S') - HAPUS manual: $user (expired: $exp)" >> /root/autokill.log
             echo -e "${GREEN}SUKSES! Akun $user telah dihapus beserta datanya.${NC}"
         else

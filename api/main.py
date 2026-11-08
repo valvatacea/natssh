@@ -222,7 +222,12 @@ def delete_account(user: str, x_api_token: str | None = Header(default=None)):
         r = sh(f"pgrep -u {user}")
         if not r.stdout.strip():
             break
-    sh(f"userdel -r {user} 2>/dev/null; rm -f {BASE}/limits/{user}")
+    r = subprocess.run(["userdel", "-r", user], capture_output=True, text=True)
+    # verifikasi
+    check = sh(f"getent passwd {user}")
+    if r.returncode != 0 or check.stdout.strip():
+        raise HTTPException(500, f"delete failed: {r.stderr.strip() or 'user still exists'}")
+    sh(f"rm -f {BASE}/limits/{user}")
     return {"ok": True}
 
 
