@@ -1347,16 +1347,27 @@ promo_menu() {
         read -p "Pilih (0-5): " p || exit 0
         case $p in
             1)
-                echo "Slot tersedia:"; ls -1 /root/natssh/banners/*.txt 2>/dev/null | xargs -n1 basename 2>/dev/null
-                read -p "Nama slot (tanpa .txt, 0=batal): " slot
+                echo "Slot tersedia:"
+                i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
+                read -p "Nomor slot existing atau nama baru (0=batal): " slot
                 [ "$slot" = "0" ] && continue
+                if [[ "$slot" =~ ^[0-9]+$ ]]; then
+                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
+                    [ -z "$slot" ] && { echo -e "${RED}Nomor tidak valid${NC}"; pause; continue; }
+                fi
+                [[ "$slot" =~ ^[a-zA-Z0-9_-]{1,24}$ ]] || { echo -e "${RED}Nama tidak valid${NC}"; pause; continue; }
                 [[ "$slot" =~ ^[a-zA-Z0-9_-]{1,24}$ ]] || { echo -e "${RED}Nama tidak valid${NC}"; pause; continue; }
                 ${EDITOR:-nano} "/root/natssh/banners/${slot}.txt"
                 ;;
             2)
-                echo "Slot tersedia:"; ls -1 /root/natssh/banners/*.txt 2>/dev/null | xargs -n1 basename 2>/dev/null
-                read -p "Slot (0=batal): " slot
+                echo "Slot tersedia:"
+                i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
+                read -p "Nomor slot (0=batal): " slot
                 [ "$slot" = "0" ] && continue
+                if [[ "$slot" =~ ^[0-9]+$ ]]; then
+                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
+                fi
+                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
                 [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
                 read -p "Start (YYYY-MM-DD HH:MM, 0=batal): " st
                 [ "$st" = "0" ] && continue
