@@ -1418,13 +1418,13 @@ promo_menu() {
                 echo "=== JADWAL PROMO ==="
                 echo ""
                 if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
-                    echo -e "${YELLOW}NO  SLOT                      DURASI(h)  INTERVAL(m)  STATUS${NC}"
-                    echo -e "${YELLOW}---  -------------------------  ---------  -----------  ----------------${NC}"
                     i=1
                     while IFS='|' read -r slot start days interval enabled; do
                         [ -z "$slot" ] && continue
+                        end=$((start + days*86400))
+                        start_str=$(date -d "@$start" '+%d/%m %H:%M')
+                        end_str=$(date -d "@$end" '+%d/%m %H:%M')
                         if [ "$enabled" = "1" ]; then
-                            end=$((start + days*86400))
                             if [ "$now" -ge "$start" ] && [ "$now" -le "$end" ]; then
                                 status="${GREEN}● AKTIF${NC}"
                             elif [ "$now" -lt "$start" ]; then
@@ -1435,7 +1435,7 @@ promo_menu() {
                         else
                             status="${RED}○ NONAKTIF${NC}"
                         fi
-                        printf " %2d   %-26s %-6s %-6s %s\n" "$i" "$slot" "$days" "$interval" "$status"
+                        echo -e "  ${CYAN}$i.${NC} ${YELLOW}$slot${NC}  |  durasi: ${days}h  |  interval: ${interval}m  |  $start_str → $end_str  |  $status"
                         i=$((i+1))
                     done < /root/natssh/promo_schedule.conf
                     echo ""
@@ -1515,7 +1515,34 @@ promo_menu() {
                 ;;
 6)
                 # restore banner default - selalu restore
-                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
+                now=$(date +%s)
+                echo -e "${YELLOW}=== JADWAL PROMO (pilih untuk hapus) ===${NC}"
+                echo ""
+                if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+                    i=1
+                    while IFS='|' read -r slot start days interval enabled; do
+                        [ -z "$slot" ] && continue
+                        end=$((start + days*86400))
+                        start_str=$(date -d "@$start" '+%d/%m %H:%M')
+                        end_str=$(date -d "@$end" '+%d/%m %H:%M')
+                        if [ "$enabled" = "1" ]; then
+                            if [ "$now" -ge "$start" ] && [ "$now" -le "$end" ]; then
+                                status="${GREEN}● AKTIF${NC}"
+                            elif [ "$now" -lt "$start" ]; then
+                                status="${YELLOW}◐ TERJADWAL${NC}"
+                            else
+                                status="${RED}● BERAKHIR${NC}"
+                            fi
+                        else
+                            status="${RED}○ NONAKTIF${NC}"
+                        fi
+                        echo -e "  ${CYAN}$i.${NC} ${YELLOW}$slot${NC}  |  durasi: ${days}h  |  interval: ${interval}m  |  $start_str → $end_str  |  $status"
+                        i=$((i+1))
+                    done < /root/natssh/promo_schedule.conf
+                else
+                    echo -e "  ${YELLOW}Tidak ada jadwal yang tersimpan.${NC}"
+                fi
+                echo ""
                 read -p "Nomor baris hapus (0=batal, all=semua): " ln
                 [ "$ln" = "0" ] && continue
                 if [ "$ln" = "all" ]; then
@@ -1543,14 +1570,41 @@ promo_menu() {
                 echo "$(date '+%F %T') PROMO CANCEL restore" >> /root/natssh/promo.log
                 ;;
             3)
-                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
+                now=$(date +%s)
+                echo -e "${YELLOW}=== JADWAL PROMO (pilih untuk ubah) ===${NC}"
+                echo ""
+                if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+                    i=1
+                    while IFS='|' read -r slot start days interval enabled; do
+                        [ -z "$slot" ] && continue
+                        end=$((start + days*86400))
+                        start_str=$(date -d "@$start" '+%d/%m %H:%M')
+                        end_str=$(date -d "@$end" '+%d/%m %H:%M')
+                        echo -e "  ${CYAN}$i.${NC} ${YELLOW}$slot${NC}  |  durasi: ${days}h  |  interval: ${interval}m  |  $start_str → $end_str"
+                        i=$((i+1))
+                    done < /root/natssh/promo_schedule.conf
+                else
+                    echo -e "  ${YELLOW}Tidak ada jadwal yang tersimpan.${NC}"
+                fi
+                echo ""
                 read -p "Nomor baris ubah (0=batal): " ln
                 [ "$ln" = "0" ] && continue
                 line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
                 [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
                 IFS='|' read -r oldslot oldstart olddays oldiv olden <<< "$line"
-                echo "Slot lama: $oldslot | durasi ${olddays}h | interval ${oldiv}m"
-                echo "Slot tersedia:"; i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
+                oldend=$((oldstart + olddays*86400))
+                oldstart_str=$(date -d "@$oldstart" '+%d/%m/%Y %H:%M')
+                oldend_str=$(date -d "@$oldend" '+%d/%m/%Y %H:%M')
+                echo -e "${CYAN}--- Jadwal Lama ---${NC}"
+                echo -e "  Slot     : ${YELLOW}$oldslot${NC}"
+                echo -e "  Durasi   : ${olddays} hari"
+                echo -e "  Interval : ${oldiv} menit"
+                echo -e "  Periode  : $oldstart_str → $oldend_str"
+                echo -e "  Status   : $([ "$olden" = "1" ] && echo "${GREEN}aktif${NC}" || echo "${RED}nonaktif${NC}")"
+                echo ""
+                echo -e "${CYAN}--- Slot Tersedia ---${NC}"
+                i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo -e "  ${CYAN}$i.${NC} $(basename "$f" .txt)"; i=$((i+1)); done
+                echo ""
                 read -p "Slot baru (Enter=tetap, 0=batal): " slot
                 [ "$slot" = "0" ] && continue
                 [ -z "$slot" ] && slot="$oldslot"
