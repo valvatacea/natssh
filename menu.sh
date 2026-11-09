@@ -1497,24 +1497,22 @@ promo_menu() {
                 [ -z "$tg" ] && { echo -e "${RED}Target tidak valid (batal)${NC}"; pause; continue; }
                 s=$(date +%s)
                 new_end=$((s + dh*86400))
-                # validasi: tidak boleh overlap dengan jadwal aktif lain
-                _overlap=0
+                # geser waktu jika overlap: mulai setelah promo terakhir selesai
                 if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+                    _latest_end=0
                     while IFS='|' read -r _os _ost _od _oiv _oen _ojd; do
                         [ -z "$_os" ] && continue
                         [ "$_oen" = "1" ] || continue
                         _oend=$((_ost + _od*86400))
-                        # cek overlap: new_start < other_end AND new_end > other_start
-                        if [ "$s" -lt "$_oend" ] && [ "$new_end" -gt "$_ost" ]; then
-                            _overlap=1
-                            echo -e "${RED}Jadwal overlap dengan '$_os' (${_ost} s/d ${_oend})!${NC}"
-                            break
+                        if [ "$_oend" -gt "$_latest_end" ]; then
+                            _latest_end=$_oend
                         fi
                     done < /root/natssh/promo_schedule.conf
-                fi
-                if [ "$_overlap" = "1" ]; then
-                    echo -e "${YELLOW}Jadwal tidak disimpan. Ubah durasi atau tunggu jadwal lain selesai.${NC}"
-                    pause; continue
+                    if [ "$_latest_end" -gt "$s" ]; then
+                        s=$_latest_end
+                        new_end=$((s + dh*86400))
+                        echo -e "${YELLOW}Waktu bergeser: mulai setelah promo sebelumnya selesai ($(date -d @$s '+%d/%m %H:%M')).${NC}"
+                    fi
                 fi
                 echo "${slot}|${s}|${dh}|${iv}|1|${jd_sec}" >> /root/natssh/promo_schedule.conf
                 echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
