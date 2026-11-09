@@ -1340,10 +1340,10 @@ promo_menu() {
         garis
         printf "  %-3s %-46s\n" "1." "Buat/Edit Slot Promo"
         printf "  %-3s %-46s\n" "2." "Jadwalkan Promo"
-        printf "  %-3s %-46s\n" "3." "Aktifkan/Nonaktifkan Jadwal"
-        printf "  %-3s %-46s\n" "4." "Status Promo"
-        printf "  %-3s %-46s\n" "5." "Hapus Jadwal Promo (restore banner)"
-        printf "  %-3s %-46s\n" "6." "Ubah Jadwal Promo"
+        printf "  %-3s %-46s\n" "3." "Ubah Jadwal Promo"
+        printf "  %-3s %-46s\n" "4." "Aktifkan/Nonaktifkan Jadwal"
+        printf "  %-3s %-46s\n" "5." "Status Promo"
+        printf "  %-3s %-46s\n" "6." "Hapus Jadwal Promo (restore banner)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-6): " p || exit 0
         case $p in
@@ -1407,7 +1407,7 @@ promo_menu() {
                 fi
                 echo -e "${GREEN}Jadwal disimpan.${NC}"
                 ;;
-            3)
+            4)
                 echo "=== Jadwal ==="
                 nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
                 read -p "Nomor baris toggle (0=batal): " ln
@@ -1422,12 +1422,12 @@ promo_menu() {
                 echo -e "${GREEN}Diubah: $new${NC}"
                 ;;
 
-            4)
+            5)
                 echo "=== Jadwal ==="; cat /root/natssh/promo_schedule.conf 2>/dev/null
                 echo "=== Target ==="; cat /root/natssh/promo_targets.conf 2>/dev/null
                 echo "=== Backup ==="; ls -l /root/natssh/banners/.default_backup 2>/dev/null
                 ;;
-            5)
+            6)
                 # restore banner dulu
                 if [ -f /root/natssh/banners/.default_backup ]; then
                     cp /root/natssh/banners/.default_backup /etc/issue.net
@@ -1447,7 +1447,7 @@ promo_menu() {
                     echo -e "${GREEN}Baris $ln dihapus.${NC}"
                 fi
                 ;;
-            6)
+            3)
                 echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
                 read -p "Nomor baris ubah (0=batal): " ln
                 [ "$ln" = "0" ] && continue
