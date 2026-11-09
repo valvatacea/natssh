@@ -10,7 +10,7 @@ NOW=$(date +%s)
 # hapus cron jika tidak ada promo enabled
 has_enabled=0
 if [ -f "$SCHED" ]; then
-    while IFS='|' read -r slot start end interval enabled; do
+    while IFS='|' read -r slot start days interval enabled; do
         [ -z "$slot" ] && continue
         [ "$enabled" = "1" ] || continue
         has_enabled=1
@@ -29,11 +29,12 @@ fi
 
 # cari promo aktif
 active_slot=""; active_start=""; active_end=""; active_interval=""
-while IFS='|' read -r slot start end interval enabled; do
+while IFS='|' read -r slot start days interval enabled; do
     [ -z "$slot" ] && continue
     [ "$enabled" = "1" ] || continue
+    end=$((start + days*86400))
     [ "$NOW" -ge "$start" ] && [ "$NOW" -le "$end" ] || continue
-    active_slot="$slot"; active_start="$start"; active_end="$end"; active_interval="${interval:-60}"
+    active_slot="$slot"; active_start="$start"; active_end="$end"; active_interval="${interval:-30}"; active_days="$days"
     break
 done < "$SCHED"
 

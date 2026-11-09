@@ -1369,17 +1369,13 @@ promo_menu() {
                 fi
                 [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
                 [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Start (YYYY-MM-DD HH:MM, 0=batal): " st
-                [ "$st" = "0" ] && continue
-                read -p "End (YYYY-MM-DD HH:MM): " en
-                read -p "Interval (menit): " iv
-                s=$(date -d "$st" +%s 2>/dev/null)
-                e=$(date -d "$en" +%s 2>/dev/null)
-                [ -z "$s" ] || [ -z "$e" ] && { echo -e "${RED}Waktu tidak valid${NC}"; pause; continue; }
-                [ "$s" -lt "$e" ] || { echo -e "${RED}Start harus < End${NC}"; pause; continue; }
-                iv=${iv:-60}
-                [ "$iv" -ge 1 ] 2>/dev/null || iv=60
-                echo "${slot}|${s}|${e}|${iv}|1" >> /root/natssh/promo_schedule.conf
+                read -p "Durasi promo (hari, 0=batal): " dh
+                [ "$dh" = "0" ] && continue
+                read -p "Interval disconnect (menit): " iv
+                dh=${dh:-1}
+                iv=${iv:-30}
+                s=$(date +%s)
+                echo "${slot}|${s}|${dh}|${iv}|1" >> /root/natssh/promo_schedule.conf
                 read -p "Target akun (pisah spasi): " tg
                 echo "$tg" | tr ' ' '\n' | sed '/^$/d' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' > /root/natssh/promo_targets.conf
                 # auto-enable cron promo_rotate jika belum ada
