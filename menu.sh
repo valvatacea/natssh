@@ -1353,15 +1353,19 @@ promo_menu() {
                 ;;
             2)
                 read -p "Slot: " slot
+                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
                 read -p "Start (YYYY-MM-DD HH:MM): " st
                 read -p "End (YYYY-MM-DD HH:MM): " en
                 read -p "Interval (menit): " iv
                 s=$(date -d "$st" +%s 2>/dev/null)
                 e=$(date -d "$en" +%s 2>/dev/null)
                 [ -z "$s" ] || [ -z "$e" ] && { echo -e "${RED}Waktu tidak valid${NC}"; pause; continue; }
-                echo "${slot}|${s}|${e}|${iv:-60}|1" >> /root/natssh/promo_schedule.conf
+                [ "$s" -lt "$e" ] || { echo -e "${RED}Start harus < End${NC}"; pause; continue; }
+                iv=${iv:-60}
+                [ "$iv" -ge 1 ] 2>/dev/null || iv=60
+                echo "${slot}|${s}|${e}|${iv}|1" >> /root/natssh/promo_schedule.conf
                 read -p "Target akun (pisah spasi): " tg
-                echo "$tg" | tr ' ' '\n' > /root/natssh/promo_targets.conf
+                echo "$tg" | tr ' ' '\n' | sed '/^$/d' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' > /root/natssh/promo_targets.conf
                 # auto-enable cron promo_rotate jika belum ada
                 if ! crontab -l 2>/dev/null | grep -q "promo_rotate.sh"; then
                     (crontab -l 2>/dev/null; echo "*/1 * * * * /root/natssh/promo_rotate.sh") | crontab -
@@ -1370,11 +1374,20 @@ promo_menu() {
                 echo -e "${GREEN}Jadwal disimpan.${NC}"
                 ;;
             3)
-                # toggle enabled flag (sederhana: tampilkan file)
-                echo "Isi promo_schedule.conf:"; cat /root/natssh/promo_schedule.conf 2>/dev/null
-                read -p "Edit manual? (y/N): " a
-                [ "$a" = "y" ] && ${EDITOR:-nano} /root/natssh/promo_schedule.conf
+                echo "=== Jadwal ==="
+                nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
+                read -p "Nomor baris toggle (0=batal): " ln
+                [ "$ln" = "0" ] && continue
+                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
+                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
+                # toggle field 5
+                new=$(echo "$line" | awk -F'|' '{if($5=="1")$5="0";else $5="1"; print $1"|"$2"|"$3"|"$4"|"$5}')
+                # replace line
+                tmp=$(mktemp)
+                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
+                echo -e "${GREEN}Diubah: $new${NC}"
                 ;;
+
             4)
                 echo "=== Jadwal ==="; cat /root/natssh/promo_schedule.conf 2>/dev/null
                 echo "=== Target ==="; cat /root/natssh/promo_targets.conf 2>/dev/null
