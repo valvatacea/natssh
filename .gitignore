@@ -15,3 +15,4 @@ promo_schedule.conf
 promo_targets.conf
 banners/.default_backup
 promo.log
+pending_sess.json
