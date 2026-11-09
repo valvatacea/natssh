@@ -1347,14 +1347,17 @@ promo_menu() {
         read -p "Pilih (0-5): " p || exit 0
         case $p in
             1)
-                read -p "Nama slot (tanpa .txt): " slot
+                read -p "Nama slot (tanpa .txt, 0=batal): " slot
+                [ "$slot" = "0" ] && continue
                 [[ "$slot" =~ ^[a-zA-Z0-9_-]{1,24}$ ]] || { echo -e "${RED}Nama tidak valid${NC}"; pause; continue; }
                 ${EDITOR:-nano} "/root/natssh/banners/${slot}.txt"
                 ;;
             2)
-                read -p "Slot: " slot
+                read -p "Slot (0=batal): " slot
+                [ "$slot" = "0" ] && continue
                 [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Start (YYYY-MM-DD HH:MM): " st
+                read -p "Start (YYYY-MM-DD HH:MM, 0=batal): " st
+                [ "$st" = "0" ] && continue
                 read -p "End (YYYY-MM-DD HH:MM): " en
                 read -p "Interval (menit): " iv
                 s=$(date -d "$st" +%s 2>/dev/null)
