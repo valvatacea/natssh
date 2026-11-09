@@ -518,7 +518,7 @@ menu_monitor() {
         echo "5. Perangkat per Akun (live + riwayat sesi)"
         echo "6. Status RAM / CPU / Disk + Resource SSH"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-6): " p || exit 0
+        read -p "Pilih (0-5): " p || exit 0
         case $p in
             1) sessi_online ;;
             2) autokill_manual ;;
@@ -772,7 +772,7 @@ conf_service() {
         echo "4. Toggle Keepalive SSH"
         echo "5. Toggle Heartbeat WS"
         echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-6): " p || exit 0
+        read -p "Pilih (0-5): " p || exit 0
         case $p in
             1)
                 echo -e "${YELLOW}Menjalankan natssh-ws...${NC}"
@@ -1342,10 +1342,9 @@ promo_menu() {
         printf "  %-3s %-46s\n" "2." "Jadwalkan Promo"
         printf "  %-3s %-46s\n" "3." "Aktifkan/Nonaktifkan Jadwal"
         printf "  %-3s %-46s\n" "4." "Status Promo"
-        printf "  %-3s %-46s\n" "5." "Batalkan Promo Sekarang (Restore)"
-        printf "  %-3s %-46s\n" "6." "Hapus Jadwal Promo"
+        printf "  %-3s %-46s\n" "5." "Hapus Jadwal Promo (restore banner)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-6): " p || exit 0
+        read -p "Pilih (0-5): " p || exit 0
         case $p in
             1)
                 echo "Slot tersedia:"
@@ -1427,7 +1426,13 @@ promo_menu() {
                 echo "=== Target ==="; cat /root/natssh/promo_targets.conf 2>/dev/null
                 echo "=== Backup ==="; ls -l /root/natssh/banners/.default_backup 2>/dev/null
                 ;;
-            6)
+            5)
+                # restore banner dulu
+                if [ -f /root/natssh/banners/.default_backup ]; then
+                    cp /root/natssh/banners/.default_backup /etc/issue.net
+                    echo -e "${GREEN}Banner restored.${NC}"
+                    echo "$(date '+%F %T') PROMO CANCEL restore" >> /root/natssh/promo.log
+                fi
                 echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
                 read -p "Nomor baris hapus (0=batal, all=semua): " ln
                 [ "$ln" = "0" ] && continue
@@ -1439,14 +1444,6 @@ promo_menu() {
                     tmp=$(mktemp)
                     awk -v n="$ln" 'NR!=n{print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
                     echo -e "${GREEN}Baris $ln dihapus.${NC}"
-                fi
-                ;;
-            5)
-                read -p "Restore banner default sekarang? (y/N): " a
-                if [ "$a" = "y" ] && [ -f /root/natssh/banners/.default_backup ]; then
-                    cp /root/natssh/banners/.default_backup /etc/issue.net
-                    echo -e "${GREEN}Banner restored.${NC}"
-                    echo "$(date '+%F %T') PROMO CANCEL restore" >> /root/natssh/promo.log
                 fi
                 ;;
             0) return ;;
