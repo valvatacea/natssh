@@ -1362,6 +1362,11 @@ promo_menu() {
                 echo "${slot}|${s}|${e}|${iv:-60}|1" >> /root/natssh/promo_schedule.conf
                 read -p "Target akun (pisah spasi): " tg
                 echo "$tg" | tr ' ' '\n' > /root/natssh/promo_targets.conf
+                # auto-enable cron promo_rotate jika belum ada
+                if ! crontab -l 2>/dev/null | grep -q "promo_rotate.sh"; then
+                    (crontab -l 2>/dev/null; echo "*/1 * * * * /root/natssh/promo_rotate.sh") | crontab -
+                    echo -e "${GREEN}Cron promo_rotate diaktifkan.${NC}"
+                fi
                 echo -e "${GREEN}Jadwal disimpan.${NC}"
                 ;;
             3)
