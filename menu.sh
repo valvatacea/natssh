@@ -1412,18 +1412,41 @@ promo_menu() {
                 echo -e "${GREEN}Jadwal disimpan.${NC}"
                 ;;
             4)
-                echo "=== Jadwal ==="
-                nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
+                echo "=== JADWAL PROMO ==="
+                echo ""
+                if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+                    echo -e "${YELLOW}NO  SLOT                      DURASI(h)  INTERVAL(m)  STATUS${NC}"
+                    echo -e "${YELLOW}---  -------------------------  ---------  -----------  ----------------${NC}"
+                    i=1
+                    while IFS='|' read -r slot start days interval enabled; do
+                        [ -z "$slot" ] && continue
+                        if [ "$enabled" = "1" ]; then
+                            if [ "$days" = "0" ]; then
+                                status="${GREEN}● AKTIF${NC}"
+                            else
+                                status="${GREEN}● AKTIF${NC}"
+                            fi
+                        else
+                            status="${RED}○ NONAKTIF${NC}"
+                        fi
+                        printf " %2d   %-26s %-6s %-6s %s\n" "$i" "$slot" "$days" "$interval" "$status"
+                        i=$((i+1))
+                    done < /root/natssh/promo_schedule.conf
+                    echo ""
+                else
+                    echo -e "  ${YELLOW}Tidak ada jadwal yang tersimpan.${NC}"
+                fi
+                echo ""
                 read -p "Nomor baris toggle (0=batal): " ln
                 [ "$ln" = "0" ] && continue
                 line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
                 [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
                 # toggle field 5
-                new=$(echo "$line" | awk -F'|' '{if($5=="1")$5="0";else $5="1"; print $1"|"$2"|"$3"|"$4"|"$5}')
+                new=$(echo "$line" | awk -F'|' '{if($5=="1") $5="0"; else $5="1"; print $1"|"$2"|"$3"|"$4"|"$5}')
                 # replace line
                 tmp=$(mktemp)
                 awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo -e "${GREEN}Diubah: $new${NC}"
+                echo -e "${GREEN}Dihentikan/dieaktifkan: $new${NC}"
                 ;;
 
             5)
