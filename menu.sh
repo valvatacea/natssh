@@ -1423,9 +1423,62 @@ promo_menu() {
                 ;;
 
             5)
-                echo "=== Jadwal ==="; cat /root/natssh/promo_schedule.conf 2>/dev/null
-                echo "=== Target ==="; cat /root/natssh/promo_targets.conf 2>/dev/null
-                echo "=== Backup ==="; ls -l /root/natssh/banners/.default_backup 2>/dev/null
+                echo -e "${CYAN}=== STATUS PROMO ===${NC}"
+                echo ""
+                # Jadwal
+                if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+                    echo -e "${YELLOW}Jadwal Promo:${NC}"
+                    now=$(date +%s)
+                    i=1
+                    while IFS='|' read -r slot start days interval enabled; do
+                        [ -z "$slot" ] && continue
+                        end=$((start + days*86400))
+                        start_str=$(date -d "@$start" '+%d/%m/%Y %H:%M')
+                        end_str=$(date -d "@$end" '+%d/%m/%Y %H:%M')
+                        if [ "$enabled" = "1" ]; then
+                            if [ "$now" -ge "$start" ] && [ "$now" -le "$end" ]; then
+                                status="${GREEN}AKTIF${NC}"
+                            elif [ "$now" -lt "$start" ]; then
+                                status="${YELLOW}TERJADWAL${NC}"
+                            else
+                                status="${RED}BERAKHIR${NC}"
+                            fi
+                        else
+                            status="${RED}NONAKTIF${NC}"
+                        fi
+                        echo -e "  $i. ${CYAN}$slot${NC} | $start_str s/d $end_str | Interval: ${interval}m | $status"
+                        i=$((i+1))
+                    done < /root/natssh/promo_schedule.conf
+                else
+                    echo -e "  ${YELLOW}(tidak ada jadwal)${NC}"
+                fi
+                echo ""
+                # Target
+                if [ -f /root/natssh/promo_targets.conf ] && [ -s /root/natssh/promo_targets.conf ]; then
+                    echo -e "${YELLOW}Target Akun:${NC}"
+                    i=1
+                    while read -r u; do
+                        u=$(echo "$u" | xargs)
+                        [ -z "$u" ] && continue
+                        echo -e "  $i. ${CYAN}$u${NC}"
+                        i=$((i+1))
+                    done < /root/natssh/promo_targets.conf
+                else
+                    echo -e "  ${YELLOW}(tidak ada target)${NC}"
+                fi
+                echo ""
+                # Backup
+                if [ -f /root/natssh/banners/.default_backup ]; then
+                    echo -e "${YELLOW}Backup Banner Default:${NC} ${GREEN}TERSIMPAN${NC} ($(stat -c '%y' /root/natssh/banners/.default_backup | cut -d. -f1))"
+                else
+                    echo -e "${YELLOW}Backup Banner Default:${NC} ${RED}BELUM ADA${NC}"
+                fi
+                echo ""
+                # Log promo terakhir
+                if [ -f /root/natssh/promo.log ]; then
+                    echo -e "${YELLOW}Log Terakhir:${NC}"
+                    tail -3 /root/natssh/promo.log | while read line; do echo "  $line"; done
+                fi
                 ;;
             6)
                 # restore banner dulu

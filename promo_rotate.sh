@@ -24,6 +24,8 @@ if [ "$has_enabled" = "0" ]; then
         cp "$BACKUP" /etc/issue.net
         echo "$(date '+%F %T') PROMO RESTORE default (no active promo)" >> "$LOG"
     fi
+    # cleanup flag
+    rm -f "$DIR/.promo_backup_done"
     exit 0
 fi
 
@@ -44,11 +46,18 @@ if [ -z "$active_slot" ]; then
         cp "$BACKUP" /etc/issue.net
         echo "$(date '+%F %T') PROMO RESTORE default" >> "$LOG"
     fi
+    # cleanup flag biar promo berikutnya bisa backup lagi
+    rm -f "$DIR/.promo_backup_done"
     exit 0
 fi
 
-# backup banner saat ini (selalu)
-[ -f /etc/issue.net ] && cp /etc/issue.net "$BACKUP"
+# backup banner saat ini (hanya saat transisi: tidak ada promo aktif -> ada promo aktif)
+# gunakan flag file untuk tandai sudah backup
+BACKUP_DONE="$DIR/.promo_backup_done"
+if [ -f /etc/issue.net ] && [ ! -f "$BACKUP_DONE" ]; then
+    cp /etc/issue.net "$BACKUP"
+    touch "$BACKUP_DONE"
+fi
 
 # apply banner promo
 if [ -f "$DIR/banners/$active_slot.txt" ]; then
