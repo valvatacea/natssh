@@ -2,6 +2,10 @@
 # NATSSH Menu v4.0 — utama 4 kategori + submenu
 # Konvensi: akun jualan = shell /bin/false; 1 sesi tunnel = 2 proses sshd (hitungan /2)
 
+# ══════════ KONFIGURASI WAKTU ══════════
+# Semua tampilan waktu ke user pakai WIB (GMT+7)
+export TZ=Asia/Jakarta
+
 RED='\u001b[0;31m'
 GREEN='\u001b[0;32m'
 YELLOW='\u001b[0;33m'

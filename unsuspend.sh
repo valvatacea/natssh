@@ -1,5 +1,7 @@
 #!/bin/bash
 # Buka kunci akun yang masa suspend 15 menitnya habis
+# Semua timestamp log unsuspend pakai WIB (GMT+7)
+export TZ=Asia/Jakarta
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 SUSPEND_DIR="/root/natssh/suspended"
 LOG_FILE="/root/autokill.log"

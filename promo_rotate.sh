@@ -1,4 +1,7 @@
 #!/bin/bash
+# Semua timestamp log promo pakai WIB (GMT+7)
+export TZ=Asia/Jakarta
+
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 SCHED="$DIR/promo_schedule.conf"
 TARGETS="$DIR/promo_targets.conf"

@@ -1,5 +1,7 @@
 #!/bin/bash
 # Auto-backup NATSSH: konfigurasi + akun (hash password disimpan)
+# Semua timestamp log autobackup pakai WIB (GMT+7)
+export TZ=Asia/Jakarta
 DIR="/root/natssh"
 
 # --- Backup konfigurasi (nama statis) ---

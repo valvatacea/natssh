@@ -84,9 +84,16 @@ def _dump():
         data = json.dumps({"live": list(_CONNS.values()), "last": list(_LAST)})
         _last_dump = time.time()
     tmp = CONNS_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        f.write(data)
-    os.replace(tmp, CONNS_FILE)
+    try:
+        with open(tmp, "w") as f:
+            f.write(data)
+        os.replace(tmp, CONNS_FILE)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        _log("GAGAL dump conns.json (retry ok)")
 
 
 def _maybe_dump():
