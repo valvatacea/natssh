@@ -1361,7 +1361,6 @@ promo_menu() {
                     [ -z "$slot" ] && { echo -e "${RED}Nomor tidak valid${NC}"; pause; continue; }
                 fi
                 [[ "$slot" =~ ^[a-zA-Z0-9_-]{1,24}$ ]] || { echo -e "${RED}Nama tidak valid${NC}"; pause; continue; }
-                [[ "$slot" =~ ^[a-zA-Z0-9_-]{1,24}$ ]] || { echo -e "${RED}Nama tidak valid${NC}"; pause; continue; }
                 ${EDITOR:-nano} "/root/natssh/banners/${slot}.txt"
                 ;;
             2)
@@ -1372,7 +1371,6 @@ promo_menu() {
                 if [[ "$slot" =~ ^[0-9]+$ ]]; then
                     slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
                 fi
-                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
                 [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
                 read -p "Durasi promo (hari, 0=batal): " dh
                 [ "$dh" = "0" ] && continue
@@ -1395,7 +1393,11 @@ promo_menu() {
                             selected="$selected ${ACCS[$idx]}"
                         fi
                     else
-                        selected="$selected $t"
+                        if id "$t" &>/dev/null; then
+                            selected="$selected $t"
+                        else
+                            echo -e "${RED}Username '$t' tidak ditemukan, dilewati.${NC}"
+                        fi
                     fi
                 done
                 tg=$(echo "$selected" | xargs)
@@ -1412,6 +1414,7 @@ promo_menu() {
                 echo -e "${GREEN}Jadwal disimpan.${NC}"
                 ;;
             4)
+                now=$(date +%s)
                 echo "=== JADWAL PROMO ==="
                 echo ""
                 if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
@@ -1525,15 +1528,16 @@ promo_menu() {
                     echo -e "${GREEN}Baris $ln dihapus.${NC}"
                 fi
                 # restore banner
+                _backup_tmp="/tmp/issue_banner_backup_$(date +%s)"
                 if [ -f /etc/issue.net ]; then
-                    cp /etc/issue.net /tmp/issue_banner_backup_$(date +%s)
+                    cp /etc/issue.net "$_backup_tmp"
                 fi
                 if [ -f /root/natssh/banners/.default_backup ]; then
                     cp /root/natssh/banners/.default_backup /etc/issue.net
                 elif [ -f /root/natssh/banners/default.txt ]; then
                     cp /root/natssh/banners/default.txt /etc/issue.net
-                else
-                    cp /tmp/issue_banner_backup_$(date +%s) /etc/issue.net 2>/dev/null || true
+                elif [ -f "$_backup_tmp" ]; then
+                    cp "$_backup_tmp" /etc/issue.net 2>/dev/null || true
                 fi
                 echo -e "${GREEN}Banner restored to default.${NC}"
                 echo "$(date '+%F %T') PROMO CANCEL restore" >> /root/natssh/promo.log
@@ -1576,7 +1580,7 @@ promo_menu() {
                 else
                     tg=$(cat /root/natssh/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
                 fi
-                new="${slot}|${oldstart}|${dh}|${iv}|1"
+                new="${slot}|${oldstart}|${dh}|${iv}|${olden:-1}"
                 tmp=$(mktemp)
                 awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
                 echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
