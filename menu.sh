@@ -1342,6 +1342,20 @@ promo_menu() {
         garis
         echo -e "${YELLOW}   PROMOSI BANNER${NC}"
         garis
+        # status ringkas
+        _n_sched=0; _n_active=0
+        if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+            while IFS='|' read -r _s _st _d _iv _en; do
+                [ -z "$_s" ] && continue
+                _n_sched=$((_n_sched+1))
+                [ "$_en" = "1" ] || continue
+                _end=$((_st + _d*86400))
+                _now=$(date +%s)
+                [ "$_now" -ge "$_st" ] && [ "$_now" -le "$_end" ] && _n_active=$((_n_active+1))
+            done < /root/natssh/promo_schedule.conf
+        fi
+        echo -e "  Jadwal: ${CYAN}${_n_sched}${NC}  |  Aktif sekarang: ${GREEN}${_n_active}${NC}"
+        garis
         printf "  %-3s %-46s\n" "1." "Buat/Edit Slot Promo"
         printf "  %-3s %-46s\n" "2." "Jadwalkan Promo"
         printf "  %-3s %-46s\n" "3." "Ubah Jadwal Promo"
@@ -1352,8 +1366,10 @@ promo_menu() {
         read -p "Pilih (0-6): " p || exit 0
         case $p in
             1)
+                mkdir -p /root/natssh/banners
                 echo "Slot tersedia:"
                 i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
+                [ $i -eq 1 ] && echo "  (belum ada slot)"
                 read -p "Nomor slot existing atau nama baru (0=batal): " slot
                 [ "$slot" = "0" ] && continue
                 if [[ "$slot" =~ ^[0-9]+$ ]]; then
@@ -1361,6 +1377,10 @@ promo_menu() {
                     [ -z "$slot" ] && { echo -e "${RED}Nomor tidak valid${NC}"; pause; continue; }
                 fi
                 [[ "$slot" =~ ^[a-zA-Z0-9_-]{1,24}$ ]] || { echo -e "${RED}Nama tidak valid${NC}"; pause; continue; }
+                if [ -f "/root/natssh/banners/${slot}.txt" ]; then
+                    read -p "Slot '$slot' sudah ada — timpa? (y/N): " t
+                    [[ "$t" =~ ^[Yy]$ ]] || { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
+                fi
                 ${EDITOR:-nano} "/root/natssh/banners/${slot}.txt"
                 ;;
             2)
@@ -1375,9 +1395,15 @@ promo_menu() {
                 read -p "Durasi promo (hari, 0=batal): " dh
                 [ "$dh" = "0" ] && continue
                 [ -z "$dh" ] && { echo -e "${RED}Durasi kosong (batal)${NC}"; pause; continue; }
+                if ! [[ "$dh" =~ ^[0-9]+$ ]] || [ "$dh" -lt 1 ]; then
+                    echo -e "${RED}Durasi harus angka >= 1!${NC}"; pause; continue
+                fi
                 read -p "Interval disconnect (menit, 0=batal): " iv
                 [ "$iv" = "0" ] && continue
                 [ -z "$iv" ] && { echo -e "${RED}Interval kosong (batal)${NC}"; pause; continue; }
+                if ! [[ "$iv" =~ ^[0-9]+$ ]] || [ "$iv" -lt 1 ]; then
+                    echo -e "${RED}Interval harus angka >= 1!${NC}"; pause; continue
+                fi
                 # list akun target
                 mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
                 echo "Akun target tersedia:"
@@ -1391,6 +1417,8 @@ promo_menu() {
                         idx=$((t-1))
                         if [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ]; then
                             selected="$selected ${ACCS[$idx]}"
+                        else
+                            echo -e "${RED}Nomor $t di luar daftar, dilewati.${NC}"
                         fi
                     else
                         if id "$t" &>/dev/null; then
@@ -1452,7 +1480,13 @@ promo_menu() {
                 # replace line
                 tmp=$(mktemp)
                 awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo -e "${GREEN}Dihentikan/dieaktifkan: $new${NC}"
+                toggled_slot=$(echo "$new" | cut -d'|' -f1)
+                toggled_state=$(echo "$new" | cut -d'|' -f5)
+                if [ "$toggled_state" = "1" ]; then
+                    echo -e "${GREEN}Jadwal '$toggled_slot' DIAKTIFKAN.${NC}"
+                else
+                    echo -e "${YELLOW}Jadwal '$toggled_slot' DITONAKTIFKAN.${NC}"
+                fi
                 ;;
 
             5)
@@ -1546,27 +1580,48 @@ promo_menu() {
                 read -p "Nomor baris hapus (0=batal, all=semua): " ln
                 [ "$ln" = "0" ] && continue
                 if [ "$ln" = "all" ]; then
+                    read -p "Yakin hapus SEMUA jadwal? (y/N): " y
+                    [[ "$y" =~ ^[Yy]$ ]] || { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
                     : > /root/natssh/promo_schedule.conf
                     rm -f /root/natssh/.promo_last_run
                     echo -e "${GREEN}Semua jadwal dihapus.${NC}"
                 else
+                    _target_line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
+                    _target_slot=$(echo "$_target_line" | cut -d'|' -f1)
+                    read -p "Yakin hapus jadwal '$_target_slot'? (y/N): " y
+                    [[ "$y" =~ ^[Yy]$ ]] || { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
                     tmp=$(mktemp)
                     awk -v n="$ln" 'NR!=n{print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                    echo -e "${GREEN}Baris $ln dihapus.${NC}"
+                    echo -e "${GREEN}Jadwal '$_target_slot' dihapus.${NC}"
                 fi
-                # restore banner
-                _backup_tmp="/tmp/issue_banner_backup_$(date +%s)"
-                if [ -f /etc/issue.net ]; then
-                    cp /etc/issue.net "$_backup_tmp"
+                # restore banner hanya jika tidak ada promo aktif lain
+                _has_active=0
+                if [ -f /root/natssh/promo_schedule.conf ]; then
+                    while IFS='|' read -r _s _st _d _iv _en; do
+                        [ -z "$_s" ] && continue
+                        [ "$_en" = "1" ] || continue
+                        _end=$((_st + _d*86400))
+                        if [ "$(date +%s)" -ge "$_st" ] && [ "$(date +%s)" -le "$_end" ]; then
+                            _has_active=1; break
+                        fi
+                    done < /root/natssh/promo_schedule.conf
                 fi
-                if [ -f /root/natssh/banners/.default_backup ]; then
-                    cp /root/natssh/banners/.default_backup /etc/issue.net
-                elif [ -f /root/natssh/banners/default.txt ]; then
-                    cp /root/natssh/banners/default.txt /etc/issue.net
-                elif [ -f "$_backup_tmp" ]; then
-                    cp "$_backup_tmp" /etc/issue.net 2>/dev/null || true
+                if [ "$_has_active" = "0" ]; then
+                    _backup_tmp="/tmp/issue_banner_backup_$(date +%s)"
+                    if [ -f /etc/issue.net ]; then
+                        cp /etc/issue.net "$_backup_tmp"
+                    fi
+                    if [ -f /root/natssh/banners/.default_backup ]; then
+                        cp /root/natssh/banners/.default_backup /etc/issue.net
+                    elif [ -f /root/natssh/banners/default.txt ]; then
+                        cp /root/natssh/banners/default.txt /etc/issue.net
+                    elif [ -f "$_backup_tmp" ]; then
+                        cp "$_backup_tmp" /etc/issue.net 2>/dev/null || true
+                    fi
+                    echo -e "${GREEN}Banner restored to default.${NC}"
+                else
+                    echo -e "${YELLOW}Masih ada promo aktif lain — banner tidak di-restore.${NC}"
                 fi
-                echo -e "${GREEN}Banner restored to default.${NC}"
                 echo "$(date '+%F %T') PROMO CANCEL restore" >> /root/natssh/promo.log
                 ;;
             3)
@@ -1614,8 +1669,14 @@ promo_menu() {
                 [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
                 read -p "Durasi baru (hari, Enter=tetap): " dh
                 [ -z "$dh" ] && dh="$olddays"
+                if ! [[ "$dh" =~ ^[0-9]+$ ]] || [ "$dh" -lt 1 ]; then
+                    echo -e "${RED}Durasi harus angka >= 1!${NC}"; pause; continue
+                fi
                 read -p "Interval baru (menit, Enter=tetap): " iv
                 [ -z "$iv" ] && iv="$oldiv"
+                if ! [[ "$iv" =~ ^[0-9]+$ ]] || [ "$iv" -lt 1 ]; then
+                    echo -e "${RED}Interval harus angka >= 1!${NC}"; pause; continue
+                fi
                 mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
                 echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
                 read -p "Target baru (nomor/nama, Enter=tetap): " tg
@@ -1626,7 +1687,11 @@ promo_menu() {
                             idx=$((t-1))
                             [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
                         else
-                            selected="$selected $t"
+                            if id "$t" &>/dev/null; then
+                                selected="$selected $t"
+                            else
+                                echo -e "${RED}Username '$t' tidak ditemukan, dilewati.${NC}"
+                            fi
                         fi
                     done
                     tg=$(echo "$selected" | xargs)
