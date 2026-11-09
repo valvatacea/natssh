@@ -1371,13 +1371,34 @@ promo_menu() {
                 [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
                 read -p "Durasi promo (hari, 0=batal): " dh
                 [ "$dh" = "0" ] && continue
-                read -p "Interval disconnect (menit): " iv
-                dh=${dh:-1}
-                iv=${iv:-30}
+                [ -z "$dh" ] && { echo -e "${RED}Durasi kosong (batal)${NC}"; pause; continue; }
+                read -p "Interval disconnect (menit, 0=batal): " iv
+                [ "$iv" = "0" ] && continue
+                [ -z "$iv" ] && { echo -e "${RED}Interval kosong (batal)${NC}"; pause; continue; }
+                # list akun target
+                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
+                echo "Akun target tersedia:"
+                for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
+                read -p "Pilih nomor akun (pisah spasi, 0=batal): " tg
+                [ "$tg" = "0" ] && continue
+                [ -z "$tg" ] && { echo -e "${RED}Target kosong (batal)${NC}"; pause; continue; }
+                selected=""
+                for t in $tg; do
+                    if [[ "$t" =~ ^[0-9]+$ ]]; then
+                        idx=$((t-1))
+                        if [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ]; then
+                            selected="$selected ${ACCS[$idx]}"
+                        fi
+                    else
+                        selected="$selected $t"
+                    fi
+                done
+                tg=$(echo "$selected" | xargs)
+                [ -z "$tg" ] && { echo -e "${RED}Target tidak valid (batal)${NC}"; pause; continue; }
                 s=$(date +%s)
                 echo "${slot}|${s}|${dh}|${iv}|1" >> /root/natssh/promo_schedule.conf
-                read -p "Target akun (pisah spasi): " tg
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' > /root/natssh/promo_targets.conf
+                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
+                echo -e "${GREEN}Target: $tg${NC}"
                 # auto-enable cron promo_rotate jika belum ada
                 if ! crontab -l 2>/dev/null | grep -q "promo_rotate.sh"; then
                     (crontab -l 2>/dev/null; echo "*/1 * * * * /root/natssh/promo_rotate.sh") | crontab -
