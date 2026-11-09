@@ -377,53 +377,6 @@ menu_akun() {
             2) akun_daftar ;;
             3) akun_autoclean ;;
             4) akun_ganti_password ;;
-            6)
-                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
-                read -p "Nomor baris ubah (0=batal): " ln
-                [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
-                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
-                IFS='|' read -r oldslot oldstart olddays oldiv olden <<< "$line"
-                echo "Slot lama: $oldslot | durasi ${olddays}h | interval ${oldiv}m"
-                # slot
-                echo "Slot tersedia:"; i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
-                read -p "Slot baru (Enter= tetap, 0=batal): " slot
-                [ "$slot" = "0" ] && continue
-                [ -z "$slot" ] && slot="$oldslot"
-                if [[ "$slot" =~ ^[0-9]+$ ]]; then
-                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
-                fi
-                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Durasi baru (hari, Enter=tetap): " dh
-                [ -z "$dh" ] && dh="$olddays"
-                read -p "Interval baru (menit, Enter=tetap): " iv
-                [ -z "$iv" ] && iv="$oldiv"
-                # target
-                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
-                echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
-                read -p "Target baru (nomor/nama, Enter=tetap): " tg
-                if [ -n "$tg" ]; then
-                    selected=""
-                    for t in $tg; do
-                        if [[ "$t" =~ ^[0-9]+$ ]]; then
-                            idx=$((t-1))
-                            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
-                        else
-                            selected="$selected $t"
-                        fi
-                    done
-                    tg=$(echo "$selected" | xargs)
-                    [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
-                else
-                    tg=$(cat /root/natssh/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
-                fi
-                new="${slot}|${oldstart}|${dh}|${iv}|1"
-                tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
-                echo -e "${GREEN}Jadwal diubah: $new${NC}"
-                echo -e "${GREEN}Target: $tg${NC}"
-                ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
@@ -573,53 +526,6 @@ menu_monitor() {
             4) ws_peak ;;
             5) ws_peruser ;;
             6) status_sistem ;;
-            6)
-                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
-                read -p "Nomor baris ubah (0=batal): " ln
-                [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
-                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
-                IFS='|' read -r oldslot oldstart olddays oldiv olden <<< "$line"
-                echo "Slot lama: $oldslot | durasi ${olddays}h | interval ${oldiv}m"
-                # slot
-                echo "Slot tersedia:"; i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
-                read -p "Slot baru (Enter= tetap, 0=batal): " slot
-                [ "$slot" = "0" ] && continue
-                [ -z "$slot" ] && slot="$oldslot"
-                if [[ "$slot" =~ ^[0-9]+$ ]]; then
-                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
-                fi
-                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Durasi baru (hari, Enter=tetap): " dh
-                [ -z "$dh" ] && dh="$olddays"
-                read -p "Interval baru (menit, Enter=tetap): " iv
-                [ -z "$iv" ] && iv="$oldiv"
-                # target
-                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
-                echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
-                read -p "Target baru (nomor/nama, Enter=tetap): " tg
-                if [ -n "$tg" ]; then
-                    selected=""
-                    for t in $tg; do
-                        if [[ "$t" =~ ^[0-9]+$ ]]; then
-                            idx=$((t-1))
-                            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
-                        else
-                            selected="$selected $t"
-                        fi
-                    done
-                    tg=$(echo "$selected" | xargs)
-                    [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
-                else
-                    tg=$(cat /root/natssh/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
-                fi
-                new="${slot}|${oldstart}|${dh}|${iv}|1"
-                tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
-                echo -e "${GREEN}Jadwal diubah: $new${NC}"
-                echo -e "${GREEN}Target: $tg${NC}"
-                ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
@@ -726,53 +632,6 @@ menu_backup() {
             1) backup_ekspor ;;
             2) backup_config ;;
             3) conf_autobackup ;;
-            6)
-                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
-                read -p "Nomor baris ubah (0=batal): " ln
-                [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
-                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
-                IFS='|' read -r oldslot oldstart olddays oldiv olden <<< "$line"
-                echo "Slot lama: $oldslot | durasi ${olddays}h | interval ${oldiv}m"
-                # slot
-                echo "Slot tersedia:"; i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
-                read -p "Slot baru (Enter= tetap, 0=batal): " slot
-                [ "$slot" = "0" ] && continue
-                [ -z "$slot" ] && slot="$oldslot"
-                if [[ "$slot" =~ ^[0-9]+$ ]]; then
-                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
-                fi
-                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Durasi baru (hari, Enter=tetap): " dh
-                [ -z "$dh" ] && dh="$olddays"
-                read -p "Interval baru (menit, Enter=tetap): " iv
-                [ -z "$iv" ] && iv="$oldiv"
-                # target
-                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
-                echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
-                read -p "Target baru (nomor/nama, Enter=tetap): " tg
-                if [ -n "$tg" ]; then
-                    selected=""
-                    for t in $tg; do
-                        if [[ "$t" =~ ^[0-9]+$ ]]; then
-                            idx=$((t-1))
-                            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
-                        else
-                            selected="$selected $t"
-                        fi
-                    done
-                    tg=$(echo "$selected" | xargs)
-                    [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
-                else
-                    tg=$(cat /root/natssh/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
-                fi
-                new="${slot}|${oldstart}|${dh}|${iv}|1"
-                tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
-                echo -e "${GREEN}Jadwal diubah: $new${NC}"
-                echo -e "${GREEN}Target: $tg${NC}"
-                ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
@@ -874,53 +733,6 @@ conf_domain() {
         case $p in
             1) conf_domain_edit ;;
             2) conf_domain_cf_edit ;;
-            6)
-                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
-                read -p "Nomor baris ubah (0=batal): " ln
-                [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
-                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
-                IFS='|' read -r oldslot oldstart olddays oldiv olden <<< "$line"
-                echo "Slot lama: $oldslot | durasi ${olddays}h | interval ${oldiv}m"
-                # slot
-                echo "Slot tersedia:"; i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
-                read -p "Slot baru (Enter= tetap, 0=batal): " slot
-                [ "$slot" = "0" ] && continue
-                [ -z "$slot" ] && slot="$oldslot"
-                if [[ "$slot" =~ ^[0-9]+$ ]]; then
-                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
-                fi
-                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Durasi baru (hari, Enter=tetap): " dh
-                [ -z "$dh" ] && dh="$olddays"
-                read -p "Interval baru (menit, Enter=tetap): " iv
-                [ -z "$iv" ] && iv="$oldiv"
-                # target
-                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
-                echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
-                read -p "Target baru (nomor/nama, Enter=tetap): " tg
-                if [ -n "$tg" ]; then
-                    selected=""
-                    for t in $tg; do
-                        if [[ "$t" =~ ^[0-9]+$ ]]; then
-                            idx=$((t-1))
-                            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
-                        else
-                            selected="$selected $t"
-                        fi
-                    done
-                    tg=$(echo "$selected" | xargs)
-                    [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
-                else
-                    tg=$(cat /root/natssh/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
-                fi
-                new="${slot}|${oldstart}|${dh}|${iv}|1"
-                tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
-                echo -e "${GREEN}Jadwal diubah: $new${NC}"
-                echo -e "${GREEN}Target: $tg${NC}"
-                ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
@@ -997,53 +809,6 @@ conf_service() {
                 ;;
             4) conf_keepalive; continue ;;
             5) conf_heartbeat; continue ;;
-            6)
-                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
-                read -p "Nomor baris ubah (0=batal): " ln
-                [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
-                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
-                IFS='|' read -r oldslot oldstart olddays oldiv olden <<< "$line"
-                echo "Slot lama: $oldslot | durasi ${olddays}h | interval ${oldiv}m"
-                # slot
-                echo "Slot tersedia:"; i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
-                read -p "Slot baru (Enter= tetap, 0=batal): " slot
-                [ "$slot" = "0" ] && continue
-                [ -z "$slot" ] && slot="$oldslot"
-                if [[ "$slot" =~ ^[0-9]+$ ]]; then
-                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
-                fi
-                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Durasi baru (hari, Enter=tetap): " dh
-                [ -z "$dh" ] && dh="$olddays"
-                read -p "Interval baru (menit, Enter=tetap): " iv
-                [ -z "$iv" ] && iv="$oldiv"
-                # target
-                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
-                echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
-                read -p "Target baru (nomor/nama, Enter=tetap): " tg
-                if [ -n "$tg" ]; then
-                    selected=""
-                    for t in $tg; do
-                        if [[ "$t" =~ ^[0-9]+$ ]]; then
-                            idx=$((t-1))
-                            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
-                        else
-                            selected="$selected $t"
-                        fi
-                    done
-                    tg=$(echo "$selected" | xargs)
-                    [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
-                else
-                    tg=$(cat /root/natssh/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
-                fi
-                new="${slot}|${oldstart}|${dh}|${iv}|1"
-                tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
-                echo -e "${GREEN}Jadwal diubah: $new${NC}"
-                echo -e "${GREEN}Target: $tg${NC}"
-                ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
         esac
@@ -1160,53 +925,6 @@ conf_speed() {
                 echo "--- tc filters $iface ---"; tc filter show dev $iface parent 1:
                 echo "--- ingress ---"; tc filter show dev $iface parent ffff:
                 pause ;;
-            6)
-                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
-                read -p "Nomor baris ubah (0=batal): " ln
-                [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
-                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
-                IFS='|' read -r oldslot oldstart olddays oldiv olden <<< "$line"
-                echo "Slot lama: $oldslot | durasi ${olddays}h | interval ${oldiv}m"
-                # slot
-                echo "Slot tersedia:"; i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
-                read -p "Slot baru (Enter= tetap, 0=batal): " slot
-                [ "$slot" = "0" ] && continue
-                [ -z "$slot" ] && slot="$oldslot"
-                if [[ "$slot" =~ ^[0-9]+$ ]]; then
-                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
-                fi
-                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Durasi baru (hari, Enter=tetap): " dh
-                [ -z "$dh" ] && dh="$olddays"
-                read -p "Interval baru (menit, Enter=tetap): " iv
-                [ -z "$iv" ] && iv="$oldiv"
-                # target
-                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
-                echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
-                read -p "Target baru (nomor/nama, Enter=tetap): " tg
-                if [ -n "$tg" ]; then
-                    selected=""
-                    for t in $tg; do
-                        if [[ "$t" =~ ^[0-9]+$ ]]; then
-                            idx=$((t-1))
-                            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
-                        else
-                            selected="$selected $t"
-                        fi
-                    done
-                    tg=$(echo "$selected" | xargs)
-                    [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
-                else
-                    tg=$(cat /root/natssh/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
-                fi
-                new="${slot}|${oldstart}|${dh}|${iv}|1"
-                tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
-                echo -e "${GREEN}Jadwal diubah: $new${NC}"
-                echo -e "${GREEN}Target: $tg${NC}"
-                ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
         esac
@@ -1424,53 +1142,6 @@ BEOF
                     esac
                 done
                 ;;
-            6)
-                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
-                read -p "Nomor baris ubah (0=batal): " ln
-                [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
-                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
-                IFS='|' read -r oldslot oldstart olddays oldiv olden <<< "$line"
-                echo "Slot lama: $oldslot | durasi ${olddays}h | interval ${oldiv}m"
-                # slot
-                echo "Slot tersedia:"; i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
-                read -p "Slot baru (Enter= tetap, 0=batal): " slot
-                [ "$slot" = "0" ] && continue
-                [ -z "$slot" ] && slot="$oldslot"
-                if [[ "$slot" =~ ^[0-9]+$ ]]; then
-                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
-                fi
-                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Durasi baru (hari, Enter=tetap): " dh
-                [ -z "$dh" ] && dh="$olddays"
-                read -p "Interval baru (menit, Enter=tetap): " iv
-                [ -z "$iv" ] && iv="$oldiv"
-                # target
-                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
-                echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
-                read -p "Target baru (nomor/nama, Enter=tetap): " tg
-                if [ -n "$tg" ]; then
-                    selected=""
-                    for t in $tg; do
-                        if [[ "$t" =~ ^[0-9]+$ ]]; then
-                            idx=$((t-1))
-                            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
-                        else
-                            selected="$selected $t"
-                        fi
-                    done
-                    tg=$(echo "$selected" | xargs)
-                    [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
-                else
-                    tg=$(cat /root/natssh/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
-                fi
-                new="${slot}|${oldstart}|${dh}|${iv}|1"
-                tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
-                echo -e "${GREEN}Jadwal diubah: $new${NC}"
-                echo -e "${GREEN}Target: $tg${NC}"
-                ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
@@ -1557,53 +1228,6 @@ conf_udpgw() {
                 else
                     systemctl enable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} aktif${NC}" || echo -e "${RED}Gagal${NC}"
                 fi
-                ;;
-            6)
-                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
-                read -p "Nomor baris ubah (0=batal): " ln
-                [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
-                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
-                IFS='|' read -r oldslot oldstart olddays oldiv olden <<< "$line"
-                echo "Slot lama: $oldslot | durasi ${olddays}h | interval ${oldiv}m"
-                # slot
-                echo "Slot tersedia:"; i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
-                read -p "Slot baru (Enter= tetap, 0=batal): " slot
-                [ "$slot" = "0" ] && continue
-                [ -z "$slot" ] && slot="$oldslot"
-                if [[ "$slot" =~ ^[0-9]+$ ]]; then
-                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
-                fi
-                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Durasi baru (hari, Enter=tetap): " dh
-                [ -z "$dh" ] && dh="$olddays"
-                read -p "Interval baru (menit, Enter=tetap): " iv
-                [ -z "$iv" ] && iv="$oldiv"
-                # target
-                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
-                echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
-                read -p "Target baru (nomor/nama, Enter=tetap): " tg
-                if [ -n "$tg" ]; then
-                    selected=""
-                    for t in $tg; do
-                        if [[ "$t" =~ ^[0-9]+$ ]]; then
-                            idx=$((t-1))
-                            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
-                        else
-                            selected="$selected $t"
-                        fi
-                    done
-                    tg=$(echo "$selected" | xargs)
-                    [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
-                else
-                    tg=$(cat /root/natssh/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
-                fi
-                new="${slot}|${oldstart}|${dh}|${iv}|1"
-                tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
-                echo -e "${GREEN}Jadwal diubah: $new${NC}"
-                echo -e "${GREEN}Target: $tg${NC}"
                 ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
@@ -1701,53 +1325,6 @@ menu_conf() {
             9) conf_restart_schedule ;;
             10) conf_banner ;;
             11) conf_suspend_minutes ;;
-            6)
-                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
-                read -p "Nomor baris ubah (0=batal): " ln
-                [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
-                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
-                IFS='|' read -r oldslot oldstart olddays oldiv olden <<< "$line"
-                echo "Slot lama: $oldslot | durasi ${olddays}h | interval ${oldiv}m"
-                # slot
-                echo "Slot tersedia:"; i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
-                read -p "Slot baru (Enter= tetap, 0=batal): " slot
-                [ "$slot" = "0" ] && continue
-                [ -z "$slot" ] && slot="$oldslot"
-                if [[ "$slot" =~ ^[0-9]+$ ]]; then
-                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
-                fi
-                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Durasi baru (hari, Enter=tetap): " dh
-                [ -z "$dh" ] && dh="$olddays"
-                read -p "Interval baru (menit, Enter=tetap): " iv
-                [ -z "$iv" ] && iv="$oldiv"
-                # target
-                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
-                echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
-                read -p "Target baru (nomor/nama, Enter=tetap): " tg
-                if [ -n "$tg" ]; then
-                    selected=""
-                    for t in $tg; do
-                        if [[ "$t" =~ ^[0-9]+$ ]]; then
-                            idx=$((t-1))
-                            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
-                        else
-                            selected="$selected $t"
-                        fi
-                    done
-                    tg=$(echo "$selected" | xargs)
-                    [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
-                else
-                    tg=$(cat /root/natssh/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
-                fi
-                new="${slot}|${oldstart}|${dh}|${iv}|1"
-                tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
-                echo -e "${GREEN}Jadwal diubah: $new${NC}"
-                echo -e "${GREEN}Target: $tg${NC}"
-                ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
@@ -1878,9 +1455,8 @@ promo_menu() {
                 [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
                 IFS='|' read -r oldslot oldstart olddays oldiv olden <<< "$line"
                 echo "Slot lama: $oldslot | durasi ${olddays}h | interval ${oldiv}m"
-                # slot
                 echo "Slot tersedia:"; i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
-                read -p "Slot baru (Enter= tetap, 0=batal): " slot
+                read -p "Slot baru (Enter=tetap, 0=batal): " slot
                 [ "$slot" = "0" ] && continue
                 [ -z "$slot" ] && slot="$oldslot"
                 if [[ "$slot" =~ ^[0-9]+$ ]]; then
@@ -1891,7 +1467,6 @@ promo_menu() {
                 [ -z "$dh" ] && dh="$olddays"
                 read -p "Interval baru (menit, Enter=tetap): " iv
                 [ -z "$iv" ] && iv="$oldiv"
-                # target
                 mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
                 echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
                 read -p "Target baru (nomor/nama, Enter=tetap): " tg
