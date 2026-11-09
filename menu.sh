@@ -1421,10 +1421,13 @@ promo_menu() {
                     while IFS='|' read -r slot start days interval enabled; do
                         [ -z "$slot" ] && continue
                         if [ "$enabled" = "1" ]; then
-                            if [ "$days" = "0" ]; then
+                            end=$((start + days*86400))
+                            if [ "$now" -ge "$start" ] && [ "$now" -le "$end" ]; then
                                 status="${GREEN}● AKTIF${NC}"
+                            elif [ "$now" -lt "$start" ]; then
+                                status="${YELLOW}◐ TERJADWAL${NC}"
                             else
-                                status="${GREEN}● AKTIF${NC}"
+                                status="${RED}● BERAKHIR${NC}"
                             fi
                         else
                             status="${RED}○ NONAKTIF${NC}"
