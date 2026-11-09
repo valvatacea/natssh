@@ -1347,12 +1347,14 @@ promo_menu() {
         read -p "Pilih (0-5): " p || exit 0
         case $p in
             1)
+                echo "Slot tersedia:"; ls -1 /root/natssh/banners/*.txt 2>/dev/null | xargs -n1 basename 2>/dev/null
                 read -p "Nama slot (tanpa .txt, 0=batal): " slot
                 [ "$slot" = "0" ] && continue
                 [[ "$slot" =~ ^[a-zA-Z0-9_-]{1,24}$ ]] || { echo -e "${RED}Nama tidak valid${NC}"; pause; continue; }
                 ${EDITOR:-nano} "/root/natssh/banners/${slot}.txt"
                 ;;
             2)
+                echo "Slot tersedia:"; ls -1 /root/natssh/banners/*.txt 2>/dev/null | xargs -n1 basename 2>/dev/null
                 read -p "Slot (0=batal): " slot
                 [ "$slot" = "0" ] && continue
                 [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
