@@ -772,7 +772,7 @@ conf_service() {
         echo "4. Toggle Keepalive SSH"
         echo "5. Toggle Heartbeat WS"
         echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-5): " p || exit 0
+        read -p "Pilih (0-6): " p || exit 0
         case $p in
             1)
                 echo -e "${YELLOW}Menjalankan natssh-ws...${NC}"
@@ -1343,8 +1343,9 @@ promo_menu() {
         printf "  %-3s %-46s\n" "3." "Aktifkan/Nonaktifkan Jadwal"
         printf "  %-3s %-46s\n" "4." "Status Promo"
         printf "  %-3s %-46s\n" "5." "Batalkan Promo Sekarang (Restore)"
+        printf "  %-3s %-46s\n" "6." "Hapus Jadwal Promo"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-5): " p || exit 0
+        read -p "Pilih (0-6): " p || exit 0
         case $p in
             1)
                 echo "Slot tersedia:"
@@ -1425,6 +1426,20 @@ promo_menu() {
                 echo "=== Jadwal ==="; cat /root/natssh/promo_schedule.conf 2>/dev/null
                 echo "=== Target ==="; cat /root/natssh/promo_targets.conf 2>/dev/null
                 echo "=== Backup ==="; ls -l /root/natssh/banners/.default_backup 2>/dev/null
+                ;;
+            6)
+                echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
+                read -p "Nomor baris hapus (0=batal, all=semua): " ln
+                [ "$ln" = "0" ] && continue
+                if [ "$ln" = "all" ]; then
+                    : > /root/natssh/promo_schedule.conf
+                    rm -f /root/natssh/.promo_last_run
+                    echo -e "${GREEN}Semua jadwal dihapus.${NC}"
+                else
+                    tmp=$(mktemp)
+                    awk -v n="$ln" 'NR!=n{print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
+                    echo -e "${GREEN}Baris $ln dihapus.${NC}"
+                fi
                 ;;
             5)
                 read -p "Restore banner default sekarang? (y/N): " a
