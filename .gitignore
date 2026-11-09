@@ -11,3 +11,7 @@ audit_sess.log
 audit_state.json
 host_cf.conf
 hide_ip.conf
+promo_schedule.conf
+promo_targets.conf
+banners/.default_backup
+promo.log

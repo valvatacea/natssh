@@ -1332,6 +1332,64 @@ menu_conf() {
     done
 }
 
+promo_menu() {
+    while true; do
+        clear
+        garis
+        echo -e "${YELLOW}   PROMOSI BANNER${NC}"
+        garis
+        printf "  %-3s %-46s\n" "1." "Buat/Edit Slot Promo"
+        printf "  %-3s %-46s\n" "2." "Jadwalkan Promo"
+        printf "  %-3s %-46s\n" "3." "Aktifkan/Nonaktifkan Jadwal"
+        printf "  %-3s %-46s\n" "4." "Status Promo"
+        printf "  %-3s %-46s\n" "5." "Batalkan Promo Sekarang (Restore)"
+        echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
+        read -p "Pilih (0-5): " p || exit 0
+        case $p in
+            1)
+                read -p "Nama slot (tanpa .txt): " slot
+                [[ "$slot" =~ ^[a-zA-Z0-9_-]{1,24}$ ]] || { echo -e "${RED}Nama tidak valid${NC}"; pause; continue; }
+                ${EDITOR:-nano} "/root/natssh/banners/${slot}.txt"
+                ;;
+            2)
+                read -p "Slot: " slot
+                read -p "Start (YYYY-MM-DD HH:MM): " st
+                read -p "End (YYYY-MM-DD HH:MM): " en
+                read -p "Interval (menit): " iv
+                s=$(date -d "$st" +%s 2>/dev/null)
+                e=$(date -d "$en" +%s 2>/dev/null)
+                [ -z "$s" ] || [ -z "$e" ] && { echo -e "${RED}Waktu tidak valid${NC}"; pause; continue; }
+                echo "${slot}|${s}|${e}|${iv:-60}|1" >> /root/natssh/promo_schedule.conf
+                read -p "Target akun (pisah spasi): " tg
+                echo "$tg" | tr ' ' '\n' > /root/natssh/promo_targets.conf
+                echo -e "${GREEN}Jadwal disimpan.${NC}"
+                ;;
+            3)
+                # toggle enabled flag (sederhana: tampilkan file)
+                echo "Isi promo_schedule.conf:"; cat /root/natssh/promo_schedule.conf 2>/dev/null
+                read -p "Edit manual? (y/N): " a
+                [ "$a" = "y" ] && ${EDITOR:-nano} /root/natssh/promo_schedule.conf
+                ;;
+            4)
+                echo "=== Jadwal ==="; cat /root/natssh/promo_schedule.conf 2>/dev/null
+                echo "=== Target ==="; cat /root/natssh/promo_targets.conf 2>/dev/null
+                echo "=== Backup ==="; ls -l /root/natssh/banners/.default_backup 2>/dev/null
+                ;;
+            5)
+                read -p "Restore banner default sekarang? (y/N): " a
+                if [ "$a" = "y" ] && [ -f /root/natssh/banners/.default_backup ]; then
+                    cp /root/natssh/banners/.default_backup /etc/issue.net
+                    echo -e "${GREEN}Banner restored.${NC}"
+                    echo "$(date '+%F %T') PROMO CANCEL restore" >> /root/natssh/promo.log
+                fi
+                ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+        esac
+        [ "$p" != "0" ] && pause
+    done
+}
+
 # ══════════ MENU UTAMA ══════════
 
 while true; do
@@ -1341,16 +1399,18 @@ while true; do
     garis
     echo "1. Manajemen Akun           (buat/hapus/perpanjang/suspend)"
     echo "2. Monitoring & Log         (online/autokill/sistem)"
-    echo "3. Backup & Restore"
-    echo "4. Konfigurasi Sistem       (batas login/port)"
+    echo "3. Promosi Banner           (promo otomatis via banner)"
+    echo "4. Backup & Restore"
+    echo "5. Konfigurasi Sistem       (batas login/port)"
     echo -e "${RED}0. Keluar${NC}"
     garis
     read -p "Pilih menu (0-4): " menu || exit 0
     case $menu in
         1) menu_akun ;;
         2) menu_monitor ;;
-        3) menu_backup ;;
-        4) menu_conf ;;
+        3) promo_menu ;;
+        4) menu_backup ;;
+        5) menu_conf ;;
         0) echo "Keluar dari menu."; break ;;
         *) echo -e "${RED}Pilihan tidak valid!${NC}"; pause ;;
     esac
