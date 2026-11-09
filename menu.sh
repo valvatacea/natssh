@@ -819,6 +819,28 @@ conf_service() {
     done
 }
 
+_ensure_speed_service() {
+    # pastikan unit systemd natssh-speed ada (buat jika belum) agar limit persist setelah reboot
+    local unit=/etc/systemd/system/natssh-speed.service
+    if [ ! -f "$unit" ]; then
+        cat > "$unit" <<UNIT
+[Unit]
+Description=NATSSH SSH speed limit (tc)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/natssh/apply_speed.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+        systemctl daemon-reload 2>/dev/null
+    fi
+}
+
 conf_speed() {
     while true; do
         clear
@@ -864,6 +886,7 @@ conf_speed() {
                 sed -i "s/^UP_CF=.*/UP_CF=$up/" /root/natssh/speed.conf
                 sed -i "s/^DOWN_CF=.*/DOWN_CF=$down/" /root/natssh/speed.conf
                 bash /root/natssh/apply_speed.sh 2>/dev/null
+                _ensure_speed_service
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit Cloudflare diterapkan.${NC}"; pause ;;
             2)
@@ -887,6 +910,7 @@ conf_speed() {
                 sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up/" /root/natssh/speed.conf
                 sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down/" /root/natssh/speed.conf
                 bash /root/natssh/apply_speed.sh 2>/dev/null
+                _ensure_speed_service
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit CloudFront diterapkan.${NC}"; pause ;;
             3)
@@ -913,6 +937,7 @@ conf_speed() {
                 echo "DOWN_CFRONT=$down_cfront" >> /root/natssh/speed.conf
                 echo "MODE=cdn-split" >> /root/natssh/speed.conf
                 bash /root/natssh/apply_speed.sh 2>/dev/null
+                _ensure_speed_service
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit semua CDN diterapkan.${NC}"; pause ;;
             4)
