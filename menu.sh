@@ -1510,13 +1510,8 @@ promo_menu() {
                     tail -3 /root/natssh/promo.log | while read line; do echo "  $line"; done
                 fi
                 ;;
-            6)
-                # restore banner dulu
-                if [ -f /root/natssh/banners/.default_backup ]; then
-                    cp /root/natssh/banners/.default_backup /etc/issue.net
-                    echo -e "${GREEN}Banner restored.${NC}"
-                    echo "$(date '+%F %T') PROMO CANCEL restore" >> /root/natssh/promo.log
-                fi
+6)
+                # restore banner default - selalu restore
                 echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
                 read -p "Nomor baris hapus (0=batal, all=semua): " ln
                 [ "$ln" = "0" ] && continue
@@ -1529,6 +1524,19 @@ promo_menu() {
                     awk -v n="$ln" 'NR!=n{print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
                     echo -e "${GREEN}Baris $ln dihapus.${NC}"
                 fi
+                # restore banner
+                if [ -f /etc/issue.net ]; then
+                    cp /etc/issue.net /tmp/issue_banner_backup_$(date +%s)
+                fi
+                if [ -f /root/natssh/banners/.default_backup ]; then
+                    cp /root/natssh/banners/.default_backup /etc/issue.net
+                elif [ -f /root/natssh/banners/default.txt ]; then
+                    cp /root/natssh/banners/default.txt /etc/issue.net
+                else
+                    cp /tmp/issue_banner_backup_$(date +%s) /etc/issue.net 2>/dev/null || true
+                fi
+                echo -e "${GREEN}Banner restored to default.${NC}"
+                echo "$(date '+%F %T') PROMO CANCEL restore" >> /root/natssh/promo.log
                 ;;
             3)
                 echo "=== Jadwal ==="; nl -ba /root/natssh/promo_schedule.conf 2>/dev/null
