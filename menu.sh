@@ -1496,6 +1496,26 @@ promo_menu() {
                 tg=$(echo "$selected" | xargs)
                 [ -z "$tg" ] && { echo -e "${RED}Target tidak valid (batal)${NC}"; pause; continue; }
                 s=$(date +%s)
+                new_end=$((s + dh*86400))
+                # validasi: tidak boleh overlap dengan jadwal aktif lain
+                _overlap=0
+                if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+                    while IFS='|' read -r _os _ost _od _oiv _oen _ojd; do
+                        [ -z "$_os" ] && continue
+                        [ "$_oen" = "1" ] || continue
+                        _oend=$((_ost + _od*86400))
+                        # cek overlap: new_start < other_end AND new_end > other_start
+                        if [ "$s" -lt "$_oend" ] && [ "$new_end" -gt "$_ost" ]; then
+                            _overlap=1
+                            echo -e "${RED}Jadwal overlap dengan '$_os' (${_ost} s/d ${_oend})!${NC}"
+                            break
+                        fi
+                    done < /root/natssh/promo_schedule.conf
+                fi
+                if [ "$_overlap" = "1" ]; then
+                    echo -e "${YELLOW}Jadwal tidak disimpan. Ubah durasi atau tunggu jadwal lain selesai.${NC}"
+                    pause; continue
+                fi
                 echo "${slot}|${s}|${dh}|${iv}|1|${jd_sec}" >> /root/natssh/promo_schedule.conf
                 echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
                 echo -e "${GREEN}Target: $tg${NC}"
