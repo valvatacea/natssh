@@ -1392,21 +1392,52 @@ promo_menu() {
         case $p in
             1)
                 mkdir -p /root/natssh/banners
-                echo "Slot tersedia:"
-                i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
-                [ $i -eq 1 ] && echo "  (belum ada slot)"
-                read -p "Nomor slot existing atau nama baru (0=batal): " slot
-                [ "$slot" = "0" ] && continue
-                if [[ "$slot" =~ ^[0-9]+$ ]]; then
-                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
-                    [ -z "$slot" ] && { echo -e "${RED}Nomor tidak valid${NC}"; pause; continue; }
-                fi
-                [[ "$slot" =~ ^[a-zA-Z0-9_-]{1,24}$ ]] || { echo -e "${RED}Nama tidak valid${NC}"; pause; continue; }
-                if [ -f "/root/natssh/banners/${slot}.txt" ]; then
-                    read -p "Slot '$slot' sudah ada — timpa? (y/N): " t
-                    [[ "$t" =~ ^[Yy]$ ]] || { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
-                fi
-                ${EDITOR:-nano} "/root/natssh/banners/${slot}.txt"
+                while true; do
+                    echo -e "${CYAN}--- SLOT PROMO ---${NC}"
+                    echo "Slot tersedia:"
+                    i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
+                    [ $i -eq 1 ] && echo "  (belum ada slot)"
+                    echo ""
+                    echo "1. Buat/Edit Slot"
+                    echo "2. Hapus Slot"
+                    echo -e "${RED}0. Kembali${NC}"
+                    read -p "Pilih (0-2): " sub
+                    [ "$sub" = "0" ] && break
+                    case $sub in
+                        1)
+                            read -p "Nomor slot existing atau nama baru (0=batal): " slot
+                            [ "$slot" = "0" ] && continue
+                            if [[ "$slot" =~ ^[0-9]+$ ]]; then
+                                slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
+                                [ -z "$slot" ] && { echo -e "${RED}Nomor tidak valid${NC}"; pause; continue; }
+                            fi
+                            [[ "$slot" =~ ^[a-zA-Z0-9_-]{1,24}$ ]] || { echo -e "${RED}Nama tidak valid${NC}"; pause; continue; }
+                            if [ -f "/root/natssh/banners/${slot}.txt" ]; then
+                                read -p "Slot '$slot' sudah ada — timpa? (y/N): " t
+                                [[ "$t" =~ ^[Yy]$ ]] || { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
+                            fi
+                            ${EDITOR:-nano} "/root/natssh/banners/${slot}.txt"
+                            pause
+                            ;;
+                        2)
+                            i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo "  $i. $(basename "$f" .txt)"; i=$((i+1)); done
+                            [ $i -eq 1 ] && { echo -e "${YELLOW}Tidak ada slot untuk dihapus.${NC}"; pause; continue; }
+                            read -p "Nomor slot hapus (0=batal): " deln
+                            [ "$deln" = "0" ] && continue
+                            delname=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${deln}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
+                            [ -z "$delname" ] && { echo -e "${RED}Nomor tidak valid${NC}"; pause; continue; }
+                            read -p "Yakin hapus slot '$delname'? (y/N): " y
+                            if [[ "$y" =~ ^[Yy]$ ]]; then
+                                rm -f "/root/natssh/banners/${delname}.txt"
+                                echo -e "${GREEN}Slot '$delname' dihapus.${NC}"
+                            else
+                                echo -e "${YELLOW}Dibatalkan.${NC}"
+                            fi
+                            pause
+                            ;;
+                        *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+                    esac
+                done
                 ;;
             2)
                 echo "Slot tersedia:"
