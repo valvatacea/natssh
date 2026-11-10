@@ -990,7 +990,7 @@ conf_speed() {
 }
 
 conf_restart_schedule() {
-    echo -e "${YELLOW}--- JADWAL RESTART OTOMATIS (WS + UDPGW + Auto Apply Speed) ---${NC}"
+    echo -e "${YELLOW}--- JADWAL RESTART OTOMATIS (WS + UDPGW) ---${NC}"
     echo ""
     if crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
         echo -e "${GREEN}Jadwal saat ini:${NC}"
@@ -999,11 +999,11 @@ conf_restart_schedule() {
         read -p "Hapus jadwal restart? (y/N): " h
         if [[ "$h" =~ ^[Yy]$ ]]; then
             # Hapus baris restart natssh-ws dan apply_speed.sh terkait (pola subshell aman)
-            (crontab -l 2>/dev/null | grep -v -E "systemctl.*restart.*natssh-ws|apply_speed.sh") | crontab -
+            (crontab -l 2>/dev/null | grep -v "systemctl.*restart.*natssh-ws") | crontab -
             echo -e "${GREEN}Jadwal restart dihapus.${NC}"
         fi
     else
-        echo -e "${YELLOW}Belum ada jadwal restart otomatis (WS + UDPGW + auto apply speed).${NC}"
+        echo -e "${YELLOW}Belum ada jadwal restart otomatis (WS + UDPGW).${NC}"
         echo ""
         echo "Pilih jadwal:"
         echo "1. Setiap jam"
@@ -1444,7 +1444,7 @@ menu_conf() {
         echo -e "${CYAN}  -- Layanan --${NC}"
         printf "  %-3s %-46s\n" "7." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
         printf "  %-3s %-46s\n" "8." "badvpn-udpgw (UDP Gateway)"
-        printf "  %-3s %-46s\n" "9." "Atur Jadwal Restart Otomatis (WS + UDPGW + Apply Speed)"
+        printf "  %-3s %-46s\n" "9." "Atur Jadwal Restart Otomatis (WS + UDPGW)"
         printf "  %-3s %-46s\n" "10." "Atur Jadwal Reboot"
         echo -e "${CYAN}  -- Lainnya --${NC}"
         printf "  %-3s %-46s\n" "11." "Ubah Banner Pelanggan"

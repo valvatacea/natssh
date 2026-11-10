@@ -172,10 +172,10 @@ fi
 if ! crontab -l 2>/dev/null | grep -q "sess_audit"; then
     (crontab -l 2>/dev/null; echo "*/2 * * * * /usr/bin/python3 $(pwd)/sess_audit.py >/dev/null 2>&1") | crontab -
 fi
-# Auto restart natssh-ws + apply speed (jam 04:00)
+# Auto restart natssh-ws (jam 04:00)
 if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
-    (crontab -l 2>/dev/null; echo "0 4 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1; sleep 30; /root/natssh/apply_speed.sh >/dev/null 2>&1") | crontab -
-    echo -e "${GREEN}Cronjob auto-restart natssh-ws + apply speed berhasil ditambahkan (jam 04:00).${NC}"
+    (crontab -l 2>/dev/null; echo "0 4 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab -
+    echo -e "${GREEN}Cronjob auto-restart natssh-ws berhasil ditambahkan (jam 04:00).${NC}"
 fi
 
 echo -e "
