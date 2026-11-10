@@ -1243,6 +1243,84 @@ conf_suspend_minutes() {
     pause
 }
 
+conf_reboot_schedule() {
+    while true; do
+        clear
+        garis
+        echo -e "${YELLOW}   ATUR JADWAL REBOOT${NC}"
+        garis
+        echo "Jadwal reboot saat ini (cron):"
+        crontab -l 2>/dev/null | grep "reboot" || echo "  (tidak ada jadwal reboot)"
+        garis
+        printf "  %-3s %-46s\\n" "1." "Setiap hari 03:00"
+        printf "  %-3s %-46s\\n" "2." "Setiap hari 04:00"
+        printf "  %-3s %-46s\\n" "3." "Setiap 12 jam"
+        printf "  %-3s %-46s\\n" "4." "Custom cron"
+        printf "  %-3s %-46s\\n" "5." "Hapus jadwal reboot"
+        echo -e "${RED}  0.  Kembali${NC}"
+        read -p "Pilih (0-5): " p || return
+        case $p in
+            1)
+                crontab -l 2>/dev/null | grep -v "reboot" | crontab -
+                (crontab -l 2>/dev/null; echo "0 3 * * * /usr/sbin/reboot") | crontab -
+                echo -e "${GREEN}Jadwal reboot: setiap hari 03:00${NC}"
+                pause
+                ;;
+            2)
+                crontab -l 2>/dev/null | grep -v "reboot" | crontab -
+                (crontab -l 2>/dev/null; echo "0 4 * * * /usr/sbin/reboot") | crontab -
+                echo -e "${GREEN}Jadwal reboot: setiap hari 04:00${NC}"
+                pause
+                ;;
+            3)
+                crontab -l 2>/dev/null | grep -v "reboot" | crontab -
+                (crontab -l 2>/dev/null; echo "0 */12 * * * /usr/sbin/reboot") | crontab -
+                echo -e "${GREEN}Jadwal reboot: setiap 12 jam${NC}"
+                pause
+                ;;
+            4)
+                read -p "Masukkan cron expression (contoh: 0 2 * * *): " cexp
+                [ -z "$cexp" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; continue; }
+                crontab -l 2>/dev/null | grep -v "reboot" | crontab -
+                (crontab -l 2>/dev/null; echo "$cexp /usr/sbin/reboot") | crontab -
+                echo -e "${GREEN}Jadwal reboot diatur: $cexp${NC}"
+                pause
+                ;;
+            5)
+                crontab -l 2>/dev/null | grep -v "reboot" | crontab -
+                echo -e "${GREEN}Jadwal reboot dihapus.${NC}"
+                pause
+                ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}"; pause ;;
+        esac
+    done
+}
+
+conf_test_ping() {
+    clear
+    garis
+    echo -e "${YELLOW}   TEST PING (CEK KONEKSI INTERNET)${NC}"
+    garis
+    for host in 1.1.1.1 8.8.8.8 10.20.0.1; do
+        if ping -c 2 -W 3 "$host" >/dev/null 2>&1; then
+            echo -e "Ping $host : ${GREEN}OK${NC}"
+        else
+            echo -e "Ping $host : ${RED}timeout${NC}  (gateway 10.20.0.1 mungkin blokir ICMP — normal)"
+        fi
+    done
+    echo ""
+    if curl -s -o /dev/null --connect-timeout 5 --max-time 10 https://1.1.1.1 >/dev/null 2>&1; then
+        echo -e "HTTP ke Cloudflare : ${GREEN}OK${NC}"
+    else
+        echo -e "HTTP ke Cloudflare : ${RED}gagal${NC}"
+    fi
+    garis
+    echo -e "${YELLOW}Catatan: 10.20.0.1 (gateway) tidak merespons ICMP (blokir), tapi HTTP tetap bisa berjalan.${NC}"
+    echo -e "${YELLOW}Jangan diagnosa sebagai masalah koneksi jika hanya ICMP yang timeout.${NC}"
+    pause
+}
+
 conf_udpgw() {
     while true; do
         clear
@@ -1366,11 +1444,13 @@ menu_conf() {
         printf "  %-3s %-46s\n" "7." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
         printf "  %-3s %-46s\n" "8." "badvpn-udpgw (UDP Gateway)"
         printf "  %-3s %-46s\n" "9." "Atur Jadwal Restart Otomatis"
+        printf "  %-3s %-46s\n" "10." "Atur Jadwal Reboot"
         echo -e "${CYAN}  -- Lainnya --${NC}"
-        printf "  %-3s %-46s\n" "10." "Ubah Banner Pelanggan"
-        printf "  %-3s %-46s\n" "11." "Ubah Durasi Suspend (menit)"
+        printf "  %-3s %-46s\n" "11." "Ubah Banner Pelanggan"
+        printf "  %-3s %-46s\n" "12." "Ubah Durasi Suspend (menit)"
+        printf "  %-3s %-46s\n" "13." "Test Ping (Cek Koneksi Internet)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-11): " p || exit 0
+        read -p "Pilih (0-13): " p || exit 0
         case $p in
             1) conf_port ;;
             2) conf_domain ;;
@@ -1381,12 +1461,14 @@ menu_conf() {
             7) conf_service ;;
             8) conf_udpgw ;;
             9) conf_restart_schedule ;;
-            10) conf_banner ;;
-            11) conf_suspend_minutes ;;
+            10) conf_reboot_schedule ;;
+            11) conf_banner ;;
+            12) conf_suspend_minutes ;;
+            13) conf_test_ping ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && [ "$p" != "4" ] && [ "$p" != "6" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && pause
+        [ "$p" != "0" ] && [ "$p" != "4" ] && [ "$p" != "6" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && pause
     done
 }
 
