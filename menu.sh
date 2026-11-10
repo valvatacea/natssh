@@ -990,7 +990,7 @@ conf_speed() {
 }
 
 conf_restart_schedule() {
-    echo -e "${YELLOW}--- JADWAL RESTART OTOMATIS (WS + UDPGW) ---${NC}"
+    echo -e "${YELLOW}--- JADWAL RESTART OTOMATIS (WS + UDPGW + Auto Apply Speed) ---${NC}"
     echo ""
     if crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
         echo -e "${GREEN}Jadwal saat ini:${NC}"
@@ -1003,7 +1003,7 @@ conf_restart_schedule() {
             echo -e "${GREEN}Jadwal restart dan apply_speed.sh dihapus.${NC}"
         fi
     else
-        echo -e "${YELLOW}Belum ada jadwal restart otomatis (WS + UDPGW).${NC}"
+        echo -e "${YELLOW}Belum ada jadwal restart otomatis (WS + UDPGW + auto apply speed).${NC}"
         echo ""
         echo "Pilih jadwal:"
         echo "1. Setiap jam"
@@ -1444,7 +1444,7 @@ menu_conf() {
         echo -e "${CYAN}  -- Layanan --${NC}"
         printf "  %-3s %-46s\n" "7." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
         printf "  %-3s %-46s\n" "8." "badvpn-udpgw (UDP Gateway)"
-        printf "  %-3s %-46s\n" "9." "Atur Jadwal Restart Otomatis (WS + UDPGW)"
+        printf "  %-3s %-46s\n" "9." "Atur Jadwal Restart Otomatis (WS + UDPGW + Apply Speed)"
         printf "  %-3s %-46s\n" "10." "Atur Jadwal Reboot"
         echo -e "${CYAN}  -- Lainnya --${NC}"
         printf "  %-3s %-46s\n" "11." "Ubah Banner Pelanggan"
