@@ -228,6 +228,55 @@ def delete_account(user: str, x_api_token: str | None = Header(default=None)):
     if r.returncode != 0 or check.stdout.strip():
         raise HTTPException(500, f"delete failed: {r.stderr.strip() or 'user still exists'}")
     sh(f"rm -f {BASE}/limits/{user}")
+
+    # Bersihkan riwayat per akun dari log (seperti menu.sh do_hapus)
+    # Ekstrak username dari setiap baris, bandingkan dengan target user
+    def _user_from_autokill(line):
+        m = re.search(r"HAPUS (?:manual|konfirmasi langsung): ([a-zA-Z0-9_-]+)", line)
+        if m: return m.group(1)
+        m = re.search(r"Ditendang(?: manual)? & suspend [^\n]*: ([a-zA-Z0-9_-]+)", line)
+        if m: return m.group(1)
+        m = re.search(r"Ditendang(?: manual)?: ([a-zA-Z0-9_-]+)", line)
+        if m: return m.group(1)
+        m = re.search(r"Unsuspend otomatis: ([a-zA-Z0-9_-]+)", line)
+        if m: return m.group(1)
+        m = re.search(r"LIMIT: batas khusus ([a-zA-Z0-9_-]+) =", line)
+        if m: return m.group(1)
+        return None
+
+    if os.path.exists("/root/autokill.log"):
+        temp = os.path.join(BASE, ".autokill_tmp")
+        with open("/root/autokill.log") as fin, open(temp, "w") as fout:
+            for line in fin:
+                u = _user_from_autokill(line)
+                if u == user:
+                    continue
+                fout.write(line)
+        os.replace(temp, "/root/autokill.log")
+
+    # audit_sess.log: hapus baris user=<user>
+    if os.path.exists(os.path.join(BASE, "audit_sess.log")):
+        temp = os.path.join(BASE, ".audit_tmp")
+        with open(os.path.join(BASE, "audit_sess.log")) as fin, open(temp, "w") as fout:
+            for line in fin:
+                if re.search(rf"user={re.escape(user)}[ \t]", line):
+                    continue
+                fout.write(line)
+        os.replace(temp, os.path.join(BASE, "audit_sess.log"))
+
+    # suspended_history.log: hapus baris SUSPEND:<user> / UNSUSPEND:<user>
+    shist = os.path.join(BASE, "suspended_history.log")
+    if os.path.exists(shist):
+        temp = os.path.join(BASE, ".suspend_tmp")
+        with open(shist) as fin, open(temp, "w") as fout:
+            for line in fin:
+                if re.search(rf"(?:SUSPEND(?: otomatis)?|Unsuspend otomatis): {re.escape(user)}(?: |$)", line):
+                    continue
+                fout.write(line)
+        os.replace(temp, shist)
+        if os.path.getsize(shist) == 0:
+            os.remove(shist)
+
     return {"ok": True}
 
 
