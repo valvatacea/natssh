@@ -131,8 +131,37 @@ do_hapus() {
             ps -eo pid,user,comm | awk '$2=="'"$user"'" {print}'
         fi
         if [ $rc -eq 0 ]; then
+            # Hapus batas per akun
             rm -f /root/natssh/limits/"$user"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - HAPUS manual: $user (expired: $exp)" >> /root/autokill.log
+
+            # Bersihkan log akun: autokill.log
+            # Hapus baris HAPUS manual: username atau HAPUS konfirmasi langsung: username
+            if [ -f /root/autokill.log ]; then
+                temp=$(mktemp)
+                grep -v -E "HAPUS (manual|konfirmasi langsung): $user" /root/autokill.log > "$temp" 2>/dev/null || true
+                mv "$temp" /root/autokill.log
+            fi
+
+            # Bersihkan log akun: audit_sess.log
+            # Hapus baris yang mengandung user=username
+            if [ -f /root/natssh/audit_sess.log ]; then
+                temp=$(mktemp)
+                grep -v -E "user=$user[[:space:]]" /root/natssh/audit_sess.log > "$temp" 2>/dev/null || true
+                mv "$temp" /root/natssh/audit_sess.log
+            fi
+
+            # Bersihkan suspended_history.log entries untuk user ini
+            # Hapus baris SUSPEND: username atau UNSUSPEND: username
+            if [ -f /root/natssh/suspended_history.log ]; then
+                temp=$(mktemp)
+                grep -v -E "SUSPEND: $user|UNSUSPEND: $user" /root/natssh/suspended_history.log > "$temp" 2>/dev/null || true
+                mv "$temp" /root/natssh/suspended_history.log
+                # Hapus file jika kosong
+                if [ ! -s /root/natssh/suspended_history.log ]; then
+                    rm -f /root/natssh/suspended_history.log
+                fi
+            fi
+
             echo -e "${GREEN}SUKSES! Akun $user telah dihapus beserta datanya.${NC}"
         else
             echo -e "${RED}Gagal menghapus (exit $rc) — cek manual: $res${NC}"

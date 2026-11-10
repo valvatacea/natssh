@@ -42,6 +42,8 @@ systemctl daemon-reload
 crontab -l | grep -v "unsuspend.sh" | crontab - 2>/dev/null
 crontab -l | grep -v "autobackup.sh" | crontab - 2>/dev/null
 crontab -l | grep -v "apply_speed.sh" | crontab - 2>/dev/null
+crontab -l | grep -v "systemctl.*restart.*natssh-ws" | crontab - 2>/dev/null
+crontab -l | grep -v "sess_audit" | crontab - 2>/dev/null
 rm -rf /root/natssh/suspended
 
 echo -e "\n[*] Menghapus Cronjob Autokill..."

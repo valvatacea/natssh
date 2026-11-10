@@ -133,11 +133,7 @@ done
 echo -e "${GREEN}Service natssh-udpgw aktif di: ${udpgw_ports} (localhost only).${NC}"
 
 
-echo -e "
-[*] Mengatur Cronjob refresh IP Cloudflare/CloudFront + apply speed (harian)..."
-if ! crontab -l 2>/dev/null | grep -q "apply_speed.sh"; then
-    (crontab -l 2>/dev/null; echo "0 3 * * * /root/natssh/apply_speed.sh >/dev/null 2>&1") | crontab -
-fi
+echo -e "\\n[*] Cronjob apply speed digabung dengan restart (lihat bawah)..."
 
 echo -e "\n[*] Menyiapkan service NATSSH speed limit (tidak diaktifkan otomatis)..."
 cat > /etc/systemd/system/natssh-speed.service <<'EOF'
@@ -172,10 +168,14 @@ if ! crontab -l 2>/dev/null | grep -q "unsuspend.sh"; then
     (crontab -l 2>/dev/null; echo "* * * * * $(pwd)/unsuspend.sh >> /root/autokill.log 2>&1") | crontab -
 fi
 [ -f suspend_minutes.conf ] || echo 15 > suspend_minutes.conf
-# Auto restart natssh-ws setiap jam 03:00
+# Cron sess_audit (tiap 2 menit) — riwayat sesi per user
+if ! crontab -l 2>/dev/null | grep -q "sess_audit"; then
+    (crontab -l 2>/dev/null; echo "*/2 * * * * /usr/bin/python3 $(pwd)/sess_audit.py >/dev/null 2>&1") | crontab -
+fi
+# Auto restart natssh-ws + apply speed (jam 04:00)
 if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
-    (crontab -l 2>/dev/null; echo "0 3 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab -
-    echo -e "${GREEN}Cronjob auto-restart natssh-ws berhasil ditambahkan (jam 03:00).${NC}"
+    (crontab -l 2>/dev/null; echo "0 4 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1; sleep 30; /root/natssh/apply_speed.sh >/dev/null 2>&1") | crontab -
+    echo -e "${GREEN}Cronjob auto-restart natssh-ws + apply speed berhasil ditambahkan (jam 04:00).${NC}"
 fi
 
 echo -e "
