@@ -741,6 +741,12 @@ conf_port() {
             fi
             systemctl daemon-reload
             echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+            read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr
+            if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
+                echo -e "${YELLOW}Dibatalkan.${NC}"
+                pause
+                continue
+            fi
             systemctl restart natssh-ws
             sleep 1
             systemctl is-active --quiet natssh-ws && \
@@ -914,6 +920,7 @@ conf_speed() {
                 grep -q "^DOWN_CF=" /root/natssh/speed.conf || echo "DOWN_CF=25mbit" >> /root/natssh/speed.conf
                 sed -i "s/^UP_CF=.*/UP_CF=$up/" /root/natssh/speed.conf
                 sed -i "s/^DOWN_CF=.*/DOWN_CF=$down/" /root/natssh/speed.conf
+                ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 _ensure_speed_service
                 systemctl enable --now natssh-speed.service 2>/dev/null
@@ -938,6 +945,7 @@ conf_speed() {
                 grep -q "^DOWN_CFRONT=" /root/natssh/speed.conf || echo "DOWN_CFRONT=25mbit" >> /root/natssh/speed.conf
                 sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up/" /root/natssh/speed.conf
                 sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down/" /root/natssh/speed.conf
+                ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 _ensure_speed_service
                 systemctl enable --now natssh-speed.service 2>/dev/null
@@ -965,6 +973,7 @@ conf_speed() {
                 echo "UP_CFRONT=$up_cfront" >> /root/natssh/speed.conf
                 echo "DOWN_CFRONT=$down_cfront" >> /root/natssh/speed.conf
                 echo "MODE=cdn-split" >> /root/natssh/speed.conf
+                ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 _ensure_speed_service
                 systemctl enable --now natssh-speed.service 2>/dev/null
@@ -999,8 +1008,8 @@ conf_restart_schedule() {
         read -p "Hapus jadwal restart? (y/N): " h
         if [[ "$h" =~ ^[Yy]$ ]]; then
             # Hapus baris restart natssh-ws dan apply_speed.sh terkait (pola subshell aman)
-            (crontab -l 2>/dev/null | grep -v "systemctl.*restart.*natssh-ws") | crontab -
-            echo -e "${GREEN}Jadwal restart dihapus.${NC}"
+            (crontab -l 2>/dev/null | grep -v -E "reboot|apply_speed.sh") | crontab -
+            echo -e "${GREEN}Jadwal restart dan apply_speed.sh dihapus.${NC}"
         fi
     else
         echo -e "${YELLOW}Belum ada jadwal restart otomatis (WS + UDPGW).${NC}"
@@ -1059,6 +1068,11 @@ conf_maxtotal() {
     fi
     systemctl daemon-reload
     echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+    read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr2
+    if [[ ! "$cfr2" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        return
+    fi
     systemctl restart natssh-ws
     sleep 1
     systemctl is-active --quiet natssh-ws &&         echo -e "${GREEN}SUKSES! MAX_TOTAL kini $n slot.${NC}" || \
