@@ -50,9 +50,10 @@ wget -qO autobackup.sh https://raw.githubusercontent.com/valvatacea/natssh/main/
 wget -qO uninstall.sh https://raw.githubusercontent.com/valvatacea/natssh/main/uninstall.sh
 wget -qO apply_speed.sh https://raw.githubusercontent.com/valvatacea/natssh/main/apply_speed.sh
 wget -qO apply_cf_marks.sh https://raw.githubusercontent.com/valvatacea/natssh/main/apply_cf_marks.sh
+wget -qO promo_rotate.sh https://raw.githubusercontent.com/valvatacea/natssh/main/promo_rotate.sh
 
 # Unduhan gagal = file kosong -> service crash-loop; cek ukuran
-for f in menu.sh ws.py autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh apply_cf_marks.sh; do
+for f in menu.sh ws.py autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh apply_cf_marks.sh promo_rotate.sh; do
     [ -s "$f" ] || { echo "Gagal mengunduh $f (repo privat/offline?)"; exit 1; }
 done
 echo -e "
@@ -60,7 +61,7 @@ echo -e "
 
 echo -e "
 [*] Mengatur izin eksekusi..."
-chmod +x menu.sh autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh apply_cf_marks.sh
+chmod +x menu.sh autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh apply_cf_marks.sh promo_rotate.sh
 
 echo -e "
 [*] Mengatur Service Systemd untuk WebSocket Proxy (ws.py)..."
@@ -165,7 +166,7 @@ fi
 mkdir -p /root/natssh/suspended 2>/dev/null
 # Cron unsuspend (tiap 1 menit)
 if ! crontab -l 2>/dev/null | grep -q "unsuspend.sh"; then
-    (crontab -l 2>/dev/null; echo "* * * * * $(pwd)/unsuspend.sh >> /root/natssh/logs/autokill.log 2>&1") | crontab -
+    (crontab -l 2>/dev/null; echo "* * * * * $(pwd)/unsuspend.sh >> $(pwd)/logs/autokill.log 2>&1") | crontab -
 fi
 [ -f suspend_minutes.conf ] || echo 15 > suspend_minutes.conf
 # Cron sess_audit (tiap 2 menit) — riwayat sesi per user
