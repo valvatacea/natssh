@@ -26,7 +26,7 @@ C_RESET = "\033[0m"
 now = time.time()
 conn_file, log_file = sys.argv[1], sys.argv[2]
 audit_file = sys.argv[3] if len(sys.argv) > 3 else None
-suspend_file = sys.argv[4] if len(sys.argv) > 4 else "/root/natssh/suspended_history.log"
+suspend_file = sys.argv[4] if len(sys.argv) > 4 else "/root/natssh/logs/suspended_history.log"
 
 pool = []
 try:

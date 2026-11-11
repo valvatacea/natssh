@@ -1,0 +1,46 @@
+2026-11-02 11:24:01 SELESAI user=valva ip=103.129.148.143 edge=162.158.170.160 cc=ID city=- dur=3m00s up=- down=- ua=-
+2026-11-02 11:26:01 SELESAI user=valva ip=103.129.148.143 edge=172.68.242.99 cc=ID city=- dur=2m21s up=- down=- ua=-
+2026-11-02 11:30:01 SELESAI user=valva ip=103.129.148.143 edge=52.46.55.112 cc=ID city=Bogor dur=5m47s up=0.2 down=0.4 ua=DarkTunnel/2.1
+2026-11-02 11:36:01 SELESAI user=valva ip=31.58.103.3 edge=52.46.55.75 cc=ID city=Jakarta dur=2m43s up=0.2 down=0.3 ua=DarkTunnel/2.1
+2026-11-02 11:38:01 SELESAI user=valva ip=140.213.51.136 edge=52.46.55.71 cc=ID city=Bandung dur=4m57s up=1.0 down=1.2 ua=DarkTunnel/2.1
+2026-11-02 11:38:01 SELESAI user=salsa ip=31.58.103.3 edge=52.46.55.112 cc=ID city=Jakarta dur=2m10s up=0.2 down=0.2 ua=DarkTunnel/2.1
+2026-11-02 11:40:01 SELESAI user=valva ip=140.213.51.136 edge=52.46.55.109 cc=ID city=Bandung dur=2m11s up=0.0 down=0.1 ua=DarkTunnel/2.1
+2026-11-02 11:42:02 SELESAI user=valva ip=31.58.103.3 edge=104.23.232.42 cc=ID city=- dur=2m37s up=0.1 down=0.1 ua=-
+2026-11-02 12:04:02 SELESAI user=valva ip=140.213.37.227 edge=52.46.55.78 cc=ID city=Bandung dur=24m46s up=1.5 down=3.0 ua=DarkTunnel/2.1
+2026-11-02 12:04:02 SELESAI user=salsa ip=31.58.103.3 edge=52.46.55.79 cc=ID city=Jakarta dur=23m04s up=0.7 down=1.9 ua=DarkTunnel/2.1
+2026-11-02 12:04:02 SELESAI user=valva ip=140.213.37.227 edge=52.46.55.110 cc=ID city=Bandung dur=4m14s up=0.4 down=0.8 ua=DarkTunnel/2.1
+2026-11-02 12:04:02 SELESAI user=salsa ip=31.58.103.3 edge=52.46.55.73 cc=ID city=Jakarta dur=3m41s up=0.2 down=0.5 ua=DarkTunnel/2.1
+2026-11-02 12:06:01 SELESAI user=salsa ip=31.58.103.3 edge=52.46.55.100 cc=ID city=Jakarta dur=6m00s up=0.0 down=0.0 ua=DarkTunnel/2.1
+2026-11-02 12:08:01 SELESAI user=valva ip=140.213.37.227 edge=52.46.55.65 cc=ID city=Bandung dur=4m49s up=0.4 down=0.9 ua=DarkTunnel/2.1
+2026-11-02 12:08:01 SELESAI user=salsa ip=31.58.103.3 edge=52.46.55.79 cc=ID city=Jakarta dur=4m39s up=0.2 down=0.5 ua=DarkTunnel/2.1
+2026-11-02 12:10:01 SELESAI user=valva ip=140.213.37.227 edge=52.46.55.99 cc=ID city=Bandung dur=2m28s up=0.0 down=0.0 ua=DarkTunnel/2.1
+2026-11-02 12:22:01 SELESAI user=salsa ip=103.129.148.143 edge=52.46.55.79 cc=ID city=Bogor dur=11m18s up=0.4 down=0.9 ua=DarkTunnel/2.1
+2026-11-02 12:48:01 SELESAI user=salsa ip=103.129.148.143 edge=52.46.55.108 cc=ID city=Bogor dur=30m43s up=2.1 down=3.6 ua=DarkTunnel/2.1
+2026-11-02 13:10:01 SELESAI user=salsa ip=103.129.148.143 edge=52.46.55.104 cc=ID city=Bogor dur=23m20s up=1.2 down=10.0 ua=DarkTunnel/2.1
+2026-11-10 21:48:02 SELESAI user=salsa ip=182.5.139.219 edge=172.64.178.241 cc=ID city=- dur=6344m38s up=- down=- ua=-
+2026-11-10 22:26:01 SELESAI user=curvasud ip=140.213.15.215 edge=52.46.55.77 cc=ID city=Central-Jakarta dur=124m47s up=15.8 down=1235.8 ua=Mozilla/5.0 (Linux; Android 15; 25053PC47G) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Mobile Safari/537.36
+2026-11-10 22:42:01 SELESAI user=ndu48 ip=140.213.100.36 edge=52.46.55.112 cc=ID city=Bandung dur=124m54s up=7.8 down=670.1 ua=[ua]
+2026-11-10 23:32:01 SELESAI user=curvasud ip=140.213.250.80 edge=52.46.55.65 cc=ID city=Tangerang dur=8m34s up=1.5 down=19.0 ua=Mozilla/5.0 (Linux; Android 15; 23124RA7EO Build/AQ3A.240829.003; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/156.0.8078.47 Mobile Safari/537.36
+2026-11-11 00:10:01 SELESAI user=curvasud ip=140.213.250.80 edge=52.46.55.65 cc=ID city=Tangerang dur=38m28s up=11.7 down=365.9 ua=Mozilla/5.0 (Linux; Android 15; 23124RA7EO Build/AQ3A.240829.003; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/156.0.8078.47 Mobile Safari/537.36
+2026-11-11 00:16:01 SELESAI user=curvasud ip=140.213.251.128 edge=52.46.55.79 cc=ID city=Tangerang dur=3m38s up=0.5 down=7.3 ua=Mozilla/5.0 (Linux; Android 15; 23124RA7EO Build/AQ3A.240829.003; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/156.0.8078.47 Mobile Safari/537.36
+2026-11-11 00:18:02 SELESAI user=curvasud ip=140.213.250.80 edge=52.46.55.65 cc=ID city=Tangerang dur=5m47s up=0.1 down=0.3 ua=Mozilla/5.0 (Linux; Android 15; 23124RA7EO Build/AQ3A.240829.003; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/156.0.8078.47 Mobile Safari/537.36
+2026-11-11 00:24:02 SELESAI user=curvasud ip=140.213.26.237 edge=52.46.55.112 cc=ID city=Tangerang dur=124m15s up=6.8 down=94.7 ua=Mozilla/5.0 (Linux; Android 15; 25053PC47G) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Mobile Safari/537.36
+2026-11-11 00:42:01 SELESAI user=ndu48 ip=140.213.99.243 edge=52.46.55.71 cc=ID city=Bandung dur=124m58s up=9.7 down=1069.9 ua=[ua]
+2026-11-11 01:18:02 SELESAI user=curvasud ip=140.213.0.109 edge=52.46.55.98 cc=ID city=West-Jakarta dur=57m36s up=0.8 down=0.9 ua=Mozilla/5.0 (Linux; Android 15; 25053PC47G) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Mobile Safari/537.36
+2026-11-11 02:42:01 SELESAI user=ndu48 ip=140.213.101.113 edge=52.46.55.107 cc=ID city=Bandung dur=124m58s up=4.2 down=36.7 ua=[ua]
+2026-11-11 03:06:01 SELESAI user=- ip=114.79.0.99 edge=52.46.55.74 cc=ID city=West-Jakarta dur=0m03s up=0.0 down=0.0 ua=Mozilla/5.0 (Linux; Android 6.0.1; vivo Y55A Build/MMB29M; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/95.0.4638.74 Mobile Safari/537.36
+2026-11-11 03:10:02 SELESAI user=- ip=114.79.0.99 edge=52.46.55.102 cc=ID city=West-Jakarta dur=5m06s up=0.0 down=0.0 ua=Mozilla/5.0 (Linux; Android 6.0.1; vivo Y55A Build/MMB29M; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/95.0.4638.74 Mobile Safari/537.36
+2026-11-11 04:02:01 SELESAI user=ndu48 ip=140.213.37.172 edge=52.46.55.66 cc=ID city=Bandung dur=86m29s up=- down=- ua=[ua]
+2026-11-11 04:22:01 SELESAI user=ndu48 ip=140.213.47.112 edge=52.46.55.109 cc=ID city=Bandung dur=20m08s up=0.3 down=0.3 ua=[ua]
+2026-11-11 04:42:01 SELESAI user=ndu48 ip=140.213.47.112 edge=52.46.55.111 cc=ID city=Bandung dur=25m08s up=0.5 down=0.3 ua=[ua]
+2026-11-11 04:50:02 SELESAI user=- ip=114.122.71.21 edge=130.176.44.78 cc=ID city=Bandung dur=0m08s up=0.0 down=0.0 ua=DarkTunnel/2.1
+2026-11-11 04:50:02 SELESAI user=- ip=114.122.71.21 edge=130.176.44.109 cc=ID city=Bandung dur=0m08s up=0.0 down=0.0 ua=DarkTunnel/2.1
+2026-11-11 06:42:01 SELESAI user=ndu48 ip=140.213.103.90 edge=52.46.55.65 cc=ID city=Bandung dur=125m04s up=9.4 down=165.3 ua=[ua]
+2026-11-11 07:04:02 SELESAI user=salsa ip=182.5.132.228 edge=172.64.178.240 cc=ID city=- dur=59m44s up=19.9 down=200.9 ua=
+2026-11-11 07:06:01 SELESAI user=salsa ip=182.5.132.228 edge=162.158.218.72 cc=ID city=- dur=0m37s up=0.0 down=0.0 ua=
+2026-11-11 07:20:02 SELESAI user=- ip=31.58.103.2 edge=172.71.124.148 cc=ID city=- dur=0m02s up=0.0 down=0.0 ua=[ua] byop1
+2026-11-11 08:12:02 SELESAI user=ndu48 ip=140.213.49.116 edge=52.46.55.102 cc=ID city=Bandung dur=96m27s up=- down=- ua=[ua]
+2026-11-11 08:12:02 SELESAI user=salsa ip=182.5.132.228 edge=104.23.232.30 cc=ID city=- dur=67m41s up=- down=- ua=-
+2026-11-11 08:12:02 SELESAI user=curvasud ip=112.215.170.31 edge=52.46.55.67 cc=ID city=West-Jakarta dur=57m21s up=- down=- ua=Mozilla/5.0 (Linux; Android 15; 25053PC47G) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Mobile Safari/537.36
+2026-11-11 08:14:01 SELESAI user=- ip=127.0.0.1 edge=127.0.0.1 cc= city=- dur=0m00s up=0.0 down=0.0 ua=
+2026-11-11 08:26:01 SELESAI user=- ip=140.213.2.48 edge=52.46.55.76 cc=ID city=Central-Jakarta dur=13m38s up=0.0 down=0.1 ua=Mozilla/5.0 (Linux; Android 15; 25053PC47G) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Mobile Safari/537.36

@@ -4,7 +4,7 @@
 export TZ=Asia/Jakarta
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 SUSPEND_DIR="/root/natssh/suspended"
-LOG_FILE="/root/autokill.log"
+LOG_FILE="/root/natssh/logs/autokill.log"
 [ -d "$SUSPEND_DIR" ] || exit 0
 now=$(date +%s)
 for f in "$SUSPEND_DIR"/*; do
@@ -15,6 +15,6 @@ for f in "$SUSPEND_DIR"/*; do
         usermod -U "$user" 2>/dev/null
         rm -f "$f"
         echo "$(date '+%Y-%m-%d %H:%M:%S') - Unsuspend otomatis: $user" >> "$LOG_FILE"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - UNSUSPEND: $user" >> /root/natssh/suspended_history.log
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - UNSUSPEND: $user" >> /root/natssh/logs/suspended_history.log
     fi
 done
