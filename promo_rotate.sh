@@ -3,7 +3,7 @@ export TZ=Asia/Jakarta
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-SCHED="$DIR/promo_schedule.conf"
+SCHED="$DIR/config/promo/promo_schedule.conf"
 BACKUP="$DIR/banners/.default_backup"
 LOG="$DIR/logs/promo.log"
 STATE="$DIR/.promo_cycle"
@@ -79,10 +79,10 @@ active_interval="${active_intervals[$cur_idx]}"
 active_jeda="${active_jedas[$cur_idx]}"
 [[ "$active_jeda" =~ ^[0-9]+$ ]] || active_jeda=0
 [[ "$active_interval" =~ ^[0-9]+$ ]] || active_interval=30
-if [ -f "$DIR/promo_targets_${active_slot}.conf" ]; then
-    TARGETS="$DIR/promo_targets_${active_slot}.conf"
+if [ -f "$DIR/config/promo/promo_targets_${active_slot}.conf" ]; then
+    TARGETS="$DIR/config/promo/promo_targets_${active_slot}.conf"
 else
-    TARGETS="$DIR/promo_targets.conf"
+    TARGETS="$DIR/config/promo/promo_targets.conf"
 fi
 
 # Main loop: process phases sequentially if conditions met
@@ -148,10 +148,10 @@ while [ "$changed" = "1" ]; do
                     active_interval="${active_intervals[$idx]}"; active_jeda="${active_jedas[$idx]}"
                     [[ "$active_jeda" =~ ^[0-9]+$ ]] || active_jeda=0
                     [[ "$active_interval" =~ ^[0-9]+$ ]] || active_interval=30
-                    if [ -f "$DIR/promo_targets_${active_slot}.conf" ]; then
-                        TARGETS="$DIR/promo_targets_${active_slot}.conf"
+                    if [ -f "$DIR/config/promo/promo_targets_${active_slot}.conf" ]; then
+                        TARGETS="$DIR/config/promo/promo_targets_${active_slot}.conf"
                     else
-                        TARGETS="$DIR/promo_targets.conf"
+                        TARGETS="$DIR/config/promo/promo_targets.conf"
                     fi
                     state_key="$active_key"; state_phase=0; state_ts=0; changed=1
                 else

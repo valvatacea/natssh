@@ -1641,7 +1641,7 @@ promo_menu() {
         garis
         # status ringkas
         _n_sched=0; _n_active=0
-        if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+        if [ -f /root/natssh/config/promo/promo_schedule.conf ] && [ -s /root/natssh/config/promo/promo_schedule.conf ]; then
             while IFS='|' read -r _s _st _d _iv _en _jd; do
                 [ -z "$_s" ] && continue
                 _n_sched=$((_n_sched+1))
@@ -1649,7 +1649,7 @@ promo_menu() {
                 _end=$((_st + _d*86400))
                 _now=$(date +%s)
                 [ "$_now" -ge "$_st" ] && [ "$_now" -le "$_end" ] && _n_active=$((_n_active+1))
-            done < /root/natssh/promo_schedule.conf
+            done < /root/natssh/config/promo/promo_schedule.conf
         fi
         echo -e "  Jadwal: ${CYAN}${_n_sched}${NC}  |  Aktif sekarang: ${GREEN}${_n_active}${NC}"
         garis
@@ -1770,7 +1770,7 @@ promo_menu() {
                 s=$(date +%s)
                 new_end=$((s + dh*86400))
                 # geser waktu jika overlap: mulai setelah promo terakhir selesai
-                if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+                if [ -f /root/natssh/config/promo/promo_schedule.conf ] && [ -s /root/natssh/config/promo/promo_schedule.conf ]; then
                     _latest_end=0
                     while IFS='|' read -r _os _ost _od _oiv _oen _ojd; do
                         [ -z "$_os" ] && continue
@@ -1779,15 +1779,15 @@ promo_menu() {
                         if [ "$_oend" -gt "$_latest_end" ]; then
                             _latest_end=$_oend
                         fi
-                    done < /root/natssh/promo_schedule.conf
+                    done < /root/natssh/config/promo/promo_schedule.conf
                     if [ "$_latest_end" -gt "$s" ]; then
                         s=$_latest_end
                         new_end=$((s + dh*86400))
                         echo -e "${YELLOW}Waktu bergeser: mulai setelah promo sebelumnya selesai ($(date -d @$s '+%d/%m %H:%M')).${NC}"
                     fi
                 fi
-                echo "${slot}|${s}|${dh}|${iv}|1|${jd_sec}" >> /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets_${slot}.conf
+                echo "${slot}|${s}|${dh}|${iv}|1|${jd_sec}" >> /root/natssh/config/promo/promo_schedule.conf
+                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/config/promo/promo_targets_${slot}.conf
                 echo -e "${GREEN}Target: $tg${NC}"
                 echo -e "${GREEN}Jeda sesi: ${jd_sec}s${NC}"
                 # auto-enable cron promo_rotate jika belum ada
@@ -1801,7 +1801,7 @@ promo_menu() {
                 now=$(date +%s)
                 echo "=== JADWAL PROMO ==="
                 echo ""
-                if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+                if [ -f /root/natssh/config/promo/promo_schedule.conf ] && [ -s /root/natssh/config/promo/promo_schedule.conf ]; then
                     i=1
                     while IFS='|' read -r slot start days interval enabled jeda; do
                         [ -z "$slot" ] && continue
@@ -1822,7 +1822,7 @@ promo_menu() {
                         fi
                         echo -e "  ${CYAN}$i.${NC} ${YELLOW}$slot${NC}  |  durasi: ${days}h  |  interval: ${interval}m  |  jeda: ${jeda}s  |  $start_str → $end_str  |  $status"
                         i=$((i+1))
-                    done < /root/natssh/promo_schedule.conf
+                    done < /root/natssh/config/promo/promo_schedule.conf
                     echo ""
                 else
                     echo -e "  ${YELLOW}Tidak ada jadwal yang tersimpan.${NC}"
@@ -1830,13 +1830,13 @@ promo_menu() {
                 echo ""
                 read -p "Nomor baris toggle (0=batal): " ln
                 [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
+                line=$(sed -n "${ln}p" /root/natssh/config/promo/promo_schedule.conf 2>/dev/null)
                 [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
                 # toggle field 5
                 new=$(echo "$line" | awk -F'|' '{if($5=="1") $5="0"; else $5="1"; print $1"|"$2"|"$3"|"$4"|"$5"|"$6}')
                 # replace line
                 tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
+                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/config/promo/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/config/promo/promo_schedule.conf
                 toggled_slot=$(echo "$new" | cut -d'|' -f1)
                 toggled_state=$(echo "$new" | cut -d'|' -f5)
                 if [ "$toggled_state" = "1" ]; then
@@ -1850,7 +1850,7 @@ promo_menu() {
                 echo -e "${CYAN}=== STATUS PROMO ===${NC}"
                 echo ""
                 # Jadwal
-                if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+                if [ -f /root/natssh/config/promo/promo_schedule.conf ] && [ -s /root/natssh/config/promo/promo_schedule.conf ]; then
                     echo -e "${YELLOW}Jadwal Promo:${NC}"
                     now=$(date +%s)
                     i=1
@@ -1873,13 +1873,13 @@ promo_menu() {
                         fi
                         echo -e "  $i. ${CYAN}$slot${NC} | $start_str s/d $end_str | Interval: ${interval}m | Jeda: ${jeda}s | $status"
                         i=$((i+1))
-                    done < /root/natssh/promo_schedule.conf
+                    done < /root/natssh/config/promo/promo_schedule.conf
                 else
                     echo -e "  ${YELLOW}(tidak ada jadwal)${NC}"
                 fi
                 echo ""
                 # Target
-                if [ -f /root/natssh/promo_targets.conf ] && [ -s /root/natssh/promo_targets.conf ]; then
+                if [ -f /root/natssh/config/promo/promo_targets.conf ] && [ -s /root/natssh/config/promo/promo_targets.conf ]; then
                     echo -e "${YELLOW}Target Akun:${NC}"
                     i=1
                     while read -r u; do
@@ -1887,7 +1887,7 @@ promo_menu() {
                         [ -z "$u" ] && continue
                         echo -e "  $i. ${CYAN}$u${NC}"
                         i=$((i+1))
-                    done < /root/natssh/promo_targets.conf
+                    done < /root/natssh/config/promo/promo_targets.conf
                 else
                     echo -e "  ${YELLOW}(tidak ada target)${NC}"
                 fi
@@ -1910,7 +1910,7 @@ promo_menu() {
                 now=$(date +%s)
                 echo -e "${YELLOW}=== JADWAL PROMO (pilih untuk hapus) ===${NC}"
                 echo ""
-                if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+                if [ -f /root/natssh/config/promo/promo_schedule.conf ] && [ -s /root/natssh/config/promo/promo_schedule.conf ]; then
                     i=1
                     while IFS='|' read -r slot start days interval enabled jeda; do
                         [ -z "$slot" ] && continue
@@ -1931,7 +1931,7 @@ promo_menu() {
                         fi
                         echo -e "  ${CYAN}$i.${NC} ${YELLOW}$slot${NC}  |  durasi: ${days}h  |  interval: ${interval}m  |  jeda: ${jeda}s  |  $start_str → $end_str  |  $status"
                         i=$((i+1))
-                    done < /root/natssh/promo_schedule.conf
+                    done < /root/natssh/config/promo/promo_schedule.conf
                 else
                     echo -e "  ${YELLOW}Tidak ada jadwal yang tersimpan.${NC}"
                 fi
@@ -1941,21 +1941,21 @@ promo_menu() {
                 if [ "$ln" = "all" ]; then
                     read -p "Yakin hapus SEMUA jadwal? (y/N): " y
                     [[ "$y" =~ ^[Yy]$ ]] || { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
-                    : > /root/natssh/promo_schedule.conf
+                    : > /root/natssh/config/promo/promo_schedule.conf
                     rm -f /root/natssh/.promo_last_run
                     echo -e "${GREEN}Semua jadwal dihapus.${NC}"
                 else
-                    _target_line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
+                    _target_line=$(sed -n "${ln}p" /root/natssh/config/promo/promo_schedule.conf 2>/dev/null)
                     _target_slot=$(echo "$_target_line" | cut -d'|' -f1)
                     read -p "Yakin hapus jadwal '$_target_slot'? (y/N): " y
                     [[ "$y" =~ ^[Yy]$ ]] || { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
                     tmp=$(mktemp)
-                    awk -v n="$ln" 'NR!=n{print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
+                    awk -v n="$ln" 'NR!=n{print}' /root/natssh/config/promo/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/config/promo/promo_schedule.conf
                     echo -e "${GREEN}Jadwal '$_target_slot' dihapus.${NC}"
                 fi
                 # restore banner hanya jika tidak ada promo aktif lain
                 _has_active=0
-                if [ -f /root/natssh/promo_schedule.conf ]; then
+                if [ -f /root/natssh/config/promo/promo_schedule.conf ]; then
                     while IFS='|' read -r _s _st _d _iv _en _jd; do
                         [ -z "$_s" ] && continue
                         [ "$_en" = "1" ] || continue
@@ -1963,7 +1963,7 @@ promo_menu() {
                         if [ "$(date +%s)" -ge "$_st" ] && [ "$(date +%s)" -le "$_end" ]; then
                             _has_active=1; break
                         fi
-                    done < /root/natssh/promo_schedule.conf
+                    done < /root/natssh/config/promo/promo_schedule.conf
                 fi
                 if [ "$_has_active" = "0" ]; then
                     _backup_tmp="/tmp/issue_banner_backup_$(date +%s)"
@@ -1987,7 +1987,7 @@ promo_menu() {
                 now=$(date +%s)
                 echo -e "${YELLOW}=== JADWAL PROMO (pilih untuk ubah) ===${NC}"
                 echo ""
-                if [ -f /root/natssh/promo_schedule.conf ] && [ -s /root/natssh/promo_schedule.conf ]; then
+                if [ -f /root/natssh/config/promo/promo_schedule.conf ] && [ -s /root/natssh/config/promo/promo_schedule.conf ]; then
                     i=1
                     while IFS='|' read -r slot start days interval enabled jeda; do
                         [ -z "$slot" ] && continue
@@ -1997,14 +1997,14 @@ promo_menu() {
                         end_str=$(date -d "@$end" '+%d/%m %H:%M')
                         echo -e "  ${CYAN}$i.${NC} ${YELLOW}$slot${NC}  |  durasi: ${days}h  |  interval: ${interval}m  |  jeda: ${jeda}s  |  $start_str → $end_str"
                         i=$((i+1))
-                    done < /root/natssh/promo_schedule.conf
+                    done < /root/natssh/config/promo/promo_schedule.conf
                 else
                     echo -e "  ${YELLOW}Tidak ada jadwal yang tersimpan.${NC}"
                 fi
                 echo ""
                 read -p "Nomor baris ubah (0=batal): " ln
                 [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/promo_schedule.conf 2>/dev/null)
+                line=$(sed -n "${ln}p" /root/natssh/config/promo/promo_schedule.conf 2>/dev/null)
                 [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
                 IFS='|' read -r oldslot oldstart olddays oldiv olden oldjeda <<< "$line"
                 oldjeda=${oldjeda:-0}
@@ -2073,12 +2073,12 @@ promo_menu() {
                     tg=$(echo "$selected" | xargs)
                     [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
                 else
-                    tg=$(cat /root/natssh/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
+                    tg=$(cat /root/natssh/config/promo/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
                 fi
                 new="${slot}|${oldstart}|${dh}|${iv}|${olden:-1}|${jd_sec}"
                 tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets_${slot}.conf
+                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/config/promo/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/config/promo/promo_schedule.conf
+                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/config/promo/promo_targets_${slot}.conf
                 echo -e "${GREEN}Jadwal diubah: $new${NC}"
                 echo -e "${GREEN}Target: $tg${NC}"
                 ;;
