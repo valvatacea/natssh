@@ -548,7 +548,7 @@ menu_monitor() {
         echo "2. Autokill Manual (Tendang Multi-Login)"
         echo "3. Riwayat Autokill"
         echo "4. Puncak Koneksi WebSocket (slot)"
-        echo "5. Perangkat per Akun (live + riwayat sesi)"
+        echo "5. Riwayat Akun (live + sesi)"
         echo "6. Status RAM / CPU / Disk + Resource SSH"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-6): " p || exit 0
