@@ -93,7 +93,11 @@ while [ "$changed" = "1" ]; do
         0)
             if [ "$state_ts" = "0" ] || [ $((NOW - state_ts)) -ge $((active_interval * 60)) ]; then
                 [ ! -f "$DIR/.promo_backup_done" ] && [ -f /etc/issue.net ] && { cp /etc/issue.net "$BACKUP"; touch "$DIR/.promo_backup_done"; }
-                [ -f "$DIR/banners/$active_slot.txt" ] && cp "$DIR/banners/$active_slot.txt" /etc/issue.net
+                if [ -f "$DIR/banners/$active_slot.txt" ]; then
+                    cp "$DIR/banners/$active_slot.txt" /etc/issue.net
+                else
+                    echo "$(date '+%F %T') PROMO WARNING banner tidak ada untuk slot=$active_slot, lewati pemasang banner" >> "$LOG"
+                fi
                 if [ -f "$TARGETS" ]; then
                     while read -r u; do
                         u=$(echo "$u" | xargs); [ -z "$u" ] && continue

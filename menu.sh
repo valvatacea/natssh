@@ -1700,6 +1700,13 @@ promo_menu() {
                         if [[ "$y" =~ ^[Yy]$ ]]; then
                             rm -f "/root/natssh/banners/${delname}.txt"
                             echo -e "${GREEN}Slot '$delname' dihapus.${NC}"
+                            # Hapus jadwal yang mereferensi slot ini
+                            if [ -f /root/natssh/config/promo/promo_schedule.conf ] && grep -q "^${delname}|" /root/natssh/config/promo/promo_schedule.conf 2>/dev/null; then
+                                tmp=$(mktemp)
+                                grep -v "^${delname}|" /root/natssh/config/promo/promo_schedule.conf > "$tmp"
+                                mv "$tmp" /root/natssh/config/promo/promo_schedule.conf
+                                echo -e "${YELLOW}Jadwal slot '$delname' juga dihapus.${NC}"
+                            fi
                         else
                             echo -e "${YELLOW}Dibatalkan.${NC}"
                         fi
@@ -1841,6 +1848,11 @@ promo_menu() {
                 toggled_state=$(echo "$new" | cut -d'|' -f5)
                 if [ "$toggled_state" = "1" ]; then
                     echo -e "${GREEN}Jadwal '$toggled_slot' DIAKTIFKAN.${NC}"
+                    # Aktifkan cron promo_rotate jika belum ada
+                    if ! crontab -l 2>/dev/null | grep -q "promo_rotate.sh"; then
+                        (crontab -l 2>/dev/null; echo "*/1 * * * * /root/natssh/promo_rotate.sh") | crontab -
+                        echo -e "${GREEN}Cron promo_rotate diaktifkan.${NC}"
+                    fi
                 else
                     echo -e "${YELLOW}Jadwal '$toggled_slot' DINONAKTIFKAN.${NC}"
                 fi
@@ -2073,7 +2085,11 @@ promo_menu() {
                     tg=$(echo "$selected" | xargs)
                     [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
                 else
-                    tg=$(cat /root/natssh/config/promo/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
+                    if [ -f /root/natssh/config/promo/promo_targets_${oldslot}.conf ] && [ -s /root/natssh/config/promo/promo_targets_${oldslot}.conf ]; then
+                        tg=$(cat /root/natssh/config/promo/promo_targets_${oldslot}.conf 2>/dev/null | tr '\n' ' ' | xargs)
+                    else
+                        tg=$(cat /root/natssh/config/promo/promo_targets.conf 2>/dev/null | tr '\n' ' ' | xargs)
+                    fi
                 fi
                 new="${slot}|${oldstart}|${dh}|${iv}|${olden:-1}|${jd_sec}"
                 tmp=$(mktemp)
