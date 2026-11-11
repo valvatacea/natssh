@@ -21,6 +21,7 @@ MAX_PER_IP = int(os.environ.get("NATSSH_MAX_PER_IP", "10"))
 MAX_TOTAL = int(os.environ.get("NATSSH_MAX_TOTAL", "30"))
 IDLE_TIMEOUT = int(os.environ.get("NATSSH_IDLE_TIMEOUT", "300"))  # detik tanpa data -> putuskan
 TCP_KEEPALIVE = os.environ.get("NATSSH_TCP_KEEPALIVE", "1") == "1"  # heartbeat TCP
+MAX_CONN_AGE = int(os.environ.get("NATSSH_MAX_CONN_AGE", "3600"))  # maks usia koneksi (detik), 0 = nonaktif
 MAX_LOG_SIZE = 512_000  # 500 KB, selaras autokill.sh
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ws.log")
@@ -139,6 +140,7 @@ def handle_client(client_socket, ip):
     conn = None
     cid = 0
     via_cdn = False
+    admitted = False
     try:
         buf = client_socket.recv(4096)                      # RAW (bytes): utk diteruskan
         request = buf.decode("utf-8", errors="ignore")     # hanya utk deteksi header
@@ -178,6 +180,7 @@ def handle_client(client_socket, ip):
             except OSError:
                 pass
         return
+    admitted = True
     try:
         ssh_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         ssh_socket.settimeout(10)
@@ -246,7 +249,26 @@ def handle_client(client_socket, ip):
                     os.replace(tmp,PENDING_FILE)
             except Exception:
                 pass
-        _release(ip, via_cdn)
+        if admitted:
+            _release(ip, via_cdn)
+
+
+def _watchdog():
+    """Bunuh koneksi yang melebihi MAX_CONN_AGE agar slot tidak menempel selamanya."""
+    while True:
+        time.sleep(60)
+        if MAX_CONN_AGE <= 0:
+            continue
+        now = time.time()
+        with _lock:
+            stale = [cid for cid, c in _CONNS.items() if now - c.get("start", now) > MAX_CONN_AGE]
+        for cid in stale:
+            try:
+                with _lock:
+                    _CONNS.pop(cid, None)
+                _log(f"WATCHDOG hapus koneksi usia > {MAX_CONN_AGE}s cid={cid}")
+            except Exception:
+                pass
 
 
 def main():
@@ -255,9 +277,18 @@ def main():
     server.bind(("0.0.0.0", WS_PORT))
     server.listen(64)
     _log(f"mulai: ws={WS_PORT} -> ssh lokal {SSH_PORT}, limit {MAX_PER_IP}/ip, {MAX_TOTAL} total")
+    t_wd = threading.Thread(target=_watchdog, daemon=True)
+    t_wd.start()
     while True:
-        client, addr = server.accept()
-        threading.Thread(target=handle_client, args=(client, addr[0]), daemon=True).start()
+        try:
+            client, addr = server.accept()
+            threading.Thread(target=handle_client, args=(client, addr[0]), daemon=True).start()
+        except OSError as exc:
+            _log(f"ACCEPT ERROR: {exc}")
+            time.sleep(1)
+        except Exception as exc:
+            _log(f"ACCEPT ERROR: {exc}")
+            time.sleep(1)
 
 
 if __name__ == "__main__":
