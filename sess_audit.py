@@ -106,7 +106,7 @@ def main():
     # proses pending (real-time) dulu
     pending=[]
     try:
-        pending=json.load(open(os.path.join(DIR,"pending_sess.json")))
+        pending=json.load(open(os.path.join(DIR,"logs","pending_sess.json")))
     except (OSError,ValueError):
         pending=[]
     for c in pending:
@@ -122,7 +122,7 @@ def main():
               f"up={c.get('up',0)/1048576:.1f} down={c.get('down',0)/1048576:.1f} ua={c.get('ua','-')}")
         state.pop(key,None)
     try:
-        with open(os.path.join(DIR,"pending_sess.json"),"w") as f: json.dump([],f)
+        with open(os.path.join(DIR,"logs","pending_sess.json"),"w") as f: json.dump([],f)
     except OSError:
         pass
 
