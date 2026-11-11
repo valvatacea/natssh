@@ -42,4 +42,4 @@ BACKUP_FILE="/root/backup_akun_ssh.sh"
 } > "$BACKUP_FILE"
 chmod 700 "$BACKUP_FILE"
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Auto-backup: config=$OUT_CFG akun=$BACKUP_FILE" >> /root/natssh/autobackup.log
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Auto-backup: config=$OUT_CFG akun=$BACKUP_FILE" >> /root/natssh/logs/autobackup.log
