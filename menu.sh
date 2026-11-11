@@ -781,13 +781,13 @@ conf_autobackup() {
     read -p "Pilih: " a
     case $a in
         1)
-            (crontab -l 2>/dev/null; echo "0 2 * * * /root/natssh/autobackup.sh") | crontab -
+            (crontab -l 2>/dev/null | grep -v "autobackup.sh"; echo "0 2 * * * /root/natssh/autobackup.sh") | crontab -
             echo -e "${GREEN}Auto-backup harian 02:00 diaktifkan.${NC}" ;;
         2)
-            (crontab -l 2>/dev/null; echo "0 */6 * * * /root/natssh/autobackup.sh") | crontab -
+            (crontab -l 2>/dev/null | grep -v "autobackup.sh"; echo "0 */6 * * * /root/natssh/autobackup.sh") | crontab -
             echo -e "${GREEN}Auto-backup tiap 6 jam diaktifkan.${NC}" ;;
         3)
-            crontab -l 2>/dev/null | grep -v "autobackup.sh" | crontab -
+            (crontab -l 2>/dev/null | grep -v "autobackup.sh") | crontab -
             echo -e "${YELLOW}Auto-backup dinonaktifkan.${NC}" ;;
         0) return ;;
         *) echo -e "${RED}Tidak valid${NC}" ;;
@@ -806,7 +806,7 @@ menu_backup() {
         [ -d "$BACKUP_DIR" ] && ls -1t "$BACKUP_DIR"/config_*.tar.gz 2>/dev/null | head -1 | xargs -r basename | xargs -r -I{} echo -e "   (terakhir: {})"
         echo "3. Restore Data Akun (dari file backup)"
         echo "4. Restore Konfigurasi (dari file backup)"
-        echo "5. Atur Auto-Backup Konfigurasi"
+        echo "5. Atur Auto-Backup (Konfigurasi + Akun)"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-5): " p || exit 0
         case $p in
