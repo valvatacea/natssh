@@ -1787,7 +1787,7 @@ promo_menu() {
                     fi
                 fi
                 echo "${slot}|${s}|${dh}|${iv}|1|${jd_sec}" >> /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
+                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets_${slot}.conf
                 echo -e "${GREEN}Target: $tg${NC}"
                 echo -e "${GREEN}Jeda sesi: ${jd_sec}s${NC}"
                 # auto-enable cron promo_rotate jika belum ada
@@ -1842,7 +1842,7 @@ promo_menu() {
                 if [ "$toggled_state" = "1" ]; then
                     echo -e "${GREEN}Jadwal '$toggled_slot' DIAKTIFKAN.${NC}"
                 else
-                    echo -e "${YELLOW}Jadwal '$toggled_slot' DITONAKTIFKAN.${NC}"
+                    echo -e "${YELLOW}Jadwal '$toggled_slot' DINONAKTIFKAN.${NC}"
                 fi
                 ;;
 
@@ -1902,7 +1902,7 @@ promo_menu() {
                 # Log promo terakhir
                 if [ -f /root/natssh/promo.log ]; then
                     echo -e "${YELLOW}Log Terakhir:${NC}"
-                    tail -3 /root/natssh/promo.log | while read line; do echo "  $line"; done
+                    tail -20 /root/natssh/promo.log | while read line; do echo "  $line"; done
                 fi
                 ;;
 6)
@@ -2078,7 +2078,7 @@ promo_menu() {
                 new="${slot}|${oldstart}|${dh}|${iv}|${olden:-1}|${jd_sec}"
                 tmp=$(mktemp)
                 awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/promo_schedule.conf
-                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets.conf
+                echo "$tg" | tr ' ' '\n' | sed '/^$/d' > /root/natssh/promo_targets_${slot}.conf
                 echo -e "${GREEN}Jadwal diubah: $new${NC}"
                 echo -e "${GREEN}Target: $tg${NC}"
                 ;;
