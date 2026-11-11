@@ -24,7 +24,7 @@ TCP_KEEPALIVE = os.environ.get("NATSSH_TCP_KEEPALIVE", "1") == "1"  # heartbeat 
 MAX_CONN_AGE = int(os.environ.get("NATSSH_MAX_CONN_AGE", "3600"))  # maks usia koneksi (detik), 0 = nonaktif
 MAX_LOG_SIZE = 512_000  # 500 KB, selaras autokill.sh
 
-LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ws.log")
+LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "ws.log")
 
 _lock = threading.Lock()
 _per_ip: dict[str, int] = {}

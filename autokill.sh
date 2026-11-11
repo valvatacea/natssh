@@ -4,10 +4,10 @@ export TZ=Asia/Jakarta
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 MAX_LOGIN="${MAX_LOGIN:-5}" # batas perangkat global; env MAX_LOGIN disuntik cron; khusus per akun di limits/<user>
 
-LOG_FILE="/root/autokill.log"
+LOG_FILE="/root/natssh/logs/autokill.log"
 MAX_LOG_SIZE=512000 # 500KB
 SUSPEND_DIR="/root/natssh/suspended"
-SUSPEND_MINUTES=$(cat /root/natssh/suspend_minutes.conf 2>/dev/null)
+SUSPEND_MINUTES=$(cat /root/natssh/config/suspend_minutes.conf 2>/dev/null)
 SUSPEND_MINUTES=${SUSPEND_MINUTES:-15}
 SUSPEND_SEC=$(( SUSPEND_MINUTES * 60 ))
 mkdir -p "$SUSPEND_DIR"
@@ -64,7 +64,7 @@ ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | un
             usermod -L "$user" 2>/dev/null
             echo $(( $(date +%s) + SUSPEND_SEC )) > "$SUSPEND_DIR/$user"
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang & suspend ${SUSPEND_MINUTES}m: $user ($devices perangkat, batas $limit)" >> "$LOG_FILE"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - SUSPEND: $user ($devices perangkat, batas $limit, expired $(date -d @$(( $(date +%s) + SUSPEND_SEC )) '+%Y-%m-%d %H:%M:%S'))" >> /root/natssh/suspended_history.log
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - SUSPEND: $user ($devices perangkat, batas $limit, expired $(date -d @$(( $(date +%s) + SUSPEND_SEC )) '+%Y-%m-%d %H:%M:%S'))" >> /root/natssh/logs/suspended_history.log
         fi
     fi
 done

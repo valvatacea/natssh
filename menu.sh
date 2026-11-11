@@ -46,11 +46,11 @@ akun_baru() {
             # Detail siap-salin untuk dikirim ke pelanggan
             # host.conf  = domain Cloudflare (recommended) / IP utk koneksi langsung
             # port.conf  = port Cloudflare yg dipakai klien (default 2086); asal via Origin Rule ke port NAT
-            ipaddr=$(cat /root/natssh/ip.conf 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
+            ipaddr=$(cat /root/natssh/config/ip.conf 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
             ipaddr=${ipaddr:-$(hostname -I | awk '{print $1}')}
-            host=$(cat /root/natssh/host.conf 2>/dev/null)
+            host=$(cat /root/natssh/config/host.conf 2>/dev/null)
             wsport=$(port_ws)
-            cfport=$(cat /root/natssh/port.conf 2>/dev/null)
+            cfport=$(cat /root/natssh/config/port.conf 2>/dev/null)
             cfport=${cfport:-2086}
             maxlog=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
             echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC}"
@@ -61,9 +61,9 @@ akun_baru() {
             if [ "$host" != "$ipaddr" ]; then
                 echo "Domain    : $host"
             fi
-            local hostcf=$(cat /root/natssh/host_cf.conf 2>/dev/null)
+            local hostcf=$(cat /root/natssh/config/host_cf.conf 2>/dev/null)
             [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
-            if [ "$(cat /root/natssh/hide_ip.conf 2>/dev/null)" != "1" ]; then
+            if [ "$(cat /root/natssh/config/hide_ip.conf 2>/dev/null)" != "1" ]; then
                 echo "IP        : $ipaddr"
             fi
             echo "Port WS   : $cfport (via Cloudflare)"
@@ -136,29 +136,29 @@ do_hapus() {
 
             # Bersihkan log akun: autokill.log
             # Hapus baris HAPUS manual: username atau HAPUS konfirmasi langsung: username
-            if [ -f /root/autokill.log ]; then
+            if [ -f /root/natssh/logs/autokill.log ]; then
                 temp=$(mktemp)
-                grep -v -E "HAPUS (manual|konfirmasi langsung): $user" /root/autokill.log > "$temp" 2>/dev/null || true
-                mv "$temp" /root/autokill.log
+                grep -v -E "HAPUS (manual|konfirmasi langsung): $user" /root/natssh/logs/autokill.log > "$temp" 2>/dev/null || true
+                mv "$temp" /root/natssh/logs/autokill.log
             fi
 
             # Bersihkan log akun: audit_sess.log
             # Hapus baris yang mengandung user=username
-            if [ -f /root/natssh/audit_sess.log ]; then
+            if [ -f /root/natssh/logs/audit_sess.log ]; then
                 temp=$(mktemp)
-                grep -v -E "user=$user[[:space:]]" /root/natssh/audit_sess.log > "$temp" 2>/dev/null || true
-                mv "$temp" /root/natssh/audit_sess.log
+                grep -v -E "user=$user[[:space:]]" /root/natssh/logs/audit_sess.log > "$temp" 2>/dev/null || true
+                mv "$temp" /root/natssh/logs/audit_sess.log
             fi
 
             # Bersihkan suspended_history.log entries untuk user ini
             # Hapus baris SUSPEND: username atau UNSUSPEND: username
-            if [ -f /root/natssh/suspended_history.log ]; then
+            if [ -f /root/natssh/logs/suspended_history.log ]; then
                 temp=$(mktemp)
-                grep -v -E "SUSPEND: $user|UNSUSPEND: $user" /root/natssh/suspended_history.log > "$temp" 2>/dev/null || true
-                mv "$temp" /root/natssh/suspended_history.log
+                grep -v -E "SUSPEND: $user|UNSUSPEND: $user" /root/natssh/logs/suspended_history.log > "$temp" 2>/dev/null || true
+                mv "$temp" /root/natssh/logs/suspended_history.log
                 # Hapus file jika kosong
-                if [ ! -s /root/natssh/suspended_history.log ]; then
-                    rm -f /root/natssh/suspended_history.log
+                if [ ! -s /root/natssh/logs/suspended_history.log ]; then
+                    rm -f /root/natssh/logs/suspended_history.log
                 fi
             fi
 
@@ -318,7 +318,7 @@ do_limit() {
     echo "$n" > "$lfile"
     local nn="$n perangkat"
     echo -e "${GREEN}SUKSES! Batas khusus akun $1: ${nn} (autokill pakai ini, bukan global ${global}).${NC}"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - LIMIT: batas khusus $1 = $n perangkat (global $global)" >> /root/autokill.log
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - LIMIT: batas khusus $1 = $n perangkat (global $global)" >> /root/natssh/logs/autokill.log
 }
 
 do_suspend() {
@@ -364,12 +364,12 @@ akun_autoclean() {
                 done
                 userdel -r "$user" 2>/dev/null || true
                 echo -e "Menghapus akun ${RED}$user${NC} (Kedaluwarsa: $exp_date)"
-                echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO-CLEAN hapus $user (kedaluwarsa: $exp_date)" >> /root/autokill.log
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO-CLEAN hapus $user (kedaluwarsa: $exp_date)" >> /root/natssh/logs/autokill.log
                 ((count++))
             fi
         fi
     done < <(awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd)
-    echo -e "${GREEN}Selesai! $count akun kedaluwarsa dihapus (tercatat di /root/autokill.log).${NC}"
+    echo -e "${GREEN}Selesai! $count akun kedaluwarsa dihapus (tercatat di /root/natssh/logs/autokill.log).${NC}"
 }
 
 akun_ganti_password() {
@@ -454,7 +454,7 @@ autokill_manual() {
             if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$max_login" ]; then
                 echo -e "Menendang user ${RED}$user${NC} ($devices perangkat)..."
                 pkill -u "$user" sshd
-                echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang manual: $user ($devices perangkat, batas $max_login)" >> /root/autokill.log
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang manual: $user ($devices perangkat, batas $max_login)" >> /root/natssh/logs/autokill.log
             fi
         fi
     done
@@ -463,8 +463,8 @@ autokill_manual() {
 
 autokill_riwayat() {
     echo -e "${YELLOW}--- 20 RIWAYAT AUTOKILL TERAKHIR ---${NC}"
-    if [ -f "/root/autokill.log" ]; then
-        tail -n 20 /root/autokill.log
+    if [ -f "/root/natssh/logs/autokill.log" ]; then
+        tail -n 20 /root/natssh/logs/autokill.log
     else
         echo -e "${RED}Belum ada riwayat autokill saat ini.${NC}"
     fi
@@ -845,17 +845,17 @@ conf_maxlogin() {
 
 conf_domain_cf_edit() {
     # domain CloudFront (jalur AWS) utk kartu akun; host_cf.conf — opsional
-    local cur=$(cat /root/natssh/host_cf.conf 2>/dev/null)
+    local cur=$(cat /root/natssh/config/host_cf.conf 2>/dev/null)
     echo -e "Domain CloudFront saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
     read -p "Domain CloudFront baru (kosong = hapus/sembunyikan, 0 = batal): " h
     [ "$h" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if [ -z "$h" ]; then
-        rm -f /root/natssh/host_cf.conf
+        rm -f /root/natssh/config/host_cf.conf
         echo -e "${GREEN}Domain CloudFront dihapus — baris 'Domain CF' tak tampil di kartu.${NC}"
     elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}(:[0-9]+)?$ ]]; then
         echo -e "${RED}Gagal: format domain salah (contoh: dabcdefgh.cloudfront.net)!${NC}"
     else
-        echo "$h" > /root/natssh/host_cf.conf
+        echo "$h" > /root/natssh/config/host_cf.conf
         echo -e "${GREEN}Domain CloudFront tersimpan: $h — muncul di baris 'Domain CF' kartu akun.${NC}"
     fi
 }
@@ -908,8 +908,8 @@ conf_domain() {
     # satu pintu domain: Cloudflare (biasa) + CloudFront — dua-duanya ke kartu akun
     local cur curcf
     while true; do
-        cur=$(cat /root/natssh/host.conf 2>/dev/null)
-        curcf=$(cat /root/natssh/host_cf.conf 2>/dev/null)
+        cur=$(cat /root/natssh/config/host.conf 2>/dev/null)
+        curcf=$(cat /root/natssh/config/host_cf.conf 2>/dev/null)
         echo -e "${YELLOW}---- UBAH DOMAIN ----${NC}"
         echo -e "1. Domain (Cloudflare) : ${GREEN}${cur:-OTOMATIS (IP publik)}${NC}"
         echo -e "2. Domain CloudFront   : ${GREEN}${curcf:-BELUM DIATUR}${NC}"
@@ -927,17 +927,17 @@ conf_domain() {
 
 conf_domain_edit() {
     # host/domain Cloudflare di kartu akun; host.conf dipakai akun_baru (fallback: IP publik)
-    local cur=$(cat /root/natssh/host.conf 2>/dev/null)
+    local cur=$(cat /root/natssh/config/host.conf 2>/dev/null)
     echo -e "Host kartu akun saat ini: ${YELLOW}${cur:-OTOMATIS (IP publik)}${NC}"
     read -p "Domain/host baru (kosong = otomatis IP, 0 = batal): " h
     [ "$h" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if [ -z "$h" ]; then
-        rm -f /root/natssh/host.conf
+        rm -f /root/natssh/config/host.conf
         echo -e "${GREEN}Host kembali otomatis (IP publik terdeteksi saat buat akun).${NC}"
     elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}(:[0-9]+)?$ ]]; then
         echo -e "${RED}Gagal: format domain/host salah (contoh: vpn.example.com)!${NC}"
     else
-        echo "$h" > /root/natssh/host.conf
+        echo "$h" > /root/natssh/config/host.conf
         echo -e "${GREEN}Domain tersimpan: $h — dipakai otomatis di kartu akun berikutnya.${NC}"
     fi
 }
@@ -1029,7 +1029,7 @@ conf_speed() {
         echo -e "${YELLOW}--- ATUR LIMIT SPEED per CDN ---${NC}"
         garis
         if tc class show dev eth0 2>/dev/null | grep -q "class htb.*1:10"; then
-            _limits=$(grep -E "^(UP|DOWN)_" /root/natssh/speed.conf 2>/dev/null)
+            _limits=$(grep -E "^(UP|DOWN)_" /root/natssh/config/speed.conf 2>/dev/null)
             if [ -n "$_limits" ]; then
                 echo -e "${GREEN}Limit AKTIF:${NC}"
                 echo "$_limits"
@@ -1056,16 +1056,16 @@ conf_speed() {
                 done
                 # update only CF fields in speed.conf
                 iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
-                if [ ! -f /root/natssh/speed.conf ]; then
-                    echo "IFACE=$iface" > /root/natssh/speed.conf
-                    echo "MODE=cdn-split" >> /root/natssh/speed.conf
+                if [ ! -f /root/natssh/config/speed.conf ]; then
+                    echo "IFACE=$iface" > /root/natssh/config/speed.conf
+                    echo "MODE=cdn-split" >> /root/natssh/config/speed.conf
                 fi
-                sed -i "s/^IFACE=.*/IFACE=$iface/" /root/natssh/speed.conf
+                sed -i "s/^IFACE=.*/IFACE=$iface/" /root/natssh/config/speed.conf
                 # ensure CF fields exist
-                grep -q "^UP_CF=" /root/natssh/speed.conf || echo "UP_CF=25mbit" >> /root/natssh/speed.conf
-                grep -q "^DOWN_CF=" /root/natssh/speed.conf || echo "DOWN_CF=25mbit" >> /root/natssh/speed.conf
-                sed -i "s/^UP_CF=.*/UP_CF=$up/" /root/natssh/speed.conf
-                sed -i "s/^DOWN_CF=.*/DOWN_CF=$down/" /root/natssh/speed.conf
+                grep -q "^UP_CF=" /root/natssh/config/speed.conf || echo "UP_CF=25mbit" >> /root/natssh/config/speed.conf
+                grep -q "^DOWN_CF=" /root/natssh/config/speed.conf || echo "DOWN_CF=25mbit" >> /root/natssh/config/speed.conf
+                sed -i "s/^UP_CF=.*/UP_CF=$up/" /root/natssh/config/speed.conf
+                sed -i "s/^DOWN_CF=.*/DOWN_CF=$down/" /root/natssh/config/speed.conf
                 ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 _ensure_speed_service
@@ -1082,15 +1082,15 @@ conf_speed() {
                     val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
                 done
                 iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
-                if [ ! -f /root/natssh/speed.conf ]; then
-                    echo "IFACE=$iface" > /root/natssh/speed.conf
-                    echo "MODE=cdn-split" >> /root/natssh/speed.conf
+                if [ ! -f /root/natssh/config/speed.conf ]; then
+                    echo "IFACE=$iface" > /root/natssh/config/speed.conf
+                    echo "MODE=cdn-split" >> /root/natssh/config/speed.conf
                 fi
-                sed -i "s/^IFACE=.*/IFACE=$iface/" /root/natssh/speed.conf
-                grep -q "^UP_CFRONT=" /root/natssh/speed.conf || echo "UP_CFRONT=25mbit" >> /root/natssh/speed.conf
-                grep -q "^DOWN_CFRONT=" /root/natssh/speed.conf || echo "DOWN_CFRONT=25mbit" >> /root/natssh/speed.conf
-                sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up/" /root/natssh/speed.conf
-                sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down/" /root/natssh/speed.conf
+                sed -i "s/^IFACE=.*/IFACE=$iface/" /root/natssh/config/speed.conf
+                grep -q "^UP_CFRONT=" /root/natssh/config/speed.conf || echo "UP_CFRONT=25mbit" >> /root/natssh/config/speed.conf
+                grep -q "^DOWN_CFRONT=" /root/natssh/config/speed.conf || echo "DOWN_CFRONT=25mbit" >> /root/natssh/config/speed.conf
+                sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up/" /root/natssh/config/speed.conf
+                sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down/" /root/natssh/config/speed.conf
                 ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 _ensure_speed_service
@@ -1113,12 +1113,12 @@ conf_speed() {
                     val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
                 done
                 iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
-                echo "IFACE=$iface" > /root/natssh/speed.conf
-                echo "UP_CF=$up_cf" >> /root/natssh/speed.conf
-                echo "DOWN_CF=$down_cf" >> /root/natssh/speed.conf
-                echo "UP_CFRONT=$up_cfront" >> /root/natssh/speed.conf
-                echo "DOWN_CFRONT=$down_cfront" >> /root/natssh/speed.conf
-                echo "MODE=cdn-split" >> /root/natssh/speed.conf
+                echo "IFACE=$iface" > /root/natssh/config/speed.conf
+                echo "UP_CF=$up_cf" >> /root/natssh/config/speed.conf
+                echo "DOWN_CF=$down_cf" >> /root/natssh/config/speed.conf
+                echo "UP_CFRONT=$up_cfront" >> /root/natssh/config/speed.conf
+                echo "DOWN_CFRONT=$down_cfront" >> /root/natssh/config/speed.conf
+                echo "MODE=cdn-split" >> /root/natssh/config/speed.conf
                 ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 _ensure_speed_service
@@ -1129,11 +1129,11 @@ conf_speed() {
                 tc qdisc del dev eth0 ingress 2>/dev/null
                 ip link set dev ifb0 down 2>/dev/null
                 ip link del ifb0 2>/dev/null
-                rm -f /root/natssh/speed.conf
+                rm -f /root/natssh/config/speed.conf
                 systemctl disable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit speed dihapus.${NC}"; pause ;;
             5)
-                iface=$(grep "^IFACE=" /root/natssh/speed.conf 2>/dev/null | cut -d= -f2); iface=${iface:-eth0}
+                iface=$(grep "^IFACE=" /root/natssh/config/speed.conf 2>/dev/null | cut -d= -f2); iface=${iface:-eth0}
                 echo "--- tc classes $iface ---"; tc class show dev $iface
                 echo "--- tc filters $iface ---"; tc filter show dev $iface parent 1:
                 echo "--- ingress ---"; tc filter show dev $iface parent ffff:
@@ -1368,7 +1368,7 @@ BEOF
 }
 
 conf_hide_ip() {
-    local cur=$(cat /root/natssh/hide_ip.conf 2>/dev/null)
+    local cur=$(cat /root/natssh/config/hide_ip.conf 2>/dev/null)
     cur=${cur:-0}
     echo -e "${YELLOW}---- HIDE IP SAAT BUAT AKUN ----${NC}"
     if [ "$cur" = "1" ]; then
@@ -1379,10 +1379,10 @@ conf_hide_ip() {
     read -p "Toggle? (1=ON, 0=OFF, kosong=batal): " v
     [ -z "$v" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if [ "$v" = "1" ]; then
-        echo "1" > /root/natssh/hide_ip.conf
+        echo "1" > /root/natssh/config/hide_ip.conf
         echo -e "${GREEN}Hide IP diaktifkan.${NC}"
     elif [ "$v" = "0" ]; then
-        echo "0" > /root/natssh/hide_ip.conf
+        echo "0" > /root/natssh/config/hide_ip.conf
         echo -e "${GREEN}Hide IP dinonaktifkan.${NC}"
     else
         echo -e "${RED}Pilihan tidak valid!${NC}"
@@ -1390,7 +1390,7 @@ conf_hide_ip() {
 }
 
 conf_suspend_minutes() {
-    local cur=$(cat /root/natssh/suspend_minutes.conf 2>/dev/null)
+    local cur=$(cat /root/natssh/config/suspend_minutes.conf 2>/dev/null)
     cur=${cur:-15}
     echo -e "${YELLOW}---- DURASI SUSPEND (autokill) ----${NC}"
     echo -e "Durasi saat ini: ${GREEN}${cur} menit${NC}"
@@ -1399,7 +1399,7 @@ conf_suspend_minutes() {
     if ! [[ "$v" =~ ^[0-9]+$ ]] || [ "$v" -lt 1 ] || [ "$v" -gt 1440 ]; then
         echo -e "${RED}Nilai tidak valid!${NC}"; pause; return
     fi
-    echo "$v" > /root/natssh/suspend_minutes.conf
+    echo "$v" > /root/natssh/config/suspend_minutes.conf
     echo -e "${GREEN}Durasi suspend diubah menjadi ${v} menit.${NC}"
     pause
 }
@@ -1900,9 +1900,9 @@ promo_menu() {
                 fi
                 echo ""
                 # Log promo terakhir
-                if [ -f /root/natssh/promo.log ]; then
+                if [ -f /root/natssh/logs/promo.log ]; then
                     echo -e "${YELLOW}Log Terakhir:${NC}"
-                    tail -20 /root/natssh/promo.log | while read line; do echo "  $line"; done
+                    tail -20 /root/natssh/logs/promo.log | while read line; do echo "  $line"; done
                 fi
                 ;;
 6)
@@ -1981,7 +1981,7 @@ promo_menu() {
                 else
                     echo -e "${YELLOW}Masih ada promo aktif lain — banner tidak di-restore.${NC}"
                 fi
-                echo "$(date '+%F %T') PROMO CANCEL restore" >> /root/natssh/promo.log
+                echo "$(date '+%F %T') PROMO CANCEL restore" >> /root/natssh/logs/promo.log
                 ;;
             3)
                 now=$(date +%s)

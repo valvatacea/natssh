@@ -126,8 +126,8 @@ def ws_peak(x_api_token: str | None = Header(default=None)):
     peak = "0"
     tolak = "0"
     try:
-        peak = sh("grep -o 'total=[0-9]*' /root/natssh/ws.log | cut -d= -f2 | sort -n | tail -1").stdout.strip() or "0"
-        tolak = sh("grep -c 'TOLAK' /root/natssh/ws.log").stdout.strip() or "0"
+        peak = sh("grep -o 'total=[0-9]*' /root/natssh/logs/ws.log | cut -d= -f2 | sort -n | tail -1").stdout.strip() or "0"
+        tolak = sh("grep -c 'TOLAK' /root/natssh/logs/ws.log").stdout.strip() or "0"
     except Exception:
         pass
     cur_max = "30"
@@ -244,15 +244,15 @@ def delete_account(user: str, x_api_token: str | None = Header(default=None)):
         if m: return m.group(1)
         return None
 
-    if os.path.exists("/root/autokill.log"):
+    if os.path.exists("/root/natssh/logs/autokill.log"):
         temp = os.path.join(BASE, ".autokill_tmp")
-        with open("/root/autokill.log") as fin, open(temp, "w") as fout:
+        with open("/root/natssh/logs/autokill.log") as fin, open(temp, "w") as fout:
             for line in fin:
                 u = _user_from_autokill(line)
                 if u == user:
                     continue
                 fout.write(line)
-        os.replace(temp, "/root/autokill.log")
+        os.replace(temp, "/root/natssh/logs/autokill.log")
 
     # audit_sess.log: hapus baris user=<user>
     if os.path.exists(os.path.join(BASE, "audit_sess.log")):
@@ -586,10 +586,10 @@ tc qdisc add dev $IFACE parent 1:10 handle 10: fq_codel
 tc qdisc add dev $IFACE parent 1:30 handle 30: fq_codel
 tc filter add dev $IFACE parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
 tc filter add dev $IFACE parent 1: protocol ip prio 1 u32 match ip dport 22 0xffff flowid 1:10 2>/dev/null
-echo "IFACE=$IFACE" > /root/natssh/speed.conf
-echo "UP={up}" >> /root/natssh/speed.conf
-echo "DOWN={down}" >> /root/natssh/speed.conf
-echo "MODE=ssh-only" >> /root/natssh/speed.conf
+echo "IFACE=$IFACE" > /root/natssh/config/speed.conf
+echo "UP={up}" >> /root/natssh/config/speed.conf
+echo "DOWN={down}" >> /root/natssh/config/speed.conf
+echo "MODE=ssh-only" >> /root/natssh/config/speed.conf
 """
     r = sh(cmds)
     return {"ok": r.returncode == 0, "stderr": r.stderr}

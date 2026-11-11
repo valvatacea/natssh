@@ -22,9 +22,9 @@ os.environ["TZ"] = "Asia/Jakarta"
 time.tzset()
 
 DIR = os.path.dirname(os.path.abspath(__file__))
-CONNS = os.path.join(DIR, "conns.json")
-LOG = os.path.join(DIR, "audit_sess.log")
-STATE = os.path.join(DIR, "audit_state.json")
+CONNS = os.path.join(DIR, "logs", "conns.json")
+LOG = os.path.join(DIR, "logs", "audit_sess.log")
+STATE = os.path.join(DIR, "logs", "audit_state.json")
 MAX_LOG = 512_000
 
 

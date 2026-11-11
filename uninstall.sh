@@ -71,10 +71,10 @@ if [[ "$hapus_file" =~ ^[Yy]$ ]]; then
     rm -f menu.sh ws.py autokill.sh install.sh autokill_v2.sh autobackup.sh unsuspend.sh
     read -p "Hapus juga data (issue.net, ws.log, autokill.log, backup, slot banner, conf)? (y/N): " hapus_data
     if [[ "$hapus_data" =~ ^[Yy]$ ]]; then
-        rm -f /etc/issue.net /root/autokill.log /root/backup_akun_ssh.sh
-        rm -rf /root/natssh/banners /root/natssh/ws.log
-        rm -f /root/natssh/host.conf /root/natssh/port.conf /root/natssh/ip.conf /root/natssh/hide_ip.conf /root/natssh/suspend_minutes.conf
-        rm -rf /root/natssh/limits /root/natssh/conns.json /root/natssh/audit_state.json /root/natssh/audit_sess.log
+        rm -f /etc/issue.net /root/natssh/logs/autokill.log /root/backup_akun_ssh.sh
+        rm -rf /root/natssh/banners /root/natssh/logs/ws.log
+        rm -f /root/natssh/config/host.conf /root/natssh/config/port.conf /root/natssh/config/ip.conf /root/natssh/config/hide_ip.conf /root/natssh/config/suspend_minutes.conf
+        rm -rf /root/natssh/limits /root/natssh/logs/conns.json /root/natssh/audit_state.json /root/natssh/logs/audit_sess.log
         echo -e "${GREEN}Data banner/log/backup terhapus.${NC}"
     else
         echo -e "${YELLOW}Data dipertahankan.${NC}"

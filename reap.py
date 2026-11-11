@@ -13,7 +13,7 @@ import re
 import subprocess
 import sys
 
-LOG = "/root/autokill.log"
+LOG = "/root/natssh/logs/autokill.log"
 
 
 def kill_hantu(pid, user, sebab):

@@ -5,7 +5,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 SCHED="$DIR/promo_schedule.conf"
 BACKUP="$DIR/banners/.default_backup"
-LOG="$DIR/promo.log"
+LOG="$DIR/logs/promo.log"
 STATE="$DIR/.promo_cycle"
 NOW=$(date +%s)
 

@@ -165,7 +165,7 @@ fi
 mkdir -p /root/natssh/suspended 2>/dev/null
 # Cron unsuspend (tiap 1 menit)
 if ! crontab -l 2>/dev/null | grep -q "unsuspend.sh"; then
-    (crontab -l 2>/dev/null; echo "* * * * * $(pwd)/unsuspend.sh >> /root/autokill.log 2>&1") | crontab -
+    (crontab -l 2>/dev/null; echo "* * * * * $(pwd)/unsuspend.sh >> /root/natssh/logs/autokill.log 2>&1") | crontab -
 fi
 [ -f suspend_minutes.conf ] || echo 15 > suspend_minutes.conf
 # Cron sess_audit (tiap 2 menit) — riwayat sesi per user

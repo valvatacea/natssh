@@ -2,10 +2,10 @@
 import json, os, sys, time
 os.environ["TZ"]="Asia/Jakarta"; time.tzset()
 DIR=os.path.dirname(os.path.abspath(__file__))
-CONNS=os.path.join(DIR,"conns.json")
-STATE=os.path.join(DIR,"audit_state.json")
-LOG=os.path.join(DIR,"audit_sess.log")
-LOGF=os.path.join(DIR,"ws.log")
+CONNS=os.path.join(DIR,"logs","conns.json")
+STATE=os.path.join(DIR,"logs","audit_state.json")
+LOG=os.path.join(DIR,"logs","audit_sess.log")
+LOGF=os.path.join(DIR,"logs","ws.log")
 logconns=[]
 try:
     import re,datetime
