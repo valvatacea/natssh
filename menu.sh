@@ -568,40 +568,70 @@ menu_monitor() {
 
 # ══════════ BACKUP ══════════
 
+# Direktori backup terpusat
+BACKUP_DIR="/root/natssh_backup"
+
 backup_ekspor() {
-    echo -e "${YELLOW}Membuat cadangan (Backup) data akun SSH...${NC}"
-    backup_file="/root/backup_akun_ssh.sh"
+    mkdir -p "$BACKUP_DIR"
+    local ts=$(date +%Y%m%d_%H%M%S)
+    local backup_file="$BACKUP_DIR/akun_$ts.sh"
 
-    echo "#!/bin/bash" > $backup_file
-    echo "# SCRIPT RESTORE AKUN SSH VPN" >> $backup_file
-    echo "# Tanggal Backup: $(date)" >> $backup_file
-    echo "" >> $backup_file
+    echo -e "${YELLOW}Membuat cadangan data akun SSH...${NC}"
 
-    awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd | while read user; do
-        hash=$(grep "^${user}:" /etc/shadow | cut -d: -f2)
-        exp_days=$(grep "^${user}:" /etc/shadow | cut -d: -f8)
+    echo "#!/bin/bash" > "$backup_file"
+    echo "# SCRIPT RESTORE AKUN SSH VPN" >> "$backup_file"
+    echo "# Tanggal Backup: $(date)" >> "$backup_file"
+    echo "# Catatan: Akun yang sudah ada di VPS tujuan tidak akan ditimpa." >> "$backup_file"
+    echo "" >> "$backup_file"
+
+    # Hanya akun natssh (yang ada di /root/natssh/limits/)
+    local natssh_users=""
+    if [ -d /root/natssh/limits ]; then
+        for f in /root/natssh/limits/*; do
+            [ -f "$f" ] && natssh_users="$natssh_users $(basename "$f")"
+        done
+    fi
+
+    if [ -z "$natssh_users" ]; then
+        # Fallback: ambil dari /etc/passwd jika limits kosong
+        while IFS= read -r user; do
+            natssh_users="$natssh_users $user"
+        done < <(awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd)
+    fi
+
+    local count=0
+    for user in $natssh_users; do
+        # Skip jika user tidak ada di /etc/passwd
+        id "$user" >/dev/null 2>&1 || continue
+
+        hash=$(grep "^${user}:" /etc/shadow 2>/dev/null | cut -d: -f2)
+        exp_days=$(grep "^${user}:" /etc/shadow 2>/dev/null | cut -d: -f8)
         if [ -n "$exp_days" ]; then
             exp_date=$(date -d "1970-01-01 + $exp_days days" +"%Y-%m-%d" 2>/dev/null)
             if [ $? -eq 0 ]; then
-                echo "useradd -e \"$exp_date\" -m -s /bin/false \"$user\"" >> $backup_file
+                echo "useradd -e "$exp_date" -m -s /bin/false "$user"" >> "$backup_file"
             else
-                echo "useradd -m -s /bin/false \"$user\"" >> $backup_file
+                echo "useradd -m -s /bin/false "$user"" >> "$backup_file"
             fi
         else
-            echo "useradd -m -s /bin/false \"$user\"" >> $backup_file
+            echo "useradd -m -s /bin/false "$user"" >> "$backup_file"
         fi
-        echo "usermod -p '$hash' \"$user\"" >> $backup_file
+        echo "usermod -p '$hash' "$user"" >> "$backup_file"
+        count=$((count + 1))
     done
 
-    chmod 700 $backup_file   # hash password klien di dalamnya — jangan world-readable
-    echo -e "${GREEN}SUKSES! Data seluruh akun dan kata sandi berhasil diekstrak.${NC}"
+    chmod 700 "$backup_file"
+    echo -e "${GREEN}SUKSES! Data $count akun dan kata sandi berhasil diekstrak.${NC}"
     echo -e "File cadangan tersimpan di: ${CYAN}$backup_file${NC} (mode 700)"
-    echo -e "Cara Pakai: pindahkan ke VPS baru lalu jalankan ${CYAN}./backup_akun_ssh.sh${NC}"
+    echo -e "Cara Pakai: pindahkan ke VPS baru lalu jalankan ${CYAN}$backup_file${NC}"
+    echo -e "${YELLOW}Catatan: Akun yang sudah ada di VPS tujuan tidak akan ditimpa.${NC}"
+    pause
 }
 
 backup_config() {
+    mkdir -p "$BACKUP_DIR"
     local ts=$(date +%Y%m%d_%H%M%S)
-    local out="/root/natssh_config.tar.gz"
+    local out="$BACKUP_DIR/config_$ts.tar.gz"
     local list=""
     cd /root/natssh
     [ -f ip.conf ] && list="$list ip.conf"
@@ -613,8 +643,130 @@ backup_config() {
     [ -d banners ] && list="$list banners"
     [ -f /etc/issue.net ] && cp /etc/issue.net /root/natssh/issue.net.bak && list="$list issue.net.bak"
     [ -f /etc/systemd/system/natssh-ws.service ] && cp /etc/systemd/system/natssh-ws.service /root/natssh/natssh-ws.service.bak && list="$list natssh-ws.service.bak"
-    tar -czf "$out" $list >/dev/null 2>&1
-    echo -e "${GREEN}SUKSES! Konfigurasi dibackup: ${CYAN}$out${NC}"
+
+    if [ -z "$list" ]; then
+        echo -e "${YELLOW}Tidak ada file konfigurasi untuk dibackup.${NC}"
+        pause
+        return
+    fi
+
+    if tar -czf "$out" $list >/dev/null 2>&1; then
+        echo -e "${GREEN}SUKSES! Konfigurasi dibackup: ${CYAN}$out${NC}"
+    else
+        echo -e "${RED}Gagal! Backup konfigurasi gagal.${NC}"
+    fi
+    pause
+}
+
+restore_akun() {
+    echo -e "${YELLOW}--- RESTORE AKUN SSH ---${NC}"
+    echo ""
+    echo "File backup akun yang tersedia di $BACKUP_DIR:"
+    local i=1
+    local files=()
+    for f in "$BACKUP_DIR"/akun_*.sh; do
+        [ -f "$f" ] || continue
+        files+=("$f")
+        echo "  $i. $(basename "$f")"
+        i=$((i + 1))
+    done
+
+    if [ ${#files[@]} -eq 0 ]; then
+        echo -e "${YELLOW}Tidak ada file backup akun.${NC}"
+        pause
+        return
+    fi
+
+    echo -e "${RED}0. Kembali${NC}"
+    read -p "Pilih nomor file untuk restore: " pilih || return
+    [ "$pilih" = "0" ] && return
+
+    if ! [[ "$pilih" =~ ^[0-9]+$ ]] || [ "$pilih" -lt 1 ] || [ "$pilih" -gt ${#files[@]} ]; then
+        echo -e "${RED}Pilihan tidak valid!${NC}"
+        pause
+        return
+    fi
+
+    local selected="${files[$((pilih - 1))]}"
+    echo ""
+    echo -e "${YELLOW}Peringatan: Akun yang sudah ada di VPS ini tidak akan ditimpa.${NC}"
+    echo -e "${YELLOW}Hanya akun baru yang akan dibuat.${NC}"
+    read -p "Lanjutkan restore? (y/N): " konfirm || return
+    if [[ ! "$konfirm" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
+    fi
+
+    bash "$selected"
+    local rc=$?
+    if [ $rc -eq 0 ]; then
+        echo -e "${GREEN}SUKSES! Restore akun selesai.${NC}"
+    else
+        echo -e "${RED}Gagal! Beberapa akun mungkin tidak terbuat.${NC}"
+    fi
+    pause
+}
+
+restore_config() {
+    echo -e "${YELLOW}--- RESTORE KONFIGURASI ---${NC}"
+    echo ""
+    echo "File backup konfigurasi yang tersedia di $BACKUP_DIR:"
+    local i=1
+    local files=()
+    for f in "$BACKUP_DIR"/config_*.tar.gz; do
+        [ -f "$f" ] || continue
+        files+=("$f")
+        echo "  $i. $(basename "$f")"
+        i=$((i + 1))
+    done
+
+    if [ ${#files[@]} -eq 0 ]; then
+        echo -e "${YELLOW}Tidak ada file backup konfigurasi.${NC}"
+        pause
+        return
+    fi
+
+    echo -e "${RED}0. Kembali${NC}"
+    read -p "Pilih nomor file untuk restore: " pilih || return
+    [ "$pilih" = "0" ] && return
+
+    if ! [[ "$pilih" =~ ^[0-9]+$ ]] || [ "$pilih" -lt 1 ] || [ "$pilih" -gt ${#files[@]} ]; then
+        echo -e "${RED}Pilihan tidak valid!${NC}"
+        pause
+        return
+    fi
+
+    local selected="${files[$((pilih - 1))]}"
+    echo ""
+    echo -e "${YELLOW}Peringatan: File konfigurasi yang sudah ada akan ditimpa.${NC}"
+    read -p "Lanjutkan restore konfigurasi? (y/N): " konfirm || return
+    if [[ ! "$konfirm" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
+    fi
+
+    local tmpdir="/tmp/natssh_restore_$$"
+    mkdir -p "$tmpdir"
+    if tar -xzf "$selected" -C "$tmpdir" 2>/dev/null; then
+        for f in ip.conf host.conf port.conf hide_ip.conf suspend_minutes.conf; do
+            [ -f "$tmpdir/$f" ] && cp "$tmpdir/$f" "/root/natssh/$f"
+        done
+        [ -d "$tmpdir/limits" ] && cp -r "$tmpdir/limits" /root/natssh/
+        [ -d "$tmpdir/banners" ] && cp -r "$tmpdir/banners" /root/natssh/
+        [ -f "$tmpdir/issue.net.bak" ] && cp "$tmpdir/issue.net.bak" /etc/issue.net
+        [ -f "$tmpdir/natssh-ws.service.bak" ] && cp "$tmpdir/natssh-ws.service.bak" /etc/systemd/system/natssh-ws.service
+
+        rm -rf "$tmpdir"
+
+        systemctl daemon-reload 2>/dev/null
+        echo -e "${GREEN}SUKSES! Konfigurasi direstore.${NC}"
+        echo -e "${YELLOW}Peringatan: Beberapa perubahan memerlukan restart natssh-ws agar berlaku.${NC}"
+    else
+        rm -rf "$tmpdir"
+        echo -e "${RED}Gagal! Gagal mengekstrak file backup.${NC}"
+    fi
     pause
 }
 
@@ -633,11 +785,9 @@ conf_autobackup() {
     read -p "Pilih: " a
     case $a in
         1)
-            crontab -l 2>/dev/null | grep -v "autobackup.sh" | crontab -
             (crontab -l 2>/dev/null; echo "0 2 * * * /root/natssh/autobackup.sh") | crontab -
             echo -e "${GREEN}Auto-backup harian 02:00 diaktifkan.${NC}" ;;
         2)
-            crontab -l 2>/dev/null | grep -v "autobackup.sh" | crontab -
             (crontab -l 2>/dev/null; echo "0 */6 * * * /root/natssh/autobackup.sh") | crontab -
             echo -e "${GREEN}Auto-backup tiap 6 jam diaktifkan.${NC}" ;;
         3)
@@ -656,25 +806,26 @@ menu_backup() {
         echo -e "${YELLOW}   BACKUP & RESTORE${NC}"
         garis
         echo "1. Backup Data Akun (Ekspor Portabel)"
-        [ -f /root/backup_akun_ssh.sh ] && echo -e "   (backup terakhir: $(stat -c '%y' /root/backup_akun_ssh.sh | cut -d. -f1))"
+        [ -d "$BACKUP_DIR" ] && ls -1t "$BACKUP_DIR"/akun_*.sh 2>/dev/null | head -1 | xargs -r basename | xargs -r -I{} echo -e "   (terakhir: {})"
         echo "2. Backup Konfigurasi (tar.gz)"
-        echo "3. Atur Auto-Backup Konfigurasi"
+        [ -d "$BACKUP_DIR" ] && ls -1t "$BACKUP_DIR"/config_*.tar.gz 2>/dev/null | head -1 | xargs -r basename | xargs -r -I{} echo -e "   (terakhir: {})"
+        echo "3. Restore Data Akun (dari file backup)"
+        echo "4. Restore Konfigurasi (dari file backup)"
+        echo "5. Atur Auto-Backup Konfigurasi"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-3): " p || exit 0
+        read -p "Pilih (0-5): " p || exit 0
         case $p in
             1) backup_ekspor ;;
             2) backup_config ;;
-            3) conf_autobackup ;;
+            3) restore_akun ;;
+            4) restore_config ;;
+            5) conf_autobackup ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && [ "$p" != "2" ] && [ "$p" != "3" ] && pause
-
+        [ "$p" != "0" ] && [ "$p" != "5" ] && pause
     done
 }
-
-# ══════════ KONFIGURASI ══════════
-
 conf_maxlogin() {
     cur=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
     cur=${cur:-5}
