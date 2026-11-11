@@ -94,7 +94,7 @@ def status(x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
     ws = sh("systemctl is-active natssh-ws").stdout.strip()
     try:
-        conns = json.load(open(os.path.join(BASE, "conns.json")))
+        conns = json.load(open(os.path.join(BASE, "logs", "conns.json")))
         live = len(conns.get("live", []))
     except Exception:
         live = 0
@@ -104,7 +104,7 @@ def status(x_api_token: str | None = Header(default=None)):
 def live_sessions(x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
     try:
-        conns = json.load(open(os.path.join(BASE, "conns.json")))
+        conns = json.load(open(os.path.join(BASE, "logs", "conns.json")))
         rows = conns.get("live", [])
     except Exception:
         rows = []

@@ -75,8 +75,8 @@ _CONNS = {}                      # conn_id -> state koneksi live
 _SEQ = itertools.count(1)
 _LAST = collections.deque(maxlen=100)   # 100 koneksi terakhir selesai
 _last_dump = 0.0
-CONNS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "conns.json")
-PENDING_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pending_sess.json")
+CONNS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "conns.json")
+PENDING_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "pending_sess.json")
 
 
 def _dump():

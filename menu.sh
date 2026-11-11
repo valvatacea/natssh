@@ -535,7 +535,7 @@ ws_peruser() {
         return
     fi
     echo -e "${YELLOW}--- PERANGKAT PER AKUN (korelasi waktu) ---${NC}"
-    printf '%b' "$rows" | python3 "$dir/ws_match.py" "$dir/conns.json" "$dir/ws.log" "$dir/audit_sess.log" "$dir/suspended_history.log"
+    printf '%b' "$rows" | python3 "$dir/ws_match.py" "$dir/logs/conns.json" "$dir/logs/ws.log" "$dir/logs/audit_sess.log" "$dir/logs/suspended_history.log"
 }
 
 menu_monitor() {
