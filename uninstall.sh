@@ -64,6 +64,9 @@ sed -i "/^[#[:space:]]*ClientAliveCountMax/d" /etc/ssh/sshd_config
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 echo -e "${GREEN}Keepalive SSH dinonaktifkan.${NC}"
 
+rm -f /usr/local/bin/natssh
+echo -e "${GREEN}Perintah 'natssh' dihapus.${NC}"
+
 echo -e ""
 echo -e "[*] Menghapus file skrip..."
 read -p "Apakah Anda ingin menghapus file menu.sh, ws.py, autokill.sh, dan install.sh? (y/n): " hapus_file

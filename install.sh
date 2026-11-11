@@ -230,11 +230,20 @@ fi
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 
-echo -e "
-${CYAN}================================================${NC}"
+echo -e ""
+echo -e "[*] Membuat perintah pintas 'natssh'..."
+cat > /usr/local/bin/natssh << 'EOF'
+#!/bin/bash
+exec /root/natssh/menu.sh "$@"
+EOF
+chmod +x /usr/local/bin/natssh
+echo -e "${GREEN}Perintah 'natssh' telah dibuat. Ketik 'natssh' untuk membuka menu.${NC}"
+
+echo -e ""
+echo -e "${CYAN}================================================${NC}"
 echo -e "${GREEN} INSTALASI SELESAI!                             ${NC}"
 echo -e "${CYAN}================================================${NC}"
-echo -e "1. Untuk mengelola akun, jalankan: ${YELLOW}./menu.sh${NC}"
+echo -e "1. Untuk mengelola akun, jalankan: ${YELLOW}natssh${NC}"
 echo -e "2. Untuk mengecek status WebSocket: ${YELLOW}systemctl status natssh-ws${NC}"
 echo -e "3. Port WebSocket Anda saat ini: ${YELLOW}${ws_port}${NC}"
 echo -e "4. Batas perangkat per akun (autokill): ${YELLOW}${max_login}${NC}"
