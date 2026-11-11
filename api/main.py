@@ -255,19 +255,19 @@ def delete_account(user: str, x_api_token: str | None = Header(default=None)):
         os.replace(temp, "/root/natssh/logs/autokill.log")
 
     # audit_sess.log: hapus baris user=<user>
-    if os.path.exists(os.path.join(BASE, "audit_sess.log")):
-        temp = os.path.join(BASE, ".audit_tmp")
-        with open(os.path.join(BASE, "audit_sess.log")) as fin, open(temp, "w") as fout:
+    if os.path.exists(os.path.join(BASE, "logs", "audit_sess.log")):
+        temp = os.path.join(BASE, "logs", ".audit_tmp")
+        with open(os.path.join(BASE, "logs", "audit_sess.log")) as fin, open(temp, "w") as fout:
             for line in fin:
                 if re.search(rf"user={re.escape(user)}[ \t]", line):
                     continue
                 fout.write(line)
-        os.replace(temp, os.path.join(BASE, "audit_sess.log"))
+        os.replace(temp, os.path.join(BASE, "logs", "audit_sess.log"))
 
     # suspended_history.log: hapus baris SUSPEND:<user> / UNSUSPEND:<user>
-    shist = os.path.join(BASE, "suspended_history.log")
+    shist = os.path.join(BASE, "logs", "suspended_history.log")
     if os.path.exists(shist):
-        temp = os.path.join(BASE, ".suspend_tmp")
+        temp = os.path.join(BASE, "logs", ".suspend_tmp")
         with open(shist) as fin, open(temp, "w") as fout:
             for line in fin:
                 if re.search(rf"(?:SUSPEND(?: otomatis)?|Unsuspend otomatis): {re.escape(user)}(?: |$)", line):
@@ -287,7 +287,7 @@ def history(user: str, x_api_token: str | None = Header(default=None)):
         raise HTTPException(400, "invalid user")
     rows = []
     try:
-        for line in open(os.path.join(BASE, "audit_sess.log")):
+        for line in open(os.path.join(BASE, "logs", "audit_sess.log")):
             if f"user={user} " in line:
                 rows.append(line.strip())
     except FileNotFoundError:
@@ -331,7 +331,7 @@ def audit(user: str | None = None, x_api_token: str | None = Header(default=None
     auth(x_api_token)
     rows = []
     try:
-        for line in open(os.path.join(BASE, "audit_sess.log")):
+        for line in open(os.path.join(BASE, "logs", "audit_sess.log")):
             if user and f"user={user} " not in line:
                 continue
             rows.append(line.strip())
@@ -514,7 +514,7 @@ def set_restart_schedule(body: RestartScheduleIn, x_api_token: str | None = Head
 def logs(file: str = "ws", lines: int = 50, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
     if file == "audit":
-        path = os.path.join(BASE, "audit_sess.log")
+        path = os.path.join(BASE, "logs", "audit_sess.log")
     else:
         path = os.path.join(BASE, "ws.log")
     try:
