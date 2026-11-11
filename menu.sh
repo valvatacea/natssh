@@ -1890,19 +1890,39 @@ promo_menu() {
                     echo -e "  ${YELLOW}(tidak ada jadwal)${NC}"
                 fi
                 echo ""
-                # Target
+                # Target per-slot
+                _has_target=0
+                if [ -f /root/natssh/config/promo/promo_schedule.conf ]; then
+                    while IFS='|' read -r _ps _pst _pd _piv _pen _pjd; do
+                        [ -z "$_ps" ] && continue
+                        if [ -f /root/natssh/config/promo/promo_targets_${_ps}.conf ] && [ -s /root/natssh/config/promo/promo_targets_${_ps}.conf ]; then
+                            [ "$_has_target" -eq 0 ] && echo -e "${YELLOW}Target Akun (per slot):${NC}"
+                            _slot_has_target=0
+                            while read -r u; do
+                                u=$(echo "$u" | xargs)
+                                [ -z "$u" ] && continue
+                                [ "$_slot_has_target" -eq 0 ] && echo -e "  Slot ${CYAN}$_ps${NC}:"
+                                _slot_has_target=1
+                                _has_target=1
+                                echo -e "    - ${CYAN}$u${NC}"
+                            done < /root/natssh/config/promo/promo_targets_${_ps}.conf
+                        fi
+                    done < /root/natssh/config/promo/promo_schedule.conf
+                fi
+                # Global target
                 if [ -f /root/natssh/config/promo/promo_targets.conf ] && [ -s /root/natssh/config/promo/promo_targets.conf ]; then
-                    echo -e "${YELLOW}Target Akun:${NC}"
+                    [ "$_has_target" -eq 0 ] && echo -e "${YELLOW}Target Akun:${NC}"
                     i=1
                     while read -r u; do
                         u=$(echo "$u" | xargs)
                         [ -z "$u" ] && continue
+                        [ "$_has_target" -eq 0 ] && echo -e "  Default:"
+                        _has_target=1
                         echo -e "  $i. ${CYAN}$u${NC}"
                         i=$((i+1))
                     done < /root/natssh/config/promo/promo_targets.conf
-                else
-                    echo -e "  ${YELLOW}(tidak ada target)${NC}"
                 fi
+                [ "$_has_target" -eq 0 ] && echo -e "  ${YELLOW}(tidak ada target)${NC}"
                 echo ""
                 # Backup
                 if [ -f /root/natssh/banners/.default_backup ]; then
