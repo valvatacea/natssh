@@ -625,7 +625,6 @@ backup_ekspor() {
     echo -e "File cadangan tersimpan di: ${CYAN}$backup_file${NC} (mode 700)"
     echo -e "Cara Pakai: pindahkan ke VPS baru lalu jalankan ${CYAN}$backup_file${NC}"
     echo -e "${YELLOW}Catatan: Akun yang sudah ada di VPS tujuan tidak akan ditimpa.${NC}"
-    pause
 }
 
 backup_config() {
@@ -655,7 +654,6 @@ backup_config() {
     else
         echo -e "${RED}Gagal! Backup konfigurasi gagal.${NC}"
     fi
-    pause
 }
 
 restore_akun() {
@@ -705,7 +703,6 @@ restore_akun() {
     else
         echo -e "${RED}Gagal! Beberapa akun mungkin tidak terbuat.${NC}"
     fi
-    pause
 }
 
 restore_config() {
@@ -767,7 +764,6 @@ restore_config() {
         rm -rf "$tmpdir"
         echo -e "${RED}Gagal! Gagal mengekstrak file backup.${NC}"
     fi
-    pause
 }
 
 conf_autobackup() {
@@ -796,7 +792,6 @@ conf_autobackup() {
         0) return ;;
         *) echo -e "${RED}Tidak valid${NC}" ;;
     esac
-    pause
 }
 
 menu_backup() {
@@ -823,7 +818,7 @@ menu_backup() {
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && [ "$p" != "5" ] && pause
+        [ "$p" != "0" ] && pause
     done
 }
 conf_maxlogin() {
