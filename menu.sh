@@ -12,6 +12,9 @@ YELLOW='\u001b[0;33m'
 CYAN='\u001b[0;36m'
 NC='\u001b[0m'
 
+# Direktori natssh (portabel jika dipindah)
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 port_ws() {
     # port WebSocket running — ss menampilkan nama proses "python3", bukan ws.py,
     # maka cocokkan via PID: hasil kosong = service tak berjalan
@@ -46,11 +49,11 @@ akun_baru() {
             # Detail siap-salin untuk dikirim ke pelanggan
             # host.conf  = domain Cloudflare (recommended) / IP utk koneksi langsung
             # port.conf  = port Cloudflare yg dipakai klien (default 2086); asal via Origin Rule ke port NAT
-            ipaddr=$(cat /root/natssh/config/ip.conf 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
+            ipaddr=$(cat "${DIR}/config/ip.conf" 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
             ipaddr=${ipaddr:-$(hostname -I | awk '{print $1}')}
-            host=$(cat /root/natssh/config/host.conf 2>/dev/null)
+            host=$(cat "${DIR}/config/host.conf" 2>/dev/null)
             wsport=$(port_ws)
-            cfport=$(cat /root/natssh/config/port.conf 2>/dev/null)
+            cfport=$(cat "${DIR}/config/port.conf" 2>/dev/null)
             cfport=${cfport:-2086}
             maxlog=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
             echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC}"
@@ -61,9 +64,9 @@ akun_baru() {
             if [ "$host" != "$ipaddr" ]; then
                 echo "Domain    : $host"
             fi
-            local hostcf=$(cat /root/natssh/config/host_cf.conf 2>/dev/null)
+            local hostcf=$(cat "${DIR}/config/host_cf.conf" 2>/dev/null)
             [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
-            if [ "$(cat /root/natssh/config/hide_ip.conf 2>/dev/null)" != "1" ]; then
+            if [ "$(cat "${DIR}/config/hide_ip.conf" 2>/dev/null)" != "1" ]; then
                 echo "IP        : $ipaddr"
             fi
             echo "Port WS   : $cfport (via Cloudflare)"
@@ -132,33 +135,33 @@ do_hapus() {
         fi
         if [ $rc -eq 0 ]; then
             # Hapus batas per akun
-            rm -f /root/natssh/limits/"$user"
+            rm -f "${DIR}/limits/$user"
 
             # Bersihkan log akun: autokill.log
             # Hapus baris HAPUS manual: username atau HAPUS konfirmasi langsung: username
-            if [ -f /root/natssh/logs/autokill.log ]; then
+            if [ -f "${DIR}/logs/autokill.log" ]; then
                 temp=$(mktemp)
-                grep -v -E "HAPUS (manual|konfirmasi langsung): $user" /root/natssh/logs/autokill.log > "$temp" 2>/dev/null || true
-                mv "$temp" /root/natssh/logs/autokill.log
+                grep -v -E "HAPUS (manual|konfirmasi langsung): $user" "${DIR}/logs/autokill.log" > "$temp" 2>/dev/null || true
+                mv "$temp" "${DIR}/logs/autokill.log"
             fi
 
             # Bersihkan log akun: audit_sess.log
             # Hapus baris yang mengandung user=username
-            if [ -f /root/natssh/logs/audit_sess.log ]; then
+            if [ -f "${DIR}/logs/audit_sess.log" ]; then
                 temp=$(mktemp)
-                grep -v -E "user=$user[[:space:]]" /root/natssh/logs/audit_sess.log > "$temp" 2>/dev/null || true
-                mv "$temp" /root/natssh/logs/audit_sess.log
+                grep -v -E "user=$user[[:space:]]" "${DIR}/logs/audit_sess.log" > "$temp" 2>/dev/null || true
+                mv "$temp" "${DIR}/logs/audit_sess.log"
             fi
 
             # Bersihkan suspended_history.log entries untuk user ini
             # Hapus baris SUSPEND: username atau UNSUSPEND: username
-            if [ -f /root/natssh/logs/suspended_history.log ]; then
+            if [ -f "${DIR}/logs/suspended_history.log" ]; then
                 temp=$(mktemp)
-                grep -v -E "SUSPEND: $user|UNSUSPEND: $user" /root/natssh/logs/suspended_history.log > "$temp" 2>/dev/null || true
-                mv "$temp" /root/natssh/logs/suspended_history.log
+                grep -v -E "SUSPEND: $user|UNSUSPEND: $user" "${DIR}/logs/suspended_history.log" > "$temp" 2>/dev/null || true
+                mv "$temp" "${DIR}/logs/suspended_history.log"
                 # Hapus file jika kosong
-                if [ ! -s /root/natssh/logs/suspended_history.log ]; then
-                    rm -f /root/natssh/logs/suspended_history.log
+                if [ ! -s "${DIR}/logs/suspended_history.log" ]; then
+                    rm -f "${DIR}/logs/suspended_history.log"
                 fi
             fi
 
@@ -200,6 +203,11 @@ pilih_akun() {
             return 1
         fi
     else
+        # Validasi format username: alfanumerik, underscore, strip, 1-32 char
+        if ! [[ "$pilih" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$ ]]; then
+            echo -e "${RED}Gagal: format username tidak valid!${NC}"
+            return 1
+        fi
         AKUN="$pilih"
     fi
     if ! id "$AKUN" &>/dev/null; then
@@ -364,7 +372,21 @@ akun_autoclean() {
                 done
                 userdel -r "$user" 2>/dev/null || true
                 echo -e "Menghapus akun ${RED}$user${NC} (Kedaluwarsa: $exp_date)"
-                echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO-CLEAN hapus $user (kedaluwarsa: $exp_date)" >> /root/natssh/logs/autokill.log
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - AUTO-CLEAN hapus $user (kedaluwarsa: $exp_date)" >> "${DIR}/logs/autokill.log"
+                # Bersihkan riwayat live + sesi dari audit_sess.log dan suspended_history.log
+                if [ -f "${DIR}/logs/audit_sess.log" ]; then
+                    temp=$(mktemp)
+                    grep -v -E "user=$user[[:space:]]" "${DIR}/logs/audit_sess.log" > "$temp" 2>/dev/null || true
+                    mv "$temp" "${DIR}/logs/audit_sess.log"
+                fi
+                if [ -f "${DIR}/logs/suspended_history.log" ]; then
+                    temp=$(mktemp)
+                    grep -v -E "SUSPEND: $user|UNSUSPEND: $user" "${DIR}/logs/suspended_history.log" > "$temp" 2>/dev/null || true
+                    mv "$temp" "${DIR}/logs/suspended_history.log"
+                    if [ ! -s "${DIR}/logs/suspended_history.log" ]; then
+                        rm -f "${DIR}/logs/suspended_history.log"
+                    fi
+                fi
                 ((count++))
             fi
         fi
@@ -381,6 +403,12 @@ akun_ganti_password() {
     fi
     read -s -p "Password baru (0 = batal): " pass; echo ""
     [ "$pass" == "0" ] && return
+    read -s -p "Ulangi password baru (0 = batal): " pass2; echo ""
+    [ "$pass2" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if [ "$pass" != "$pass2" ]; then
+        echo -e "${RED}Password tidak cocok.${NC}"
+        return
+    fi
     if [ ${#pass} -lt 6 ]; then
         echo -e "${RED}Password minimal 6 karakter.${NC}"
         return
