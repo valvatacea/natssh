@@ -1173,47 +1173,39 @@ conf_speed() {
 }
 
 conf_restart_schedule() {
-    echo -e "${YELLOW}--- JADWAL RESTART OTOMATIS (WS + UDPGW + STUNNEL4) ---${NC}"
+    echo -e "${YELLOW}--- JADWAL RESTART OTOMATIS PER-LAYANAN ---${NC}"
     echo ""
-    if crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
-        echo -e "${GREEN}Jadwal saat ini:${NC}"
-        crontab -l | grep "systemctl.*restart.*natssh-ws"
+    echo "Pilih layanan untuk diatur:"
+    echo "1. natssh-ws (WebSocket)"
+    echo "2. natssh-udpgw (UDP Gateway)"
+    echo "3. stunnel4 (TLS Wrapper)"
+    echo -e "${RED}0. Batal${NC}"
+    read -p "Pilih (0-3): " p
+    case $p in
+        1) toggle_service_cron "natssh-ws" "/usr/bin/systemctl restart natssh-ws" "WebSocket" ;;
+        2) toggle_service_cron "natssh-udpgw" "/usr/bin/systemctl restart 'natssh-udpgw@*'" "UDP Gateway" ;;
+        3) toggle_service_cron "stunnel4" "/usr/bin/systemctl restart stunnel4" "Stunnel TLS" ;;
+        0) echo -e "${YELLOW}Dibatalkan.${NC}";;
+        *) echo -e "${RED}Pilihan tidak valid!${NC}";;
+    esac
+}
+
+toggle_service_cron() {
+    local svc_name="$1"
+    local restart_cmd="$2"
+    local svc_label="$3"
+
+    if crontab -l 2>/dev/null | grep -q "systemctl.*restart.*${svc_name}"; then
+        echo -e "${YELLOW}${svc_label} sudah aktif di jadwal restart:${NC}"
+        crontab -l | grep "systemctl.*restart.*${svc_name}"
         echo ""
-        read -p "Hapus dan buat ulang jadwal dengan stunnel4? (y/N): " h
+        read -p "Hapus jadwal restart ${svc_label}? (y/N): " h
         if [[ "$h" =~ ^[Yy]$ ]]; then
-            # Hapus hanya baris restart natssh-ws (satu per satu, aman)
-            (crontab -l 2>/dev/null | grep -v "systemctl.*restart.*natssh-ws") | crontab -
-            echo -e "${GREEN}Jadwal lama dihapus.${NC}"
-            echo ""
-            echo "Pilih jadwal baru:"
-            echo "1. Setiap jam"
-            echo "2. Setiap 6 jam"
-            echo "3. Setiap 12 jam"
-            echo "4. Setiap hari jam 04:00"
-            echo "5. Custom"
-            echo -e "${RED}0. Batal${NC}"
-            read -p "Pilih (0-5): " p
-            case $p in
-                1) (crontab -l 2>/dev/null; echo "0 * * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*'; /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal baru: setiap jam (WS + UDPGW + STUNNEL4).${NC}";;
-                2) (crontab -l 2>/dev/null; echo "0 */6 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*'; /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal baru: setiap 6 jam (WS + UDPGW + STUNNEL4).${NC}";;
-                3) (crontab -l 2>/dev/null; echo "0 */12 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*'; /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal baru: setiap 12 jam (WS + UDPGW + STUNNEL4).${NC}";;
-                4) (crontab -l 2>/dev/null; echo "0 4 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*'; /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal baru: setiap hari jam 04:00 (WS + UDPGW + STUNNEL4).${NC}";;
-                5)
-                    read -p "Masukkan cron (contoh: 0 4 * * *): " cron
-                    read -p "Lanjut? (y/N): " y
-                    if [[ "$y" =~ ^[Yy]$ ]] && [ -n "$cron" ]; then
-                        (crontab -l 2>/dev/null; echo "$cron /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*'; /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab -
-                        echo -e "${GREEN}Jadwal custom baru tersimpan.${NC}"
-                    else
-                        echo -e "${YELLOW}Dibatalkan.${NC}"
-                    fi
-                    ;;
-                0) echo -e "${YELLOW}Dibatalkan.${NC}";;
-                *) echo -e "${RED}Pilihan tidak valid!${NC}";;
-            esac
+            (crontab -l 2>/dev/null | grep -v "systemctl.*restart.*${svc_name}") | crontab -
+            echo -e "${GREEN}Jadwal restart ${svc_label} dihapus.${NC}"
         fi
     else
-        echo -e "${YELLOW}Belum ada jadwal restart otomatis (WS + UDPGW + STUNNEL4).${NC}"
+        echo -e "${YELLOW}${svc_label} belum ada jadwal restart.${NC}"
         echo ""
         echo "Pilih jadwal:"
         echo "1. Setiap jam"
@@ -1222,18 +1214,18 @@ conf_restart_schedule() {
         echo "4. Setiap hari jam 04:00"
         echo "5. Custom"
         echo -e "${RED}0. Batal${NC}"
-        read -p "Pilih (0-5): " p
-        case $p in
-            1) (crontab -l 2>/dev/null; echo "0 * * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*'; /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap jam (WS + UDPGW + STUNNEL4).${NC}";;
-            2) (crontab -l 2>/dev/null; echo "0 */6 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*'; /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap 6 jam (WS + UDPGW + STUNNEL4).${NC}";;
-            3) (crontab -l 2>/dev/null; echo "0 */12 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*'; /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap 12 jam (WS + UDPGW + STUNNEL4).${NC}";;
-            4) (crontab -l 2>/dev/null; echo "0 4 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*'; /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal set: setiap hari jam 04:00 (WS + UDPGW + STUNNEL4).${NC}";;
+        read -p "Pilih (0-5): " sp
+        case $sp in
+            1) (crontab -l 2>/dev/null; echo "0 * * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap jam.${NC}";;
+            2) (crontab -l 2>/dev/null; echo "0 */6 * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap 6 jam.${NC}";;
+            3) (crontab -l 2>/dev/null; echo "0 */12 * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap 12 jam.${NC}";;
+            4) (crontab -l 2>/dev/null; echo "0 4 * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap hari jam 04:00.${NC}";;
             5)
                 read -p "Masukkan cron (contoh: 0 4 * * *): " cron
                 read -p "Lanjut? (y/N): " y
                 if [[ "$y" =~ ^[Yy]$ ]] && [ -n "$cron" ]; then
-                    (crontab -l 2>/dev/null; echo "$cron /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*'; /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab -
-                    echo -e "${GREEN}Jadwal custom tersimpan.${NC}"
+                    (crontab -l 2>/dev/null; echo "${cron} ${restart_cmd} >/dev/null 2>&1") | crontab -
+                    echo -e "${GREEN}${svc_label}: jadwal custom tersimpan.${NC}"
                 else
                     echo -e "${YELLOW}Dibatalkan.${NC}"
                 fi
