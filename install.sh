@@ -179,8 +179,12 @@ if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
     echo -e "${GREEN}Cronjob auto-restart natssh-ws berhasil ditambahkan (jam 04:00).${NC}"
 fi
 
-echo -e "
-[*] Mengatur Banner Pesan SSH..."
+echo -e ""
+echo -e "[*] Backup sshd_config untuk rollback..."
+cp /etc/ssh/sshd_config /etc/ssh/sshd_config.natssh_backup
+
+echo -e ""
+echo -e "[*] Mengatur Banner Pesan SSH..."
 cat > /etc/issue.net <<EOF
 <br>
 <center>
@@ -229,6 +233,61 @@ else
 fi
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+
+echo -e ""
+echo -e "[*] Mengaktifkan SSH Enhanced (TCP forwarding, tunnel, keep-alive, kapasitas)..."
+
+# SSH ENHANCED: PermitTunnel yes
+if grep -qE "^[#[:space:]]*PermitTunnel" /etc/ssh/sshd_config; then
+    sed -i 's/^[#[:space:]]*PermitTunnel.*/PermitTunnel yes/' /etc/ssh/sshd_config
+else
+    echo "PermitTunnel yes" >> /etc/ssh/sshd_config
+fi
+
+# SSH ENHANCED: GatewayPorts no
+if grep -qE "^[#[:space:]]*GatewayPorts" /etc/ssh/sshd_config; then
+    sed -i 's/^[#[:space:]]*GatewayPorts.*/GatewayPorts no/' /etc/ssh/sshd_config
+else
+    echo "GatewayPorts no" >> /etc/ssh/sshd_config
+fi
+
+# SSH ENHANCED: TCPKeepAlive yes
+if grep -qE "^[#[:space:]]*TCPKeepAlive" /etc/ssh/sshd_config; then
+    sed -i 's/^[#[:space:]]*TCPKeepAlive.*/TCPKeepAlive yes/' /etc/ssh/sshd_config
+else
+    echo "TCPKeepAlive yes" >> /etc/ssh/sshd_config
+fi
+
+# SSH ENHANCED: MaxSessions 100
+if grep -qE "^[#[:space:]]*MaxSessions" /etc/ssh/sshd_config; then
+    sed -i 's/^[#[:space:]]*MaxSessions.*/MaxSessions 100/' /etc/ssh/sshd_config
+else
+    echo "MaxSessions 100" >> /etc/ssh/sshd_config
+fi
+
+# SSH ENHANCED: MaxStartups 100:30:200
+if grep -qE "^[#[:space:]]*MaxStartups" /etc/ssh/sshd_config; then
+    sed -i 's/^[#[:space:]]*MaxStartups.*/MaxStartups 100:30:200/' /etc/ssh/sshd_config
+else
+    echo "MaxStartups 100:30:200" >> /etc/ssh/sshd_config
+fi
+
+# SSH ENHANCED: UseDNS no
+if grep -qE "^[#[:space:]]*UseDNS" /etc/ssh/sshd_config; then
+    sed -i 's/^[#[:space:]]*UseDNS.*/UseDNS no/' /etc/ssh/sshd_config
+else
+    echo "UseDNS no" >> /etc/ssh/sshd_config
+fi
+
+# SSH ENHANCED: Compression no
+if grep -qE "^[#[:space:]]*Compression" /etc/ssh/sshd_config; then
+    sed -i 's/^[#[:space:]]*Compression.*/Compression no/' /etc/ssh/sshd_config
+else
+    echo "Compression no" >> /etc/ssh/sshd_config
+fi
+
+systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+echo -e "${GREEN}SSH Enhanced diaktifkan.${NC}"
 
 echo -e ""
 echo -e "[*] Membuat perintah pintas 'natssh'..."

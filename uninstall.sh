@@ -51,18 +51,42 @@ echo -e "\n[*] Menghapus Cronjob Autokill..."
 (crontab -l 2>/dev/null | grep -v "autokill.sh") | crontab -
 echo -e "${GREEN}Cronjob berhasil dihapus.${NC}"
 
-echo -e "[*] Menonaktifkan Banner SSH..."
-if grep -qE "^\s*Banner" /etc/ssh/sshd_config; then
-    sed -i "/^\s*Banner/d" /etc/ssh/sshd_config
+echo -e ""
+echo -e "[*] Merestore sshd_config dari backup (rollback)..."
+if [ -f /etc/ssh/sshd_config.natssh_backup ]; then
+    cp /etc/ssh/sshd_config.natssh_backup /etc/ssh/sshd_config
+    rm -f /etc/ssh/sshd_config.natssh_backup
     systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-fi
-echo -e "${GREEN}Banner SSH dinonaktifkan.${NC}"
+    echo -e "${GREEN}sshd_config dikembalikan ke kondisi awal (rollback).${NC}"
+else
+    echo -e "[*] Tidak ada backup sshd_config. Membersihkan baris natssh secara manual..."
 
-echo -e "[*] Menonaktifkan Keepalive SSH..."
-sed -i "/^[#[:space:]]*ClientAliveInterval/d" /etc/ssh/sshd_config
-sed -i "/^[#[:space:]]*ClientAliveCountMax/d" /etc/ssh/sshd_config
-systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-echo -e "${GREEN}Keepalive SSH dinonaktifkan.${NC}"
+    echo -e "[*] Menonaktifkan Banner SSH..."
+    if grep -qE "^\s*Banner" /etc/ssh/sshd_config; then
+        sed -i "/^\s*Banner/d" /etc/ssh/sshd_config
+        systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    fi
+    echo -e "${GREEN}Banner SSH dinonaktifkan.${NC}"
+
+    echo -e "[*] Menonaktifkan Keepalive SSH..."
+    sed -i "/^[#[:space:]]*ClientAliveInterval/d" /etc/ssh/sshd_config
+    sed -i "/^[#[:space:]]*ClientAliveCountMax/d" /etc/ssh/sshd_config
+    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    echo -e "${GREEN}Keepalive SSH dinonaktifkan.${NC}"
+
+    echo -e ""
+    echo -e "[*] Menonaktifkan SSH Enhanced..."
+    sed -i "/^[#[:space:]]*PermitTunnel/d" /etc/ssh/sshd_config
+    sed -i "/^[#[:space:]]*GatewayPorts/d" /etc/ssh/sshd_config
+    sed -i "/^[#[:space:]]*TCPKeepAlive/d" /etc/ssh/sshd_config
+    sed -i "/^[#[:space:]]*MaxSessions/d" /etc/ssh/sshd_config
+    sed -i "/^[#[:space:]]*MaxStartups/d" /etc/ssh/sshd_config
+    sed -i "/^[#[:space:]]*UseDNS/d" /etc/ssh/sshd_config
+    sed -i "/^[#[:space:]]*Compression/d" /etc/ssh/sshd_config
+    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    echo -e "${GREEN}SSH Enhanced dinonaktifkan.${NC}"
+fi
+
 
 rm -f /usr/local/bin/natssh
 echo -e "${GREEN}Perintah 'natssh' dihapus.${NC}"
