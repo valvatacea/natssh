@@ -209,17 +209,8 @@ for user, ep in [(u, int(e)) for u, e in raw]:
         line = (f"   {wt} {C_WHITE}{best['ip']:<16}\033[0m"
                 f"{durasi:>7} {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193 {status}{jalur}{geo}")
         extra_ua = best.get('ua') or '-'
-    else:
-        ip = ua = None
-        bd = 99
-        for t, rip, rua in logconns:
-            dsec = ep - t
-            if -2 <= dsec <= 10 and abs(dsec) < bd:
-                bd = abs(dsec)
-                ip, ua = rip, rua
-        line = (f"   {wt}  {C_WHITE}{(ip or '?-'):<15}\033[0m {(ua or '(tanpa UA)')[:18]:<18}"
-                f"  {C_DIM}(sesi basi/pra-patch: koneksi sudah lepas){C_RESET}")
-        extra_ua = ua or '(tanpa UA)'
+    if not best:
+        continue
     print(line)
     print(f"              {C_DIM}UA: {extra_ua}{C_RESET}")
 
