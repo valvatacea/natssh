@@ -39,6 +39,14 @@ done
 rm -f /etc/systemd/system/natssh-udpgw@.service
 systemctl daemon-reload
 
+echo -e "\n[*] Menghentikan dan menghapus Service stunnel4..."
+systemctl stop stunnel4.service 2>/dev/null
+systemctl disable stunnel4.service 2>/dev/null
+rm -f /etc/systemd/system/stunnel4.service
+systemctl daemon-reload
+rm -f /etc/stunnel/natssh.crt /etc/stunnel/natssh.key
+echo -e "${GREEN}Service stunnel4 berhasil dihapus.${NC}"
+
 (crontab -l 2>/dev/null | grep -v "unsuspend.sh") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "autobackup.sh") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "apply_speed.sh") | crontab - 2>/dev/null

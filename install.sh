@@ -133,6 +133,61 @@ for pp in $udpgw_ports; do
 done
 echo -e "${GREEN}Service natssh-udpgw aktif di: ${udpgw_ports} (localhost only).${NC}"
 
+# ===== Stunnel (TLS wrapper untuk WebSocket) =====
+echo -e "\n[*] Menginstal stunnel4 (TLS wrapper)..."
+apt-get install -y stunnel4 >/dev/null 2>&1
+
+# Input port stunnel dari user (seperti input port WebSocket)
+read -p "Masukkan Port Stunnel TLS (default: 20866): " stunnel_port
+stunnel_port=${stunnel_port:-20866}
+if ! [[ "$stunnel_port" =~ ^[0-9]+$ ]] || [ "$stunnel_port" -lt 1 ] || [ "$stunnel_port" -gt 65535 ]; then
+    echo "Port stunnel tidak valid!"; exit 1
+fi
+
+# Buat direktori dan sertifikat self-signed untuk stunnel
+echo -e "\n[*] Membuat sertifikat self-signed untuk stunnel..."
+mkdir -p /etc/stunnel
+openssl req -x509 -newkey rsa:2048 -keyout /etc/stunnel/natssh.key -out /etc/stunnel/natssh.crt -days 3650 -nodes \
+    -subj "/CN=natssh-vps/O=NATSSH/C=ID" >/dev/null 2>&1
+chmod 600 /etc/stunnel/natssh.key
+chmod 644 /etc/stunnel/natssh.crt
+
+# Buat konfigurasi stunnel
+cat > /etc/stunnel/stunnel.conf <<EOF
+cert = /etc/stunnel/natssh.crt
+key = /etc/stunnel/natssh.key
+sslVersion = TLSv1.2
+options = NO_SSLv2
+options = NO_SSLv3
+
+[natssh-stunnel]
+accept = 0.0.0.0:${stunnel_port}
+connect = 127.0.0.1:${ws_port}
+client = no
+EOF
+
+# Buat service systemd stunnel4
+cat > /etc/systemd/system/stunnel4.service <<EOF
+[Unit]
+Description=Stunnel 4.x (TLS tunnel for network daemons)
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/stunnel4 /etc/stunnel/stunnel.conf
+Restart=always
+RestartSec=5
+TimeoutSec=5min
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable stunnel4
+systemctl start stunnel4
+echo -e "${GREEN}Service stunnel4 berhasil dibuat dan dijalankan di port ${stunnel_port}!${NC}"
+
 
 echo -e "\\n[*] Cronjob apply speed digabung dengan restart (lihat bawah)..."
 
@@ -307,3 +362,4 @@ echo -e "2. Untuk mengecek status WebSocket: ${YELLOW}systemctl status natssh-ws
 echo -e "3. Port WebSocket Anda saat ini: ${YELLOW}${ws_port}${NC}"
 echo -e "4. Batas perangkat per akun (autokill): ${YELLOW}${max_login}${NC}"
 echo -e "5. badvpn-udpgw (localhost only): ${YELLOW}${udpgw_ports}${NC}"
+echo -e "6. Stunnel TLS (port publik): ${YELLOW}${stunnel_port}${NC} -> 127.0.0.1:${ws_port}"
