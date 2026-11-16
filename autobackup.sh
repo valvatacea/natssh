@@ -3,9 +3,11 @@
 # Semua timestamp log autobackup pakai WIB (GMT+7)
 export TZ=Asia/Jakarta
 DIR="/root/natssh"
+BACKUP_DIR="/root/natssh_backup"
+mkdir -p "$BACKUP_DIR"
 
-# --- Backup konfigurasi (nama statis) ---
-OUT_CFG="/root/natssh_config.tar.gz"
+ts=$(date +%Y%m%d_%H%M%S)
+OUT_CFG="$BACKUP_DIR/config_$ts.tar.gz"
 LIST=""
 [ -f "$DIR/ip.conf" ] && LIST="$LIST ip.conf"
 [ -f "$DIR/host.conf" ] && LIST="$LIST host.conf"
@@ -19,7 +21,7 @@ LIST=""
 cd "$DIR" && tar -czf "$OUT_CFG" $LIST >/dev/null 2>&1
 
 # --- Backup akun (portable) ---
-BACKUP_FILE="/root/backup_akun_ssh.sh"
+BACKUP_FILE="$BACKUP_DIR/akun_$ts.sh"
 {
   echo "#!/bin/bash"
   echo "# Auto-backup akun NATSSH - $(date)"
