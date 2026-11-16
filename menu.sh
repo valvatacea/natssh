@@ -1203,6 +1203,8 @@ toggle_service_cron() {
         if [[ "$h" =~ ^[Yy]$ ]]; then
             (crontab -l 2>/dev/null | grep -v "systemctl.*restart.*${svc_name}") | crontab -
             echo -e "${GREEN}Jadwal restart ${svc_label} dihapus.${NC}"
+        else
+            echo -e "${YELLOW}Jadwal restart ${svc_label} tetap aktif.${NC}"
         fi
     else
         echo -e "${YELLOW}${svc_label} belum ada jadwal restart.${NC}"
