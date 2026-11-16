@@ -1615,6 +1615,69 @@ conf_heartbeat() {
     pause
 }
 
+conf_stunnel_port() {
+    conf_file="/etc/stunnel/stunnel.conf"
+    if [ ! -f "$conf_file" ]; then
+        echo -e "${RED}Gagal: $conf_file tidak ditemukan.${NC}"
+        pause
+        return
+    fi
+    cur=$(grep -E '^accept =' "$conf_file" | head -1 | sed 's/.*:\([0-9]*\)/\1/')
+    echo -e "Port stunnel saat ini: ${YELLOW}${cur:-tidak diketahui}${NC}"
+    echo -e "${YELLOW}Ketik 0 atau kosong untuk batal.${NC}"
+    read -p "Port stunnel baru: " new_port
+    if [ -z "$new_port" ] || [ "$new_port" = "0" ]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
+    fi
+    if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
+        echo -e "${RED}Gagal: port harus angka 1-65535!${NC}"
+        pause
+        return
+    fi
+    if ss -tln | grep -q ":$new_port "; then
+        echo -e "${RED}Gagal: port $new_port sedang dipakai proses lain!${NC}"
+        pause
+        return
+    fi
+    echo -e "${YELLOW}Restart stunnel4 — koneksi aktif terputus 2-3 detik...${NC}"
+    read -p "Yakin restart stunnel? Koneksi aktif akan terputus (y/N): " cfr
+    if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
+    fi
+    sed -i "s/^accept = .*/accept = 0.0.0.0:$new_port/" "$conf_file"
+    systemctl restart stunnel4
+    sleep 1
+    systemctl is-active --quiet stunnel4 && \
+        echo -e "${GREEN}SUKSES! Stunnel kini listen di port $new_port.${NC}" || \
+        echo -e "${RED}Service gagal start! Cek: journalctl -u stunnel4 -n 20${NC}"
+    pause
+}
+
+conf_port_submenu() {
+    while true; do
+        clear
+        garis
+        echo -e "${YELLOW}   UBAH PORT LAYANAN${NC}"
+        garis
+        printf "  %-3s %-46s\n" "1." "Ubah Port WebSocket (natssh-ws)"
+        printf "  %-3s %-46s\n" "2." "Ubah Port Stunnel (TLS)"
+        printf "  %-3s %-46s\n" "3." "badvpn-udpgw (UDP Gateway)"
+        echo -e "${RED}  0.  Kembali${NC}"
+        read -p "Pilih (0-3): " p || exit 0
+        case $p in
+            1) conf_port ;;
+            2) conf_stunnel_port ;;
+            3) conf_udpgw ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+        esac
+    done
+}
+
 menu_conf() {
     while true; do
         clear
@@ -1622,7 +1685,7 @@ menu_conf() {
         echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
         garis
         echo -e "${CYAN}  -- Port --${NC}"
-        printf "  %-3s %-46s\n" "1." "Ubah Port WebSocket"
+        printf "  %-3s %-46s\n" "1." "Ubah Port Layanan (WebSocket, Stunnel, UDPGW)"
         printf "  %-3s %-46s\n" "2." "Ubah Domain/Host di Kartu Akun"
         printf "  %-3s %-46s\n" "3." "Hide IP"
         echo -e "${CYAN}  -- Batas --${NC}"
@@ -1631,33 +1694,31 @@ menu_conf() {
         printf "  %-3s %-46s\n" "6." "Atur Limit Speed per CDN (CF/CFront)"
         echo -e "${CYAN}  -- Layanan --${NC}"
         printf "  %-3s %-46s\n" "7." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
-        printf "  %-3s %-46s\n" "8." "badvpn-udpgw (UDP Gateway)"
-        printf "  %-3s %-46s\n" "9." "Atur Jadwal Restart Otomatis (WS + UDPGW)"
-        printf "  %-3s %-46s\n" "10." "Atur Jadwal Reboot"
+        printf "  %-3s %-46s\n" "8." "Atur Jadwal Restart Otomatis (WS + UDPGW)"
+        printf "  %-3s %-46s\n" "9." "Atur Jadwal Reboot"
         echo -e "${CYAN}  -- Lainnya --${NC}"
-        printf "  %-3s %-46s\n" "11." "Ubah Banner Pelanggan"
-        printf "  %-3s %-46s\n" "12." "Ubah Durasi Suspend (menit)"
-        printf "  %-3s %-46s\n" "13." "Test Ping (Cek Koneksi Internet)"
+        printf "  %-3s %-46s\n" "10." "Ubah Banner Pelanggan"
+        printf "  %-3s %-46s\n" "11." "Ubah Durasi Suspend (menit)"
+        printf "  %-3s %-46s\n" "12." "Test Ping (Cek Koneksi Internet)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-13): " p || exit 0
+        read -p "Pilih (0-12): " p || exit 0
         case $p in
-            1) conf_port ;;
+            1) conf_port_submenu ;;
             2) conf_domain ;;
             3) conf_hide_ip ;;
             4) conf_maxlogin ;;
             5) conf_maxtotal ;;
             6) conf_speed ;;
             7) conf_service ;;
-            8) conf_udpgw ;;
-            9) conf_restart_schedule ;;
-            10) conf_reboot_schedule ;;
-            11) conf_banner ;;
-            12) conf_suspend_minutes ;;
-            13) conf_test_ping ;;
+            8) conf_restart_schedule ;;
+            9) conf_reboot_schedule ;;
+            10) conf_banner ;;
+            11) conf_suspend_minutes ;;
+            12) conf_test_ping ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && [ "$p" != "4" ] && [ "$p" != "6" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && pause
+        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "4" ] && [ "$p" != "6" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && pause
     done
 }
 

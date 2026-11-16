@@ -274,7 +274,7 @@ def _watchdog():
 def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind(("0.0.0.0", WS_PORT))
+    server.bind(("127.0.0.1", WS_PORT))
     server.listen(64)
     _log(f"mulai: ws={WS_PORT} -> ssh lokal {SSH_PORT}, limit {MAX_PER_IP}/ip, {MAX_TOTAL} total")
     t_wd = threading.Thread(target=_watchdog, daemon=True)
