@@ -1175,6 +1175,16 @@ conf_speed() {
 conf_restart_schedule() {
     echo -e "${YELLOW}--- JADWAL RESTART OTOMATIS PER-LAYANAN ---${NC}"
     echo ""
+    # Tampilkan daftar cron restart aktif per layanan
+    for svc in natssh-ws natssh-udpgw stunnel4; do
+        line=$(crontab -l 2>/dev/null | grep "systemctl.*restart.*${svc}" | head -1)
+        if [ -n "$line" ]; then
+            echo -e "  ${CYAN}${svc}${NC}: ${GREEN}AKTIF${NC} | ${line}"
+        else
+            echo -e "  ${CYAN}${svc}${NC}: ${RED}TIDAK ADA JADWAL${NC}"
+        fi
+    done
+    echo ""
     echo "Pilih layanan untuk diatur:"
     echo "1. natssh-ws (WebSocket)"
     echo "2. natssh-udpgw (UDP Gateway)"
@@ -1232,8 +1242,8 @@ toggle_service_cron() {
                     echo -e "${YELLOW}Dibatalkan.${NC}"
                 fi
                 ;;
-            0) echo -e "${YELLOW}Dibatalkan.${NC}";;
-            *) echo -e "${RED}Pilihan tidak valid!${NC}";;
+            0) echo -e "${YELLOW}Dibatalkan.${NC};;
+            *) echo -e "${RED}Pilihan tidak valid!${NC};;
         esac
     fi
 }
