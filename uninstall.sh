@@ -51,6 +51,7 @@ echo -e "${GREEN}Service stunnel4 berhasil dihapus.${NC}"
 (crontab -l 2>/dev/null | grep -v "autobackup.sh") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "apply_speed.sh") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "systemctl.*restart.*natssh-ws") | crontab - 2>/dev/null
+(crontab -l 2>/dev/null | grep -v "systemctl.*restart.*stunnel4") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "sess_audit") | crontab - 2>/dev/null
 rm -rf /root/natssh/suspended
 
