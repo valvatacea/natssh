@@ -1971,7 +1971,7 @@ promo_menu() {
         printf "  %-3s %-46s\n" "3." "Ubah Jadwal Promo"
         printf "  %-3s %-46s\n" "4." "Aktifkan/Nonaktifkan Jadwal"
         printf "  %-3s %-46s\n" "5." "Status Promo"
-        printf "  %-3s %-46s\n" "7." "Hapus Jadwal Promo (restore banner)"
+        printf "  %-3s %-46s\n" "6." "Hapus Jadwal Promo (restore banner)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-6): " p || exit 0
         case $p in
