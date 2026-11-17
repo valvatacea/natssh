@@ -2,9 +2,12 @@
 
 NATSSH adalah ekosistem manajemen VPN SSH yang dirancang khusus untuk lingkungan **VPS NAT** dengan keterbatasan port. Proyek ini membungkus koneksi OpenSSH bawaan Linux ke dalam lalu lintas WebSocket (WS) agar dapat melewati proksi Cloudflare (Awan Oranye), tanpa perlu menginstal dependensi berat seperti Dropbear atau Stunnel yang sering bentrok dengan port panel Xray (misalnya 3X-UI).
 
+> 🔄 **Perubahan arsitektur terbaru:** Stunnel4 (terminator TLS lama) telah diganti oleh **Nginx Reverse Proxy**. Nginx sekarang menangani terminate TLS di port publik dan mentransfer lalu lintas plain WebSocket ke `ws.py` di localhost. Alasan: stunnel menyamakan semua klien sebagai `127.0.0.1` sehingga fitur `MAX_PER_IP` tidak berfungsi; Nginx mengirim header `X-Forwarded-For` dan `X-Forwarded-Port` sehingga IP asli klien tetap terbaca oleh `ws.py`.
+
 ## ✨ Fitur Unggulan
 
 *   **Bypass Cloudflare (`ws.py` v2):** Menjembatani port NAT eksternal ke SSH lokal (port 22) dengan **rate-limit banjir pra-autentikasi** (default 10 koneksi/IP, 30 total; env `NATSSH_MAX_PER_IP`/`NATSSH_MAX_TOTAL`) — banjir scanner dari internet ditahan sebelum menyentuh `sshd` (mencegah insiden *MaxStartups throttling* yang membuat SSH "mati"). Koneksi, penolakan, dan kegagalan dicatat di `ws.log` dengan rotasi otomatis 500KB.
+*   **TLS Termination via Nginx:** Nginx terminate TLS di port publik (port stunnel lama) dan forward plain WS ke `ws.py` di `127.0.0.1:<NATSSH_WS_PORT>`. Sertifikat TLS self-signed (10 tahun) disimpan di `/etc/nginx/ssl/natssh.{crt,key}`.
 *   **Menu Manajemen v4.0 (`menu.sh`):** Antarmuka terminal interaktif — buat akun, **browser daftar akun** (suspend/unsuspend/perpanjang/hapus di satu tempat, dengan konfirmasi + catatan audit), monitoring online/autokill/sistem, backup portabel, dan konfigurasi sistem.
 *   **Kartu Akun Siap Salin:** Setiap akun baru menampilkan blok DETAIL AKUN — Domain Cloudflare + Domain CloudFront (bila diatur), IP, Port WS, daftar port CDN, username/password, tanggal kedaluwarsa, dan limit perangkat.
 *   **Sistem Backup Portabel:** Mengekstrak seluruh akun aktif beserta kata sandi terenkripsinya menjadi satu skrip mandiri (`backup_akun_ssh.sh`, mode 700) yang siap di-*restore* di VPS mana pun.
@@ -17,15 +20,39 @@ NATSSH adalah ekosistem manajemen VPN SSH yang dirancang khusus untuk lingkungan
 *   **High Availability:** Terintegrasi penuh dengan `systemd` (Environment-aware, auto-start, auto-restart).
 *   **Instalasi Interaktif:** `install.sh` menanyakan port NAT & batas perangkat; port disetel via `Environment=` systemd (bukan edit source), unduhan tervalidasi.
 
----
+## 🏗️ Arsitektur Sistem
+
+```
+Klien (HP / PC)
+    │ HTTPS/WSS (TLS)
+    ▼
+Cloudflare (Origin Rule → Port NAT VPS)
+    │
+    ▼
+Nginx Reverse Proxy  ──┬── listen 0.0.0.0:<PORT_TLS> ssl
+                       │   ssl_certificate /etc/nginx/ssl/natssh.crt
+                       │   ssl_certificate_key /etc/nginx/ssl/natssh.key
+                       │   proxy_pass http://127.0.0.1:<PORT_BACKEND>
+                       │   X-Forwarded-For, X-Real-IP, X-Forwarded-Port
+    │ plain WS (localhost)
+    ▼
+ws.py (natssh-ws.service) ──► sshd (port 22)
+```
+
+| Komponen | Port | Catatan |
+|---|---|---|
+| Nginx (TLS publik) | Port stunnel lama (contoh: `20885` / `20975`) | Terminator TLS, forward ke backend |
+| ws.py (backend) | `127.0.0.1:<NATSSH_WS_PORT>` (contoh: `20185` / `20195`) | Plain WS, hanya bind localhost |
+| sshd | `127.0.0.1:22` | OpenSSH bawaan Linux |
+
+Port stunnel lama dan port backend ditetapkan saat instalasi melalui `install.sh` dan disimpan di `Environment=` unit systemd (`natssh-ws.service`).
 
 ## 🛠️ Prasyarat
 
 1. VPS Linux (Ubuntu/Debian) dengan akses **Root**.
 2. Minimal memiliki **1 Port NAT kosong** (untuk jalur masuk proksi Cloudflare).
 3. Domain yang sudah terhubung ke Cloudflare.
-
----
+4. Nginx akan dipasang otomatis oleh installer sebagai terminator TLS (tidak perlu stunnel).
 
 ## 📥 Panduan Instalasi (Satu Klik)
 
@@ -44,6 +71,12 @@ sudo bash install.sh
 
 **Catatan saat instalasi:** Skrip akan meminta **Port NAT kosong** (pastikan sudah di-forward oleh provider) dan **batas perangkat per akun** (default 5). Port disetel via `Environment=NATSSH_WS_PORT` di unit systemd — aman diubah kapan pun lewat menu tanpa menyentuh source.
 
+Installer juga akan:
+- Memasang Nginx sebagai reverse proxy TLS
+- Membuat sertifikat TLS self-signed di `/etc/nginx/ssl/natssh.{crt,key}`
+- Menulis konfigurasi Nginx ke `/etc/nginx/sites-available/natssh-ws`
+- Menghapus Stunnel4 bila masih terpasang (migrasi otomatis)
+
 ### Konfigurasi Cloudflare (Origin Rules)
 
 Agar koneksi bisa menembus jaringan Cloudflare:
@@ -54,7 +87,40 @@ Agar koneksi bisa menembus jaringan Cloudflare:
 4. **Action:** `Rewrite to...` isi dengan port NAT yang Anda masukkan saat instalasi tadi (Contoh: `20864`).
 5. Pastikan DNS Record `ssh.domainanda.com` berstatus **Proxied (Awan Oranye)**.
 
----
+### Konfigurasi Nginx Reverse Proxy (TLS)
+
+Contoh hasil generate installer (port disesuaikan otomatis):
+
+```nginx
+server {
+    listen 20885 ssl;
+    server_name _;
+
+    ssl_certificate /etc/nginx/ssl/natssh.crt;
+    ssl_certificate_key /etc/nginx/ssl/natssh.key;
+
+    location / {
+        proxy_pass http://127.0.0.1:20185;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+```
+
+Nginx diaktifkan melalui symlink:
+```bash
+ln -sf /etc/nginx/sites-available/natssh-ws /etc/nginx/sites-enabled/natssh-ws
+rm -f /etc/nginx/sites-enabled/default
+systemctl enable --now nginx
+```
 
 ## 🖥️ Penggunaan (Menu Manajemen)
 
@@ -95,9 +161,8 @@ Setelah terinstal, Anda dapat memanggil menu manajemen kapan saja dengan mengeti
 | `host.conf` | Domain di kartu akun | host = IP publik |
 | `ip.conf` | IP di kartu akun | auto-detect via ifconfig.me |
 | `port.conf` | Port Cloudflare di kartu akun | default 2086 |
+| `hide_ip.conf` | Toggle sembunyikan IP kartu akun | IP ditampilkan |
 | `banners/` | Slot banner tersimpan | — |
-
----
 
 ## 📱 Contoh Konfigurasi Klien (DarkTunnel / HTTP Custom)
 
@@ -111,10 +176,27 @@ Gunakan format berikut pada aplikasi VPN di ponsel pintar Anda:
 
 ```text
     GET / HTTP/1.1[crlf]Host: ssh.domainanda.com[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf][crlf]
-    
+
 ```
 
----
+## 🔍 Verifikasi Instalasi
+
+Setelah instalasi, pastikan semua layanan berjalan:
+
+```bash
+# Nginx (TLS publik)
+systemctl is-active nginx
+ss -tlnp | grep nginx
+
+# Backend ws.py
+systemctl is-active natssh-ws
+ss -tlnp | grep python3
+
+# Uji handshake WebSocket over TLS (harus balas HTTP 101)
+curl -sk -o /dev/null -w "HTTP %{http_code}\n" \
+  -H "Upgrade: websocket" -H "Connection: Upgrade" \
+  --max-time 5 https://127.0.0.1:<PORT_TLS>/
+```
 
 ## 🗑️ Cara Uninstall
 
@@ -124,8 +206,22 @@ Jika Anda ingin mencopot pemasangan NATSSH dari server Anda, cukup jalankan:
 sudo bash uninstall.sh
 ```
 
-Skrip ini akan menghentikan *service*, menghapus konfigurasi port, membersihkan penjadwalan Cronjob, dan memberikan opsi untuk menghapus direktori *source code*.
+Skrip ini akan menghentikan *service*, menghapus konfigurasi port, membersihkan penjadwalan Cronjob, dan memberikan opsi untuk menghapus direktori *source code*. Nginx dan sertifikat TLS juga akan dibersihkan.
+
+## 🔄 Migrasi Stunnel → Nginx
+
+Jika VPS Anda masih menggunakan Stunnel4 sebagai terminator TLS:
+
+1. Matikan dan hapus stunnel4: `systemctl stop stunnel4 && apt-get purge -y stunnel4 && rm -rf /etc/stunnel`
+2. Pasang Nginx dan buat sertifikat TLS baru di `/etc/nginx/ssl/`
+3. Buat konfigurasi Nginx reverse proxy (lihat contoh di atas) dengan port listen = port stunnel lama
+4. Restart Nginx dan `natssh-ws`
+5. Verifikasi dengan `curl` (harus balas HTTP 101)
+
+## 📄 Lisensi
+
+Distribusikan di bawah lisensi MIT. Lihat file `LICENSE` untuk detail.
 
 ---
 
-*Dibuat dan dioptimalkan secara khusus untuk ekosistem VPS NAT berbasis IPv4 Shared.*
+*Dibuat dan dioptimalkan secara khusus untuk ekosistem VPS NAT berbasis IPv4 Shared. Terintegrasi dengan Cloudflare sebagai proksi awalan.*
