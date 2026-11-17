@@ -2089,23 +2089,6 @@ promo_menu() {
                 [ -z "$tg" ] && { echo -e "${RED}Target tidak valid (batal)${NC}"; pause; continue; }
                 s=$(date +%s)
                 new_end=$((s + dh*86400))
-                # geser waktu jika overlap: mulai setelah promo terakhir selesai
-                if [ -f /root/natssh/config/promo/promo_schedule.conf ] && [ -s /root/natssh/config/promo/promo_schedule.conf ]; then
-                    _latest_end=0
-                    while IFS='|' read -r _os _ost _od _oiv _oen _ojd; do
-                        [ -z "$_os" ] && continue
-                        [ "$_oen" = "1" ] || continue
-                        _oend=$((_ost + _od*86400))
-                        if [ "$_oend" -gt "$_latest_end" ]; then
-                            _latest_end=$_oend
-                        fi
-                    done < /root/natssh/config/promo/promo_schedule.conf
-                    if [ "$_latest_end" -gt "$s" ]; then
-                        s=$_latest_end
-                        new_end=$((s + dh*86400))
-                        echo -e "${YELLOW}Waktu bergeser: mulai setelah promo sebelumnya selesai ($(date -d @$s '+%d/%m %H:%M')).${NC}"
-                    fi
-                fi
                 echo "${slot}|${s}|${dh}|${iv}|1|${jd_sec}|${tg}" >> /root/natssh/config/promo/promo_schedule.conf
                 echo -e "${GREEN}Target: $tg${NC}"
                 echo -e "${GREEN}Jeda sesi: ${jd_sec}s${NC}"
