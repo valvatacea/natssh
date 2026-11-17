@@ -6,6 +6,7 @@ CONNS=os.path.join(DIR,"logs","conns.json")
 STATE=os.path.join(DIR,"logs","audit_state.json")
 LOG=os.path.join(DIR,"logs","audit_sess.log")
 LOGF=os.path.join(DIR,"logs","ws.log")
+PORT_WS=os.environ.get("NATSSH_WS_PORT","20865")
 logconns=[]
 try:
     import re,datetime
@@ -49,7 +50,7 @@ for ep in eps:
                 bd=abs(dsec); ip=rip; edge=red; ua=rua
         if ip is not None:
             dur=int(now-t)
-            lines.append("SELESAI user=%s ip=%s edge=%s cc=- city=- dur=%dm%02ds up=- down=- ua=%s" % (user,ip,edge,dur//60,dur%60,ua or "-"))
+            lines.append("SELESAI user=%s ip=%s edge=%s cc=- city=- dur=%dm%02ds up=- down=- ua=%s cdn=- port_ws=%s alasan=autokill" % (user,ip,edge,dur//60,dur%60,ua or "-",PORT_WS))
         continue
     best["_used"]=True
     key=str(best["start"])
@@ -60,10 +61,10 @@ for ep in eps:
     ua=best.get("ua") or "-"
     v=state.get(key)
     if isinstance(v,dict): ua=v.get("ua",ua)
-    lines.append(f"SELESAI user={user} ip={ip} edge={edge} cc={cc} city={city} dur={dur//60}m{dur%60:02d}s up={up/1048576:.1f} down={down/1048576:.1f} ua={ua}")
+    lines.append(f"SELESAI user={user} ip={ip} edge={edge} cc={cc} city={city} dur={dur//60}m{dur%60:02d}s up={up/1048576:.1f} down={down/1048576:.1f} ua={ua} cdn={best.get('cdn','-')} port_ws={PORT_WS} alasan=autokill")
     killed_keys.add(key)
 if not lines:
-    lines.append(f"SELESAI user={user} ip=- edge=- cc=- city=- dur=0m00s up=- down=- ua=autokill")
+    lines.append(f"SELESAI user={user} ip=- edge=- cc=- city=- dur=0m00s up=- down=- ua=autokill cdn=- port_ws={PORT_WS} alasan=autokill")
 with open(LOG,"a") as f:
     for ln in lines:
         f.write(time.strftime("%Y-%m-%d %H:%M:%S ")+ln+"\n")

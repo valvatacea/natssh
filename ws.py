@@ -112,6 +112,16 @@ def _header(req: str, name: str) -> str:
     return ""
 
 
+def _cdn_label(edge: str) -> str:
+    """Label CDN dari IP edge; fallback 'Langsung' kalau tidak cocok rentang resmi."""
+    if edge.startswith(("52.", "99.", "18.", "13.32", "13.33", "3.5")):
+        return "CloudFront"
+    if edge.startswith(("104.", "172.64", "172.68", "172.69", "172.70", "172.71",
+                        "188.114", "162.158", "141.101", "108.162", "190.93", "103.2")):
+        return "Cloudflare"
+    return "Langsung"
+
+
 def forward(src, dst, conn=None, field=None):
     """Salur satu arah; tutup dua-duanya saat satu arah berhenti.
     conn/field opsional: menghitung byte lewat (statistik trafik per koneksi)."""
@@ -164,16 +174,26 @@ def handle_client(client_socket, ip):
                or (xff.split(",")[0].strip() if xff else "")
                or ip)
     via_cdn = real_ip != ip
+    # Edge IP untuk label CDN: IP yang menghubungi nginx (terjaring di X-Forwarded-For
+    # terakhir yang ditambahkan nginx = IP Cloudflare/CloudFront yang masuk ke VPS).
+    edge = ip
+    if xff:
+        for cand in reversed([x.strip() for x in xff.split(",")]):
+            if cand and cand not in ("127.0.0.1", "localhost", "::1"):
+                edge = cand
+                break
     ua = _header(request, "User-Agent")[:200]
+    # Port asli klien dari header X-Forwarded-Port (dikirim nginx reverse proxy)
+    port_ws = _header(request, "X-Forwarded-Port") or str(WS_PORT)
     # geo gratis dari CDN: CloudFront -> CloudFront-Viewer-City/Country; Cloudflare -> CF-IPCountry
     city = _header(request, "CloudFront-Viewer-City")[:32]
     cc = _header(request, "CloudFront-Viewer-Country") or _header(request, "CF-IPCountry")
     if os.environ.get("NATSSH_DEBUG_REQ"):
         _log(f"DEBUG-REQ {ip}: {request[:800]!r}")
-    if not _admit(ip, via_cdn):
+    if not _admit(real_ip, False):
         try:
-            cur = _per_ip.get(ip, 0)
-            _log(f"TOLAK {ip} (via-CDN={via_cdn}, per-ip={cur}, total={_total}, limit {MAX_PER_IP}/{MAX_TOTAL})")
+            cur = _per_ip.get(real_ip, 0)
+            _log(f"TOLAK {real_ip} (edge={edge}, per-ip={cur}, total={_total}, limit {MAX_PER_IP}/{MAX_TOTAL})")
         finally:
             try:
                 client_socket.close()
@@ -206,9 +226,11 @@ def handle_client(client_socket, ip):
                         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
                 except OSError:
                     pass
-        _log(f"JEMBAT {real_ip} (edge={ip}, ua='{ua}', total={_total})")
-        conn = {"start": round(time.time(), 3), "ip": real_ip, "edge": ip,
-                "ua": ua, "city": city, "cc": cc, "up": 0, "down": 0}
+        cdn = _cdn_label(edge)
+        _log(f"JEMBAT {real_ip} (edge={edge}, ua='{ua}', total={_total})")
+        conn = {"start": round(time.time(), 3), "ip": real_ip, "edge": edge,
+                "ua": ua, "city": city, "cc": cc, "cdn": cdn, "port_ws": port_ws,
+                "up": 0, "down": 0, "alasan": "natural"}
         with _lock:
             cid = next(_SEQ)
             _CONNS[cid] = conn
@@ -250,7 +272,7 @@ def handle_client(client_socket, ip):
             except Exception:
                 pass
         if admitted:
-            _release(ip, via_cdn)
+            _release(real_ip, False)
 
 
 def _watchdog():

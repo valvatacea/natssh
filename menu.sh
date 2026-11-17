@@ -474,16 +474,71 @@ autokill_manual() {
         echo -e "${RED}Gagal: harus angka >= 1!${NC}"
         return
     fi
-    echo -e "${YELLOW}Mengeksekusi pemutusan paksa (Autokill, batas ${max_login})...${NC}"
-    ps -eo user:40=,comm= | awk '$2=="sshd" && $1!="root" {print $1}' | sort | uniq -c | while read count user; do
+
+    # Kumpulkan daftar user yang akan ditendang
+    local kick_list=""
+    local total_devices=0
+    while read -r count user; do
+        [ -z "$user" ] && continue
         if id "$user" &>/dev/null; then
-            shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd)
-            devices=$count   # 1 sesi tunnel = 1 proses user-owned (pasangan [priv] milik root)
-            if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$max_login" ]; then
-                echo -e "Menendang user ${RED}$user${NC} ($devices perangkat)..."
-                pkill -u "$user" sshd
-                echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang manual: $user ($devices perangkat, batas $max_login)" >> /root/natssh/logs/autokill.log
+            local shell=$(awk -F: -v u="$user" '$1==u {print $7}' /etc/passwd 2>/dev/null)
+            if [ "$shell" == "/bin/false" ] && [ "$count" -gt "$max_login" ]; then
+                kick_list="$kick_list $user:$count"
+                total_devices=$((total_devices + count))
             fi
+        fi
+    done < <(ps -eo user:40=,comm= | awk '$2=="sshd" && $1!="root" {print $1}' | sort | uniq -c)
+
+    if [ -z "$kick_list" ]; then
+        echo -e "${GREEN}Tidak ada user yang melebihi batas ${max_login} perangkat.${NC}"
+        return
+    fi
+
+    echo -e "${YELLOW}User yang akan ditendang (batas ${max_login} perangkat):${NC}"
+    for pair in $kick_list; do
+        local u=${pair%%:*}
+        local d=${pair##*:}
+        echo -e "  ${RED}$u${NC}: ${d} perangkat"
+    done
+    echo -e "Total perangkat yang akan diputus: ${total_devices}"
+    echo ""
+    read -p "Yakin men-tendang semua user di atas? (y/N): " y
+    if [[ ! "$y" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        return
+    fi
+
+    local dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+    for pair in $kick_list; do
+        local u=${pair%%:*}
+
+        # Audit sebelum kill: tangkap data sesi dari conns.json / ws.log
+        local eps=""
+        for pid in $(pgrep -u "$u" sshd 2>/dev/null); do
+            local st=$(ps -o lstart= -p "$pid" 2>/dev/null | sed 's/^ *//')
+            local ep=$(date -d "$st" +%s 2>/dev/null)
+            [ -n "$ep" ] && eps="$eps $ep"
+        done
+        if [ -n "$eps" ]; then
+            echo "$eps" | python3 "$dir/audit_kill.py" "$u" 2>/dev/null
+        fi
+
+        # Kill sequence: loginctl terminate-user dulu, lalu pkill -KILL
+        loginctl terminate-user "$u" 2>/dev/null
+        pkill -KILL -u "$u" 2>/dev/null
+
+        # Tunggu sampai proses hilang (maks 5 detik)
+        local waited=0
+        while pgrep -u "$u" >/dev/null 2>&1 && [ "$waited" -lt 50 ]; do
+            sleep 0.1
+            waited=$((waited + 1))
+        done
+
+        if pgrep -u "$u" sshd >/dev/null 2>&1; then
+            echo -e "${RED}Gagal membersihkan semua sshd $u, masih ada sisa.${NC}"
+        else
+            echo -e "${GREEN}Sukses menendang $u.${NC}"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang manual: $u (melebihi batas ${max_login})" >> /root/natssh/logs/autokill.log
         fi
     done
     echo -e "${GREEN}Autokill selesai!${NC}"
@@ -505,7 +560,14 @@ status_sistem() {
     echo -e "Disk      : $(df -h / | awk 'NR==2{print $3 " / " $2 " (" $5 ")"}')"
     # ── RESOURCE SSH ──
     local nsess=$(ps -eo user:40=,args= | awk '$1!="root" && /sshd/ && !/priv/ {c++} END{print c+0}')
-    local rss_ssh=$(ps -eo rss,user,comm | awk '$3=="sshd" && $2!="root" {s+=$1} END{printf "%d", s/1024}')
+    local rss_ssh=0
+    for u in $(ps -eo user:40=,comm= | awk '$2=="sshd" && $1!="root" {print $1}' | sort -u); do
+        local shell=$(awk -F: -v u="$u" '$1==u {print $7}' /etc/passwd 2>/dev/null)
+        [ "$shell" == "/bin/false" ] || continue
+        local ru=$(ps -eo rss,user,comm | awk -v u="$u" '$2==u && $3=="sshd" {s+=$1} END{printf "%d", s}')
+        rss_ssh=$((rss_ssh + ru))
+    done
+    rss_ssh=$((rss_ssh / 1024))
     local rss_ws=$(ps -eo rss,args | awk '/[w]s.py/ {s+=$1} END{printf "%d", s/1024}')
     local nuser=$(ps -eo user:40=,comm= | awk '$2=="sshd" && $1!="root" {print $1}' | sort -u | wc -l)
     echo -e "${CYAN}── RESOURCE SSH ──${NC}"
@@ -516,11 +578,49 @@ status_sistem() {
         local avg=$(awk -v a="${rss_ssh:-0}" -v b="${nsess:-1}" 'BEGIN{printf "%.1f", a/b}')
         echo -e "Rata-rata/sesi  : ${GREEN}${avg}${NC} MB"
     fi
+
+    # ── RESOURCE NGINX ──
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+        local rss_nginx=$(ps -eo rss,comm | awk '$2=="nginx"{s+=$1} END{printf "%d", s/1024}')
+        local n_nginx=$(pgrep -c nginx 2>/dev/null || echo 0)
+        echo -e "${CYAN}── RESOURCE NGINX ──${NC}"
+        echo -e "Status          : ${GREEN}AKTIF${NC}"
+        echo -e "Proses          : ${GREEN}${n_nginx:-0}${NC}"
+        echo -e "RAM total       : ${GREEN}${rss_nginx:-0}${NC} MB"
+    else
+        echo -e "${CYAN}── RESOURCE NGINX ──${NC}"
+        echo -e "Status          : ${RED}MATI${NC}"
+    fi
+
+    # ── RESOURCE badvpn-udpgw ──
+    local udpgw_ports="7100 7200 7300 7400 7500"
+    local ada_udpgw=0
+    for pp in $udpgw_ports; do
+        if systemctl is-active --quiet "natssh-udpgw@${pp}" 2>/dev/null; then
+            ada_udpgw=1
+            break
+        fi
+    done
+    if [ "$ada_udpgw" -eq 1 ]; then
+        echo -e "${CYAN}── RESOURCE badvpn-udpgw ──${NC}"
+        for pp in $udpgw_ports; do
+            if systemctl is-active --quiet "natssh-udpgw@${pp}" 2>/dev/null; then
+                local pid=$(systemctl show "natssh-udpgw@${pp}" -p MainPID --value 2>/dev/null)
+                local rss_u=0
+                if [ -n "$pid" ] && [ "$pid" != "0" ]; then
+                    rss_u=$(ps -o rss= -p "$pid" 2>/dev/null | awk '{printf "%d", $1/1024}')
+                fi
+                echo -e "Port ${pp}        : ${GREEN}AKTIF${NC}  RAM ${GREEN}${rss_u:-0}${NC} MB"
+            else
+                echo -e "Port ${pp}        : ${RED}MATI${NC}"
+            fi
+        done
+    fi
 }
 
 ws_peak() {
     # puncak pemakaian slot jembatan (dari ws.log) — bantu keputusan naik/turun MAX_TOTAL
-    local log=$(dirname "${BASH_SOURCE[0]}")/ws.log
+    local log=$(dirname "${BASH_SOURCE[0]}")/logs/ws.log
     if [ ! -f "$log" ]; then
         echo -e "${RED}Belum ada log ws.log.${NC}"
         return
@@ -577,7 +677,7 @@ menu_monitor() {
         echo "3. Riwayat Autokill"
         echo "4. Puncak Koneksi WebSocket (slot)"
         echo "5. Riwayat Akun (live + sesi)"
-        echo "6. Status RAM / CPU / Disk + Resource SSH"
+        echo "6. Status RAM / CPU / Disk + Resource SSH, Nginx, UDPGW"
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-6): " p || exit 0
         case $p in
@@ -1028,6 +1128,60 @@ conf_service() {
     done
 }
 
+conf_nginx_service() {
+    while true; do
+        clear
+        garis
+        echo -e "${YELLOW}   KONTROL LAYANAN NGINX${NC}"
+        garis
+        status=$(systemctl is-active nginx 2>/dev/null)
+        echo -e "Status saat ini: ${GREEN}${status}${NC}"
+        echo ""
+        echo "1. Start"
+        echo "2. Stop"
+        echo "3. Restart"
+        echo -e "${RED}0. Kembali${NC}"
+        read -p "Pilih (0-3): " p || exit 0
+        case $p in
+            1)
+                echo -e "${YELLOW}Menjalankan nginx...${NC}"
+                systemctl start nginx
+                sleep 2
+                systemctl is-active --quiet nginx && echo -e "${GREEN}SUKSES! nginx berjalan.${NC}" || echo -e "${RED}Gagal start!${NC}"
+                pause
+                ;;
+            2)
+                echo -e "${YELLOW}Menghentikan nginx...${NC}"
+                echo -e "${RED}PERINGATAN: Semua koneksi WebSocket via nginx akan terputus!${NC}"
+                read -p "Yakin stop? (y/N): " y
+                if [[ "$y" =~ ^[Yy]$ ]]; then
+                    systemctl stop nginx
+                    sleep 2
+                    systemctl is-active --quiet nginx && echo -e "${RED}Masih berjalan!${NC}" || echo -e "${GREEN}Berhasil dihentikan.${NC}"
+                else
+                    echo -e "${YELLOW}Dibatalkan.${NC}"
+                fi
+                pause
+                ;;
+            3)
+                echo -e "${YELLOW}Me-restart nginx...${NC}"
+                echo -e "${RED}PERINGATAN: Semua koneksi WebSocket via nginx akan terputus!${NC}"
+                read -p "Yakin restart? (y/N): " y
+                if [[ "$y" =~ ^[Yy]$ ]]; then
+                    systemctl restart nginx
+                    sleep 3
+                    systemctl is-active --quiet nginx && echo -e "${GREEN}SUKSES! nginx berjalan kembali.${NC}" || echo -e "${RED}Gagal restart!${NC}"
+                else
+                    echo -e "${YELLOW}Dibatalkan.${NC}"
+                fi
+                pause
+                ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
+        esac
+    done
+}
+
 _ensure_speed_service() {
     # pastikan unit systemd natssh-speed ada (buat jika belum) agar limit persist setelah reboot
     local unit=/etc/systemd/system/natssh-speed.service
@@ -1176,7 +1330,7 @@ conf_restart_schedule() {
     echo -e "${YELLOW}--- JADWAL RESTART OTOMATIS PER-LAYANAN ---${NC}"
     echo ""
     # Tampilkan daftar cron restart aktif per layanan
-    for svc in natssh-ws natssh-udpgw stunnel4; do
+    for svc in natssh-ws natssh-udpgw nginx; do
         line=$(crontab -l 2>/dev/null | grep "systemctl.*restart.*${svc}" | head -1)
         if [ -n "$line" ]; then
             echo -e "  ${CYAN}${svc}${NC}: ${GREEN}AKTIF${NC} | ${line}"
@@ -1188,13 +1342,13 @@ conf_restart_schedule() {
     echo "Pilih layanan untuk diatur:"
     echo "1. natssh-ws (WebSocket)"
     echo "2. natssh-udpgw (UDP Gateway)"
-    echo "3. stunnel4 (TLS Wrapper)"
+    echo "3. nginx (Reverse Proxy)"
     echo -e "${RED}0. Batal${NC}"
     read -p "Pilih (0-3): " p
     case $p in
         1) toggle_service_cron "natssh-ws" "/usr/bin/systemctl restart natssh-ws" "WebSocket" ;;
         2) toggle_service_cron "natssh-udpgw" "/usr/bin/systemctl restart 'natssh-udpgw@*'" "UDP Gateway" ;;
-        3) toggle_service_cron "stunnel4" "/usr/bin/systemctl restart stunnel4" "Stunnel TLS" ;;
+        3) toggle_service_cron "nginx" "/usr/bin/systemctl restart nginx" "Nginx Reverse Proxy" ;;
         0) echo -e "${YELLOW}Dibatalkan.${NC}";;
         *) echo -e "${RED}Pilihan tidak valid!${NC}";;
     esac
@@ -1281,6 +1435,41 @@ conf_maxtotal() {
     systemctl restart natssh-ws
     sleep 1
     systemctl is-active --quiet natssh-ws &&         echo -e "${GREEN}SUKSES! MAX_TOTAL kini $n slot.${NC}" || \
+        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+}
+
+conf_maxperip() {
+    # batas koneksi serentak per IP (Environment=NATSSH_MAX_PER_IP di unit systemd)
+    local unit=/etc/systemd/system/natssh-ws.service
+    local cur=$(systemctl show natssh-ws -p Environment --value 2>/dev/null | grep -o "NATSSH_MAX_PER_IP=[0-9]*" | cut -d= -f2)
+    cur=${cur:-10}
+    echo -e "Batas koneksi per IP (MAX_PER_IP)  : ${YELLOW}${cur}${NC} koneksi"
+    echo -e "Catatan: jika pakai nginx reverse proxy, IP asli klien dibaca lewat header X-Forwarded-For."
+    read -p "Nilai baru (1-100, 0 = batal): " n
+    [ "$n" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 1 ] || [ "$n" -gt 100 ]; then
+        echo -e "${RED}Gagal: harus angka 1-100!${NC}"
+        return
+    fi
+    if [ ! -f "$unit" ]; then
+        echo -e "${RED}Gagal: unit natssh-ws.service tidak ditemukan.${NC}"
+        return
+    fi
+    if grep -q "Environment=NATSSH_MAX_PER_IP" "$unit"; then
+        sed -i "s/Environment=NATSSH_MAX_PER_IP=[0-9]*/Environment=NATSSH_MAX_PER_IP=$n/" "$unit"
+    else
+        sed -i "/^\\[Service\\]/a Environment=NATSSH_MAX_PER_IP=$n" "$unit"
+    fi
+    systemctl daemon-reload
+    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+    read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr3
+    if [[ ! "$cfr3" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        return
+    fi
+    systemctl restart natssh-ws
+    sleep 1
+    systemctl is-active --quiet natssh-ws &&         echo -e "${GREEN}SUKSES! MAX_PER_IP kini $n koneksi/IP.${NC}" || \
         echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
 }
 
@@ -1646,17 +1835,17 @@ conf_heartbeat() {
     pause
 }
 
-conf_stunnel_port() {
-    conf_file="/etc/stunnel/stunnel.conf"
+conf_nginx_port() {
+    conf_file="/etc/nginx/sites-available/natssh-ws"
     if [ ! -f "$conf_file" ]; then
         echo -e "${RED}Gagal: $conf_file tidak ditemukan.${NC}"
         pause
         return
     fi
-    cur=$(grep -E '^accept =' "$conf_file" | head -1 | sed 's/.*:\([0-9]*\)/\1/')
-    echo -e "Port stunnel saat ini: ${YELLOW}${cur:-tidak diketahui}${NC}"
+    cur=$(grep -E 'listen .*ssl' "$conf_file" | head -1 | grep -oE '[0-9]+' | head -1)
+    echo -e "Port nginx saat ini: ${YELLOW}${cur:-tidak diketahui}${NC}"
     echo -e "${YELLOW}Ketik 0 atau kosong untuk batal.${NC}"
-    read -p "Port stunnel baru: " new_port
+    read -p "Port nginx baru: " new_port
     if [ -z "$new_port" ] || [ "$new_port" = "0" ]; then
         echo -e "${YELLOW}Dibatalkan.${NC}"
         pause
@@ -1672,19 +1861,19 @@ conf_stunnel_port() {
         pause
         return
     fi
-    echo -e "${YELLOW}Restart stunnel4 — koneksi aktif terputus 2-3 detik...${NC}"
-    read -p "Yakin restart stunnel? Koneksi aktif akan terputus (y/N): " cfr
+    echo -e "${YELLOW}Restart nginx — koneksi aktif terputus 2-3 detik...${NC}"
+    read -p "Yakin restart nginx? Koneksi aktif akan terputus (y/N): " cfr
     if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
         echo -e "${YELLOW}Dibatalkan.${NC}"
         pause
         return
     fi
-    sed -i "s/^accept = .*/accept = 0.0.0.0:$new_port/" "$conf_file"
-    systemctl restart stunnel4
+    sed -i "s/listen [0-9]* ssl;/listen $new_port ssl;/" "$conf_file"
+    systemctl restart nginx
     sleep 1
-    systemctl is-active --quiet stunnel4 && \
-        echo -e "${GREEN}SUKSES! Stunnel kini listen di port $new_port.${NC}" || \
-        echo -e "${RED}Service gagal start! Cek: journalctl -u stunnel4 -n 20${NC}"
+    systemctl is-active --quiet nginx && \
+        echo -e "${GREEN}SUKSES! Nginx kini listen di port $new_port.${NC}" || \
+        echo -e "${RED}Service gagal start! Cek: journalctl -u nginx -n 20${NC}"
     pause
 }
 
@@ -1695,13 +1884,13 @@ conf_port_submenu() {
         echo -e "${YELLOW}   UBAH PORT LAYANAN${NC}"
         garis
         printf "  %-3s %-46s\n" "1." "Ubah Port WebSocket (natssh-ws)"
-        printf "  %-3s %-46s\n" "2." "Ubah Port Stunnel (TLS)"
+        printf "  %-3s %-46s\n" "2." "Ubah Port Nginx (Reverse Proxy)"
         printf "  %-3s %-46s\n" "3." "badvpn-udpgw (UDP Gateway)"
         echo -e "${RED}  0.  Kembali${NC}"
         read -p "Pilih (0-3): " p || exit 0
         case $p in
             1) conf_port ;;
-            2) conf_stunnel_port ;;
+            2) conf_nginx_port ;;
             3) conf_udpgw ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
@@ -1716,40 +1905,44 @@ menu_conf() {
         echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
         garis
         echo -e "${CYAN}  -- Port --${NC}"
-        printf "  %-3s %-46s\n" "1." "Ubah Port Layanan (WebSocket, Stunnel, UDPGW)"
+        printf "  %-3s %-46s\n" "1." "Ubah Port Layanan (WebSocket, Nginx, UDPGW)"
         printf "  %-3s %-46s\n" "2." "Ubah Domain/Host di Kartu Akun"
         printf "  %-3s %-46s\n" "3." "Hide IP"
         echo -e "${CYAN}  -- Batas --${NC}"
         printf "  %-3s %-46s\n" "4." "Atur Batas Login per Akun (Max Login)"
         printf "  %-3s %-46s\n" "5." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
-        printf "  %-3s %-46s\n" "6." "Atur Limit Speed per CDN (CF/CFront)"
+        printf "  %-3s %-46s\n" "6." "Ubah Batas Koneksi per IP (MAX_PER_IP)"
+        printf "  %-3s %-46s\n" "7." "Atur Limit Speed per CDN (CF/CFront)"
         echo -e "${CYAN}  -- Layanan --${NC}"
-        printf "  %-3s %-46s\n" "7." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
-        printf "  %-3s %-46s\n" "8." "Atur Jadwal Restart Otomatis (WS + UDPGW)"
-        printf "  %-3s %-46s\n" "9." "Atur Jadwal Reboot"
+        printf "  %-3s %-46s\n" "8." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
+        printf "  %-3s %-46s\n" "9." "Kontrol Layanan Nginx (Start/Stop/Restart)"
+        printf "  %-3s %-46s\n" "10." "Atur Jadwal Restart Otomatis (WS + UDPGW)"
+        printf "  %-3s %-46s\n" "11." "Atur Jadwal Reboot"
         echo -e "${CYAN}  -- Lainnya --${NC}"
-        printf "  %-3s %-46s\n" "10." "Ubah Banner Pelanggan"
-        printf "  %-3s %-46s\n" "11." "Ubah Durasi Suspend (menit)"
-        printf "  %-3s %-46s\n" "12." "Test Ping (Cek Koneksi Internet)"
+        printf "  %-3s %-46s\n" "12." "Ubah Banner Pelanggan"
+        printf "  %-3s %-46s\n" "13." "Ubah Durasi Suspend (menit)"
+        printf "  %-3s %-46s\n" "14." "Test Ping (Cek Koneksi Internet)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-12): " p || exit 0
+        read -p "Pilih (0-14): " p || exit 0
         case $p in
             1) conf_port_submenu ;;
             2) conf_domain ;;
             3) conf_hide_ip ;;
             4) conf_maxlogin ;;
             5) conf_maxtotal ;;
-            6) conf_speed ;;
-            7) conf_service ;;
-            8) conf_restart_schedule ;;
-            9) conf_reboot_schedule ;;
-            10) conf_banner ;;
-            11) conf_suspend_minutes ;;
-            12) conf_test_ping ;;
+            6) conf_maxperip ;;
+            7) conf_speed ;;
+            8) conf_service ;;
+            9) conf_nginx_service ;;
+            10) conf_restart_schedule ;;
+            11) conf_reboot_schedule ;;
+            12) conf_banner ;;
+            13) conf_suspend_minutes ;;
+            14) conf_test_ping ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "4" ] && [ "$p" != "6" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && pause
+        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "4" ] && [ "$p" != "6" ] && [ "$p" != "7" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && [ "$p" != "14" ] && pause
     done
 }
 
@@ -1778,7 +1971,7 @@ promo_menu() {
         printf "  %-3s %-46s\n" "3." "Ubah Jadwal Promo"
         printf "  %-3s %-46s\n" "4." "Aktifkan/Nonaktifkan Jadwal"
         printf "  %-3s %-46s\n" "5." "Status Promo"
-        printf "  %-3s %-46s\n" "6." "Hapus Jadwal Promo (restore banner)"
+        printf "  %-3s %-46s\n" "7." "Hapus Jadwal Promo (restore banner)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-6): " p || exit 0
         case $p in

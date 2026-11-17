@@ -39,19 +39,20 @@ done
 rm -f /etc/systemd/system/natssh-udpgw@.service
 systemctl daemon-reload
 
-echo -e "\n[*] Menghentikan dan menghapus Service stunnel4..."
-systemctl stop stunnel4.service 2>/dev/null
-systemctl disable stunnel4.service 2>/dev/null
-rm -f /etc/systemd/system/stunnel4.service
+echo -e "\n[*] Menghentikan dan menghapus Service nginx..."
+systemctl stop nginx.service 2>/dev/null
+systemctl disable nginx.service 2>/dev/null
+rm -f /etc/nginx/sites-enabled/natssh-ws /etc/nginx/sites-available/natssh-ws
+rm -f /etc/nginx/sites-enabled/natssh-ws-ssl /etc/nginx/sites-available/natssh-ws-ssl
+rm -f /etc/nginx/ssl/natssh.crt /etc/nginx/ssl/natssh.key
 systemctl daemon-reload
-rm -f /etc/stunnel/natssh.crt /etc/stunnel/natssh.key
-echo -e "${GREEN}Service stunnel4 berhasil dihapus.${NC}"
+echo -e "${GREEN}Service nginx berhasil dihapus.${NC}"
 
 (crontab -l 2>/dev/null | grep -v "unsuspend.sh") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "autobackup.sh") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "apply_speed.sh") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "systemctl.*restart.*natssh-ws") | crontab - 2>/dev/null
-(crontab -l 2>/dev/null | grep -v "systemctl.*restart.*stunnel4") | crontab - 2>/dev/null
+(crontab -l 2>/dev/null | grep -v "systemctl.*restart.*nginx") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "sess_audit") | crontab - 2>/dev/null
 rm -rf /root/natssh/suspended
 

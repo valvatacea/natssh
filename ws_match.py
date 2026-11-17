@@ -59,7 +59,7 @@ def cdn_label(edge: str) -> str:
     if edge.startswith(("104.", "172.64", "172.68", "172.69", "172.70", "172.71",
                         "188.114", "162.158", "141.101", "108.162", "190.93", "103.2")):
         return "Cloudflare"
-    return f"proxy {edge}"
+    return "-" if edge in ("127.0.0.1", "localhost", "::1") else f"proxy {edge}"
 
 
 matched: list = []
@@ -87,7 +87,7 @@ def recap(user=None) -> None:
 
 AUDIT_RE = re.compile(
     r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) SELESAI user=(\S+) ip=(\S+) "
-    r"edge=(\S+) cc=(\S+) city=(\S+) dur=(\S+) up=([\d.-]+) down=([\d.-]+) ua=(.*)$"
+    r"edge=(\S+) cc=(\S+) city=(\S+) dur=(\S+) up=([\d.-]+) down=([\d.-]+) ua=(.*?)(?:cdn=(\S+))?(?: port_ws=(\S+))?(?: alasan=(\S+))?$"
 )
 
 riwayat = []
@@ -135,12 +135,20 @@ def grup_riwayat(user):
     # print session rows if any
     if rows:
         print(f"   {C_DIM}── riwayat {user}: {len(rows)} sesi (5 terakhir) ──{C_RESET}")
-        for t, u, ip, edge, cc, city, dur, up, down, ua in rows[-5:]:
-            jalur = f" {C_DIM}[{cdn_label(edge)}]{C_RESET}" if edge not in ("-", "") else ""
-            geo = f" {C_DIM}{city}{(' ' + cc) if cc != '-' else ''}{C_RESET}" if city != "-" else ""
+        for r in rows[-5:]:
+            t, u, ip, edge, cc, city, dur, up, down, ua = r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]
+            cdn = r[10] if len(r) > 10 else "-"
+            port_ws = r[11] if len(r) > 11 else "-"
+            alasan = r[12] if len(r) > 12 else "-"
+            # cdn: prioritas field dari log, fallback heuristik edge
+            _cdn = cdn if cdn and cdn != "-" else (cdn_label(edge) if edge and edge != "-" else "")
+            jalur = f" {C_DIM}[{_cdn}]{C_RESET}" if _cdn and _cdn != "-" else ""
+            geo = f" {C_DIM}{city}{(' ' + cc) if cc != '-' else ''}{C_RESET}" if city != "-" or cc != "-" else ""
+            port_info = f" {C_DIM}ws:{port_ws}{C_RESET}" if port_ws and port_ws != "-" else ""
             print(f"     {t[11:]}   {ip:<16} {dur:>7} "
-                  f"{up}\u2191{down}\u2193{C_RESET}{jalur}{geo}")
+                  f"{up}\u2191{down}\u2193{C_RESET}{jalur}{geo}{port_info}")
             print(f"              {C_DIM}UA: {ua or '-'}{C_RESET}")
+            print(f"              {C_DIM}Alasan: {alasan}{C_RESET}")
     # suspend/unsuspend events
     evs = suspend_events.get(user)
     if evs:
@@ -200,14 +208,25 @@ for user, ep in [(u, int(e)) for u, e in raw]:
             status = "\033[32mLIVE\033[0m"
         else:
             status = f"\033[33mselesai {time.strftime('%H:%M', time.localtime(end))}\033[0m"
-        jalur = ""
-        if best.get("edge") and best["ip"] != best["edge"]:
-            jalur = f"  {C_DIM}[{cdn_label(best['edge'])}]{C_RESET}"
+        # Jalur CDN: prioritas field cdn dari ws.py, fallback heuristik edge
+        _cdn = best.get("cdn") or ""
+        if not _cdn or _cdn == "-":
+            _cdn = cdn_label(best.get("edge", "")) if best.get("edge") else ""
+        jalur = f"  {C_DIM}[{_cdn}]{C_RESET}" if _cdn and _cdn != "-" else ""
+
+        # Geo: kota + kode negara
+        _city = best.get("city") or "-"
+        _cc = best.get("cc") or "-"
         geo = ""
-        if best.get("city") or best.get("cc"):
-            geo = f"  {C_DIM}{best.get('city') or ''}{(' ' + best['cc']) if best.get('cc') else ''}{C_RESET}"
+        if _city != "-" or _cc != "-":
+            geo = f"  {C_DIM}{_city}{(' ' + _cc) if _cc != '-' else ''}{C_RESET}"
+
+        # Port WS
+        _pw = best.get("port_ws") or "-"
+        port_info = f"  {C_DIM}ws:{_pw}{C_RESET}" if _pw != "-" else ""
+
         line = (f"   {wt} {C_WHITE}{best['ip']:<16}\033[0m"
-                f"{durasi:>7} {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193 {status}{jalur}{geo}")
+                f"{durasi:>7} {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193 {status}{jalur}{geo}{port_info}")
         extra_ua = best.get('ua') or '-'
     if not best:
         continue

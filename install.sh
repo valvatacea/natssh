@@ -136,71 +136,62 @@ for pp in $udpgw_ports; do
 done
 echo -e "${GREEN}Service natssh-udpgw aktif di: ${udpgw_ports} (localhost only).${NC}"
 
-# ===== Stunnel (TLS wrapper untuk WebSocket) =====
-echo -e "\n[*] Menginstal stunnel4 (TLS wrapper)..."
-apt-get install -y stunnel4 >/dev/null 2>&1
-
-# Input port stunnel dari user (seperti input port WebSocket)
-read -p "Masukkan Port Stunnel TLS (default: 20866): " stunnel_port
-stunnel_port=${stunnel_port:-20866}
-if ! [[ "$stunnel_port" =~ ^[0-9]+$ ]] || [ "$stunnel_port" -lt 1 ] || [ "$stunnel_port" -gt 65535 ]; then
-    echo "Port stunnel tidak valid!"; exit 1
-fi
-if ss -tln | grep -q ":${stunnel_port} "; then
-    echo -e "${RED}Port ${stunnel_port} sudah dipakai proses lain!${NC}"; exit 1
+# ===== Nginx (Reverse Proxy TLS untuk WebSocket) =====
+echo -e "\n[*] Menginstal nginx (reverse proxy WebSocket)..."
+DEBIAN_FRONTEND=noninteractive apt-get install -y nginx >/dev/null 2>&1
+if ! command -v nginx &> /dev/null; then
+    echo -e "${RED}Gagal menginstal nginx.${NC}"; exit 1
 fi
 
-# Buat direktori dan sertifikat self-signed untuk stunnel
-echo -e "\n[*] Membuat sertifikat self-signed untuk stunnel..."
-mkdir -p /etc/stunnel
-openssl req -x509 -newkey rsa:2048 -keyout /etc/stunnel/natssh.key -out /etc/stunnel/natssh.crt -days 3650 -nodes \
-    -subj "/CN=natssh-vps/O=NATSSH/C=ID" >/dev/null 2>&1
-chmod 600 /etc/stunnel/natssh.key
-chmod 644 /etc/stunnel/natssh.crt
-
-# Backup konfigurasi stunnel lama jika ada
-if [ -f /etc/stunnel/stunnel.conf ]; then
-    cp /etc/stunnel/stunnel.conf "/etc/stunnel/stunnel.conf.bak-$(date +%Y%m%d_%H%M%S)"
+# Nginx listen di port publik WebSocket (20865), proxy ke ws.py
+nginx_port=20865
+if ss -tln | grep -q ":${nginx_port} "; then
+    echo -e "${RED}Port ${nginx_port} sudah dipakai proses lain!${NC}"; exit 1
 fi
 
-# Buat konfigurasi stunnel
-cat > /etc/stunnel/stunnel.conf <<EOF
-cert = /etc/stunnel/natssh.crt
-key = /etc/stunnel/natssh.key
-sslVersion = TLSv1.2
-options = NO_SSLv2
-options = NO_SSLv3
+# Hapus default site nginx agar tidak bentrok
+rm -f /etc/nginx/sites-enabled/default
 
-[natssh-stunnel]
-accept = 0.0.0.0:${stunnel_port}
-connect = 127.0.0.1:${ws_port}
-client = no
+# Sertifikat SSL self-signed untuk WSS (port 20865)
+ssl_domain=$(cat /root/natssh/config/host.conf 2>/dev/null || echo "id1.xenonblue.qzz.io")
+mkdir -p /etc/nginx/ssl
+if [ ! -f /etc/nginx/ssl/natssh.crt ] || [ ! -f /etc/nginx/ssl/natssh.key ]; then
+    echo -e "\n[*] Membuat sertifikat SSL self-signed untuk nginx (WSS)..."
+    openssl req -x509 -newkey rsa:2048 -keyout /etc/nginx/ssl/natssh.key -out /etc/nginx/ssl/natssh.crt -days 3650 -nodes \
+        -subj "/CN=${ssl_domain}/O=NATSSH/C=ID" >/dev/null 2>&1
+    chmod 600 /etc/nginx/ssl/natssh.key
+    chmod 644 /etc/nginx/ssl/natssh.crt
+fi
+
+# Buat konfigurasi reverse proxy nginx untuk WebSocket (SSL/TLS di port 20865)
+cat > /etc/nginx/sites-available/natssh-ws <<EOF
+server {
+    listen ${nginx_port} ssl;
+    server_name _;
+
+    ssl_certificate /etc/nginx/ssl/natssh.crt;
+    ssl_certificate_key /etc/nginx/ssl/natssl.key;
+
+    location / {
+        proxy_pass http://127.0.0.1:${ws_port};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
 EOF
-
-# Buat service systemd stunnel4
-cat > /etc/systemd/system/stunnel4.service <<EOF
-[Unit]
-Description=Stunnel 4.x (TLS tunnel for network daemons)
-After=network.target
-
-[Service]
-Type=forking
-ExecStart=/usr/bin/stunnel4 /etc/stunnel/stunnel.conf
-Restart=always
-RestartSec=5
-TimeoutSec=5min
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable stunnel4
-systemctl start stunnel4
-echo -e "${GREEN}Service stunnel4 berhasil dibuat dan dijalankan di port ${stunnel_port}!${NC}"
+ln -sf /etc/nginx/sites-available/natssh-ws /etc/nginx/sites-enabled/natssh-ws
+nginx -t && systemctl enable --now nginx
+echo -e "${GREEN}Service nginx berhasil dibuat dan dijalankan di port ${nginx_port} SSL -> 127.0.0.1:${ws_port}!${NC}"
 
 
-echo -e "\\n[*] Cronjob apply speed digabung dengan restart (lihat bawah)..."
+echo -e "\n[*] Cronjob apply speed digabung dengan restart (lihat bawah)..."
 
 echo -e "\n[*] Menyiapkan service NATSSH speed limit (tidak diaktifkan otomatis)..."
 cat > /etc/systemd/system/natssh-speed.service <<'EOF'
@@ -247,11 +238,11 @@ fi
 if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-udpgw"; then
     (crontab -l 2>/dev/null; echo "0 4,15 * * * /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab -
 fi
-# Auto restart stunnel4 (jam 04:30)
-if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*stunnel4"; then
-    (crontab -l 2>/dev/null; echo "0 4,30 * * * /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab -
+# Auto restart nginx (jam 04:30)
+if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*nginx"; then
+    (crontab -l 2>/dev/null; echo "0 4,30 * * * /usr/bin/systemctl restart nginx >/dev/null 2>&1") | crontab -
 fi
-echo -e "${GREEN}Cronjob auto-restart per-layanan berhasil ditambahkan (ws 04:00, udpgw 04:15, stunnel 04:30).${NC}"
+echo -e "${GREEN}Cronjob auto-restart per-layanan berhasil ditambahkan (ws 04:00, udpgw 04:15, nginx 04:30).${NC}"
 
 echo -e ""
 echo -e "[*] Backup sshd_config untuk rollback..."
@@ -350,4 +341,4 @@ echo -e "2. Untuk mengecek status WebSocket: ${YELLOW}systemctl status natssh-ws
 echo -e "3. Port WebSocket Anda saat ini: ${YELLOW}${ws_port}${NC}"
 echo -e "4. Batas perangkat per akun (autokill): ${YELLOW}${max_login}${NC}"
 echo -e "5. badvpn-udpgw (localhost only): ${YELLOW}${udpgw_ports}${NC}"
-echo -e "6. Stunnel TLS (port publik): ${YELLOW}${stunnel_port}${NC} -> 127.0.0.1:${ws_port}"
+echo -e "6. Nginx reverse proxy (port publik): ${YELLOW}20865${NC} -> 127.0.0.1:${ws_port}"

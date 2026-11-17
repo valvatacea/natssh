@@ -101,7 +101,9 @@ def main():
                                   "ua": best.get("ua") or "-",
                                   "city": (best.get("city") or "-").replace(" ", "-"),
                                   "cc": best.get("cc") or "-",
-                                  "edge": best.get("edge") or "-"}
+                                  "edge": best.get("edge") or "-",
+                                  "cdn": best.get("cdn") or "-",
+                                  "port_ws": best.get("port_ws") or "-"}
 
     # proses pending (real-time) dulu
     pending=[]
@@ -119,7 +121,8 @@ def main():
         city=(c.get("city") or "-").replace(" ","-")
         catat(f"SELESAI user={user} ip={c.get('ip','-')} edge={c.get('edge','-')} cc={c.get('cc','-')} "
               f"city={city} dur={dur//60}m{dur%60:02d}s "
-              f"up={c.get('up',0)/1048576:.1f} down={c.get('down',0)/1048576:.1f} ua={c.get('ua','-')}")
+              f"up={c.get('up',0)/1048576:.1f} down={c.get('down',0)/1048576:.1f} ua={c.get('ua','-')} "
+              f"cdn={c.get('cdn','-')} port_ws={c.get('port_ws','-')} alasan={c.get('alasan','natural')}")
         state.pop(key,None)
     try:
         with open(os.path.join(DIR,"logs","pending_sess.json"),"w") as f: json.dump([],f)
@@ -132,7 +135,8 @@ def main():
             continue  # masih live — jangan catat apalagi (race dump/cron)
         v = state[key]
         if isinstance(v, str):          # state format lama: hanya username
-            v = {"user": v, "ip": "-", "ua": "-", "city": "-", "cc": "-", "edge": "-"}
+            v = {"user": v, "ip": "-", "ua": "-", "city": "-", "cc": "-", "edge": "-",
+                 "cdn": "-", "port_ws": "-"}
         c = terlihat.get(key)
         if c is None:
             c = next((x for x in pool if str(x["start"]) == key and not x["_live"]), None)
@@ -140,13 +144,15 @@ def main():
             # hilang total (mis. bridge restart) — best-effort durasi saja
             dur = now - float(key)
             catat(f"SELESAI user={v['user']} ip={v['ip']} edge={v['edge']} cc={v['cc']} "
-                  f"city={v['city']} dur={int(dur//60)}m{int(dur%60):02d}s up=- down=- ua={v['ua']}")
+                  f"city={v['city']} dur={int(dur//60)}m{int(dur%60):02d}s up=- down=- ua={v['ua']} "
+                  f"cdn={v['cdn']} port_ws={v['port_ws']} alasan=natural")
             del state[key]
             continue
         dur = int(now - c["start"])
         catat(f"SELESAI user={v['user']} ip={v['ip']} edge={v['edge']} cc={v['cc']} "
               f"city={v['city']} dur={int(dur//60)}m{int(dur%60):02d}s "
-              f"up={c['up']/1048576:.1f} down={c['down']/1048576:.1f} ua={v['ua']}")
+              f"up={c['up']/1048576:.1f} down={c['down']/1048576:.1f} ua={v['ua']} "
+              f"cdn={v['cdn']} port_ws={v['port_ws']} alasan=natural")
         del state[key]
 
     tmp = STATE + ".tmp"
