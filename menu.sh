@@ -2116,6 +2116,105 @@ promo_menu() {
                 fi
                 echo -e "${GREEN}Jadwal disimpan.${NC}"
                 ;;
+            3)
+                now=$(date +%s)
+                echo -e "${YELLOW}=== JADWAL PROMO (pilih untuk ubah) ===${NC}"
+                echo ""
+                if [ -f /root/natssh/config/promo/promo_schedule.conf ] && [ -s /root/natssh/config/promo/promo_schedule.conf ]; then
+                    i=1
+                    while IFS='|' read -r slot start days interval enabled jeda targets; do
+                        [ -z "$slot" ] && continue
+                        jeda=${jeda:-0}
+                        end=$((start + days*86400))
+                        start_str=$(date -d "@$start" '+%d/%m %H:%M')
+                        end_str=$(date -d "@$end" '+%d/%m %H:%M')
+                        echo -e "  ${CYAN}$i.${NC} ${YELLOW}$slot${NC}  |  durasi: ${days}h  |  interval: ${interval}m  |  jeda: ${jeda}s  |  $start_str → $end_str"
+                        i=$((i+1))
+                    done < /root/natssh/config/promo/promo_schedule.conf
+                else
+                    echo -e "  ${YELLOW}Tidak ada jadwal yang tersimpan.${NC}"
+                fi
+                echo ""
+                read -p "Nomor baris ubah (0=batal): " ln
+                [ "$ln" = "0" ] && continue
+                line=$(sed -n "${ln}p" /root/natssh/config/promo/promo_schedule.conf 2>/dev/null)
+                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
+                IFS='|' read -r oldslot oldstart olddays oldiv olden oldjeda oldtargets <<< "$line"
+                oldjeda=${oldjeda:-0}
+                oldend=$((oldstart + olddays*86400))
+                oldstart_str=$(date -d "@$oldstart" '+%d/%m/%Y %H:%M')
+                oldend_str=$(date -d "@$oldend" '+%d/%m/%Y %H:%M')
+                echo -e "${CYAN}--- Jadwal Lama ---${NC}"
+                echo -e "  Slot     : ${YELLOW}$oldslot${NC}"
+                echo -e "  Durasi   : ${olddays} hari"
+                echo -e "  Interval : ${oldiv} menit"
+                echo -e "  Periode  : $oldstart_str → $oldend_str"
+                echo -e "  Status   : $([ "$olden" = "1" ] && echo "${GREEN}aktif${NC}" || echo "${RED}nonaktif${NC}")"
+                echo -e "  Jeda sesi: ${oldjeda}s"
+                echo -e "  Target   : ${YELLOW}${oldtargets:-—}${NC}"
+                echo ""
+                echo -e "${CYAN}--- Slot Tersedia ---${NC}"
+                i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo -e "  ${CYAN}$i.${NC} $(basename "$f" .txt)"; i=$((i+1)); done
+                echo ""
+                read -p "Slot baru (Enter=tetap, 0=batal): " slot
+                [ "$slot" = "0" ] && continue
+                [ -z "$slot" ] && slot="$oldslot"
+                if [[ "$slot" =~ ^[0-9]+$ ]]; then
+                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
+                fi
+                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
+                read -p "Durasi baru (hari, Enter=tetap): " dh
+                [ -z "$dh" ] && dh="$olddays"
+                if ! [[ "$dh" =~ ^[0-9]+$ ]] || [ "$dh" -lt 1 ]; then
+                    echo -e "${RED}Durasi harus angka >= 1!${NC}"; pause; continue
+                fi
+                read -p "Interval baru (menit, Enter=tetap): " iv
+                [ -z "$iv" ] && iv="$oldiv"
+                read -p "Jeda sesi baru (Enter=tetap, suffix m/s): " jd
+                if [ -z "$jd" ]; then
+                    jd_sec="$oldjeda"
+                elif [ "$jd" = "0" ]; then
+                    jd_sec="0"
+                elif [[ "$jd" =~ ^[0-9]+m$ ]]; then
+                    jd_sec=$(( ${jd%m} * 60 ))
+                elif [[ "$jd" =~ ^[0-9]+s$ ]]; then
+                    jd_sec=${jd%s}
+                elif [[ "$jd" =~ ^[0-9]+$ ]]; then
+                    jd_sec=$jd
+                else
+                    echo -e "${RED}Format jeda tidak valid!${NC}"; pause; continue
+                fi
+                if ! [[ "$iv" =~ ^[0-9]+$ ]] || [ "$iv" -lt 1 ]; then
+                    echo -e "${RED}Interval harus angka >= 1!${NC}"; pause; continue
+                fi
+                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
+                echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
+                read -p "Target baru (nomor/nama, Enter=tetap): " tg
+                if [ -n "$tg" ]; then
+                    selected=""
+                    for t in $tg; do
+                        if [[ "$t" =~ ^[0-9]+$ ]]; then
+                            idx=$((t-1))
+                            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
+                        else
+                            if id "$t" &>/dev/null; then
+                                selected="$selected $t"
+                            else
+                                echo -e "${RED}Username '$t' tidak ditemukan, dilewati.${NC}"
+                            fi
+                        fi
+                    done
+                    tg=$(echo "$selected" | xargs)
+                    [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
+                else
+                    tg="${oldtargets:-}"
+                fi
+                new="${slot}|${oldstart}|${dh}|${iv}|${olden:-1}|${jd_sec}|${tg}"
+                tmp=$(mktemp)
+                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/config/promo/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/config/promo/promo_schedule.conf
+                echo -e "${GREEN}Jadwal diubah: $new${NC}"
+                echo -e "${GREEN}Target: $tg${NC}"
+                ;;
             4)
                 now=$(date +%s)
                 echo "=== JADWAL PROMO ==="
@@ -2315,105 +2414,6 @@ promo_menu() {
                     echo -e "${YELLOW}Masih ada promo aktif lain — banner tidak di-restore.${NC}"
                 fi
                 echo "$(date '+%F %T') PROMO CANCEL restore" >> /root/natssh/logs/promo.log
-                ;;
-            3)
-                now=$(date +%s)
-                echo -e "${YELLOW}=== JADWAL PROMO (pilih untuk ubah) ===${NC}"
-                echo ""
-                if [ -f /root/natssh/config/promo/promo_schedule.conf ] && [ -s /root/natssh/config/promo/promo_schedule.conf ]; then
-                    i=1
-                    while IFS='|' read -r slot start days interval enabled jeda targets; do
-                        [ -z "$slot" ] && continue
-                        jeda=${jeda:-0}
-                        end=$((start + days*86400))
-                        start_str=$(date -d "@$start" '+%d/%m %H:%M')
-                        end_str=$(date -d "@$end" '+%d/%m %H:%M')
-                        echo -e "  ${CYAN}$i.${NC} ${YELLOW}$slot${NC}  |  durasi: ${days}h  |  interval: ${interval}m  |  jeda: ${jeda}s  |  $start_str → $end_str"
-                        i=$((i+1))
-                    done < /root/natssh/config/promo/promo_schedule.conf
-                else
-                    echo -e "  ${YELLOW}Tidak ada jadwal yang tersimpan.${NC}"
-                fi
-                echo ""
-                read -p "Nomor baris ubah (0=batal): " ln
-                [ "$ln" = "0" ] && continue
-                line=$(sed -n "${ln}p" /root/natssh/config/promo/promo_schedule.conf 2>/dev/null)
-                [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
-                IFS='|' read -r oldslot oldstart olddays oldiv olden oldjeda oldtargets <<< "$line"
-                oldjeda=${oldjeda:-0}
-                oldend=$((oldstart + olddays*86400))
-                oldstart_str=$(date -d "@$oldstart" '+%d/%m/%Y %H:%M')
-                oldend_str=$(date -d "@$oldend" '+%d/%m/%Y %H:%M')
-                echo -e "${CYAN}--- Jadwal Lama ---${NC}"
-                echo -e "  Slot     : ${YELLOW}$oldslot${NC}"
-                echo -e "  Durasi   : ${olddays} hari"
-                echo -e "  Interval : ${oldiv} menit"
-                echo -e "  Periode  : $oldstart_str → $oldend_str"
-                echo -e "  Status   : $([ "$olden" = "1" ] && echo "${GREEN}aktif${NC}" || echo "${RED}nonaktif${NC}")"
-                echo -e "  Jeda sesi: ${oldjeda}s"
-                echo -e "  Target   : ${YELLOW}${oldtargets:-—}${NC}"
-                echo ""
-                echo -e "${CYAN}--- Slot Tersedia ---${NC}"
-                i=1; for f in /root/natssh/banners/*.txt; do [ -f "$f" ] || continue; echo -e "  ${CYAN}$i.${NC} $(basename "$f" .txt)"; i=$((i+1)); done
-                echo ""
-                read -p "Slot baru (Enter=tetap, 0=batal): " slot
-                [ "$slot" = "0" ] && continue
-                [ -z "$slot" ] && slot="$oldslot"
-                if [[ "$slot" =~ ^[0-9]+$ ]]; then
-                    slot=$(ls -1 /root/natssh/banners/*.txt 2>/dev/null | sed -n "${slot}p" | xargs -r basename 2>/dev/null | sed 's/\.txt$//')
-                fi
-                [ -f "/root/natssh/banners/${slot}.txt" ] || { echo -e "${RED}Slot tidak ada${NC}"; pause; continue; }
-                read -p "Durasi baru (hari, Enter=tetap): " dh
-                [ -z "$dh" ] && dh="$olddays"
-                if ! [[ "$dh" =~ ^[0-9]+$ ]] || [ "$dh" -lt 1 ]; then
-                    echo -e "${RED}Durasi harus angka >= 1!${NC}"; pause; continue
-                fi
-                read -p "Interval baru (menit, Enter=tetap): " iv
-                [ -z "$iv" ] && iv="$oldiv"
-                read -p "Jeda sesi baru (Enter=tetap, suffix m/s): " jd
-                if [ -z "$jd" ]; then
-                    jd_sec="$oldjeda"
-                elif [ "$jd" = "0" ]; then
-                    jd_sec="0"
-                elif [[ "$jd" =~ ^[0-9]+m$ ]]; then
-                    jd_sec=$(( ${jd%m} * 60 ))
-                elif [[ "$jd" =~ ^[0-9]+s$ ]]; then
-                    jd_sec=${jd%s}
-                elif [[ "$jd" =~ ^[0-9]+$ ]]; then
-                    jd_sec=$jd
-                else
-                    echo -e "${RED}Format jeda tidak valid!${NC}"; pause; continue
-                fi
-                if ! [[ "$iv" =~ ^[0-9]+$ ]] || [ "$iv" -lt 1 ]; then
-                    echo -e "${RED}Interval harus angka >= 1!${NC}"; pause; continue
-                fi
-                mapfile -t ACCS < <(awk -F: '$7=="/bin/false"{print $1}' /etc/passwd | while read -r u; do [ -d "/home/$u" ] && echo "$u"; done)
-                echo "Akun target tersedia:"; for i in "${!ACCS[@]}"; do echo "  $((i+1)). ${ACCS[$i]}"; done
-                read -p "Target baru (nomor/nama, Enter=tetap): " tg
-                if [ -n "$tg" ]; then
-                    selected=""
-                    for t in $tg; do
-                        if [[ "$t" =~ ^[0-9]+$ ]]; then
-                            idx=$((t-1))
-                            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ACCS[@]}" ] && selected="$selected ${ACCS[$idx]}"
-                        else
-                            if id "$t" &>/dev/null; then
-                                selected="$selected $t"
-                            else
-                                echo -e "${RED}Username '$t' tidak ditemukan, dilewati.${NC}"
-                            fi
-                        fi
-                    done
-                    tg=$(echo "$selected" | xargs)
-                    [ -z "$tg" ] && { echo -e "${RED}Target tidak valid${NC}"; pause; continue; }
-                else
-                    tg="${oldtargets:-}"
-                fi
-                new="${slot}|${oldstart}|${dh}|${iv}|${olden:-1}|${jd_sec}|${tg}"
-                tmp=$(mktemp)
-                awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/config/promo/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/config/promo/promo_schedule.conf
-                echo -e "${GREEN}Jadwal diubah: $new${NC}"
-                echo -e "${GREEN}Target: $tg${NC}"
                 ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
