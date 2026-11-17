@@ -38,6 +38,9 @@ fi
 if ! [[ "$ws_port" =~ ^[0-9]+$ ]] || [ "$ws_port" -lt 1 ] || [ "$ws_port" -gt 65535 ]; then
     echo "Port tidak valid!"; exit 1
 fi
+if ss -tln | grep -q ":${ws_port} "; then
+    echo -e "${RED}Port ${ws_port} sudah dipakai proses lain!${NC}"; exit 1
+fi
 
 # Download file utama
 echo -e "
@@ -143,6 +146,9 @@ stunnel_port=${stunnel_port:-20866}
 if ! [[ "$stunnel_port" =~ ^[0-9]+$ ]] || [ "$stunnel_port" -lt 1 ] || [ "$stunnel_port" -gt 65535 ]; then
     echo "Port stunnel tidak valid!"; exit 1
 fi
+if ss -tln | grep -q ":${stunnel_port} "; then
+    echo -e "${RED}Port ${stunnel_port} sudah dipakai proses lain!${NC}"; exit 1
+fi
 
 # Buat direktori dan sertifikat self-signed untuk stunnel
 echo -e "\n[*] Membuat sertifikat self-signed untuk stunnel..."
@@ -151,6 +157,11 @@ openssl req -x509 -newkey rsa:2048 -keyout /etc/stunnel/natssh.key -out /etc/stu
     -subj "/CN=natssh-vps/O=NATSSH/C=ID" >/dev/null 2>&1
 chmod 600 /etc/stunnel/natssh.key
 chmod 644 /etc/stunnel/natssh.crt
+
+# Backup konfigurasi stunnel lama jika ada
+if [ -f /etc/stunnel/stunnel.conf ]; then
+    cp /etc/stunnel/stunnel.conf "/etc/stunnel/stunnel.conf.bak-$(date +%Y%m%d_%H%M%S)"
+fi
 
 # Buat konfigurasi stunnel
 cat > /etc/stunnel/stunnel.conf <<EOF
@@ -211,7 +222,7 @@ echo -e "${GREEN}Service natssh-speed disiapkan (belum diaktifkan). Aktif setela
 echo -e "
 [*] Mengatur Cronjob untuk Autokill..."
 # Cek apakah cronjob sudah ada agar tidak duplikat
-if ! crontab -l | grep -q "autokill.sh"; then
+if ! crontab -l 2>/dev/null | grep -q "autokill.sh"; then
     (crontab -l 2>/dev/null; echo "*/1 * * * * MAX_LOGIN=$max_login $(pwd)/autokill.sh") | crontab -
     echo 15 > suspend_minutes.conf
     echo -e "${GREEN}Cronjob Autokill berhasil ditambahkan (berjalan setiap 1 menit).${NC}"
@@ -228,15 +239,25 @@ fi
 if ! crontab -l 2>/dev/null | grep -q "sess_audit"; then
     (crontab -l 2>/dev/null; echo "*/2 * * * * /usr/bin/python3 $(pwd)/sess_audit.py >/dev/null 2>&1") | crontab -
 fi
-# Auto restart natssh-ws + stunnel4 (jam 04:00)
+# Auto restart natssh-ws (jam 04:00)
 if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
-    (crontab -l 2>/dev/null; echo "0 4 * * * /usr/bin/systemctl restart natssh-ws; /usr/bin/systemctl restart 'natssh-udpgw@*'; /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab -
-    echo -e "${GREEN}Cronjob auto-restart natssh-ws + stunnel4 berhasil ditambahkan (jam 04:00).${NC}"
+    (crontab -l 2>/dev/null; echo "0 4 * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab -
 fi
+# Auto restart natssh-udpgw (jam 04:15)
+if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-udpgw"; then
+    (crontab -l 2>/dev/null; echo "0 4,15 * * * /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab -
+fi
+# Auto restart stunnel4 (jam 04:30)
+if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*stunnel4"; then
+    (crontab -l 2>/dev/null; echo "0 4,30 * * * /usr/bin/systemctl restart stunnel4 >/dev/null 2>&1") | crontab -
+fi
+echo -e "${GREEN}Cronjob auto-restart per-layanan berhasil ditambahkan (ws 04:00, udpgw 04:15, stunnel 04:30).${NC}"
 
 echo -e ""
 echo -e "[*] Backup sshd_config untuk rollback..."
-cp /etc/ssh/sshd_config /etc/ssh/sshd_config.natssh_backup
+if [ ! -f /etc/ssh/sshd_config.natssh_backup ]; then
+    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.natssh_backup
+fi
 
 echo -e ""
 echo -e "[*] Mengatur Banner Pesan SSH..."
@@ -267,79 +288,46 @@ if grep -qE "^#?\s*Banner" /etc/ssh/sshd_config; then
 else
     echo "Banner /etc/issue.net" >> /etc/ssh/sshd_config
 fi
-systemctl restart sshd
 
 # Izinkan TCP forwarding untuk tunnel udpgw (localhost)
-if grep -qE "^[#[:space:]]*AllowTcpForwarding" /etc/ssh/sshd_config; then
-    sed -i 's/^[#[:space:]]*AllowTcpForwarding.*/AllowTcpForwarding yes/' /etc/ssh/sshd_config
-else
-    echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config
-fi
+sed -i "/^[#[:space:]]*AllowTcpForwarding[[:space:]]/d" /etc/ssh/sshd_config
+echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config
 # Aktifkan keepalive SSH (server-side) agar sesi tidak idle/putus
-if grep -qE "^[#[:space:]]*ClientAliveInterval" /etc/ssh/sshd_config; then
-    sed -i 's/^[#[:space:]]*ClientAliveInterval.*/ClientAliveInterval 30/' /etc/ssh/sshd_config
-else
-    echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config
-fi
-if grep -qE "^[#[:space:]]*ClientAliveCountMax" /etc/ssh/sshd_config; then
-    sed -i 's/^[#[:space:]]*ClientAliveCountMax.*/ClientAliveCountMax 3/' /etc/ssh/sshd_config
-else
-    echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config
-fi
-systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+sed -i "/^[#[:space:]]*ClientAliveInterval[[:space:]]/d" /etc/ssh/sshd_config
+echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config
+sed -i "/^[#[:space:]]*ClientAliveCountMax[[:space:]]/d" /etc/ssh/sshd_config
+echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config
 
 echo -e ""
 echo -e "[*] Mengaktifkan SSH Enhanced (TCP forwarding, tunnel, keep-alive, kapasitas)..."
 
 # SSH ENHANCED: PermitTunnel yes
-if grep -qE "^[#[:space:]]*PermitTunnel" /etc/ssh/sshd_config; then
-    sed -i 's/^[#[:space:]]*PermitTunnel.*/PermitTunnel yes/' /etc/ssh/sshd_config
-else
-    echo "PermitTunnel yes" >> /etc/ssh/sshd_config
-fi
+sed -i "/^[#[:space:]]*PermitTunnel[[:space:]]/d" /etc/ssh/sshd_config
+echo "PermitTunnel yes" >> /etc/ssh/sshd_config
 
 # SSH ENHANCED: GatewayPorts no
-if grep -qE "^[#[:space:]]*GatewayPorts" /etc/ssh/sshd_config; then
-    sed -i 's/^[#[:space:]]*GatewayPorts.*/GatewayPorts no/' /etc/ssh/sshd_config
-else
-    echo "GatewayPorts no" >> /etc/ssh/sshd_config
-fi
+sed -i "/^[#[:space:]]*GatewayPorts[[:space:]]/d" /etc/ssh/sshd_config
+echo "GatewayPorts no" >> /etc/ssh/sshd_config
 
 # SSH ENHANCED: TCPKeepAlive yes
-if grep -qE "^[#[:space:]]*TCPKeepAlive" /etc/ssh/sshd_config; then
-    sed -i 's/^[#[:space:]]*TCPKeepAlive.*/TCPKeepAlive yes/' /etc/ssh/sshd_config
-else
-    echo "TCPKeepAlive yes" >> /etc/ssh/sshd_config
-fi
+sed -i "/^[#[:space:]]*TCPKeepAlive[[:space:]]/d" /etc/ssh/sshd_config
+echo "TCPKeepAlive yes" >> /etc/ssh/sshd_config
 
 # SSH ENHANCED: MaxSessions 100
-if grep -qE "^[#[:space:]]*MaxSessions" /etc/ssh/sshd_config; then
-    sed -i 's/^[#[:space:]]*MaxSessions.*/MaxSessions 100/' /etc/ssh/sshd_config
-else
-    echo "MaxSessions 100" >> /etc/ssh/sshd_config
-fi
+sed -i "/^[#[:space:]]*MaxSessions[[:space:]]/d" /etc/ssh/sshd_config
+echo "MaxSessions 100" >> /etc/ssh/sshd_config
 
 # SSH ENHANCED: MaxStartups 100:30:200
-if grep -qE "^[#[:space:]]*MaxStartups" /etc/ssh/sshd_config; then
-    sed -i 's/^[#[:space:]]*MaxStartups.*/MaxStartups 100:30:200/' /etc/ssh/sshd_config
-else
-    echo "MaxStartups 100:30:200" >> /etc/ssh/sshd_config
-fi
+sed -i "/^[#[:space:]]*MaxStartups[[:space:]]/d" /etc/ssh/sshd_config
+echo "MaxStartups 100:30:200" >> /etc/ssh/sshd_config
 
 # SSH ENHANCED: UseDNS no
-if grep -qE "^[#[:space:]]*UseDNS" /etc/ssh/sshd_config; then
-    sed -i 's/^[#[:space:]]*UseDNS.*/UseDNS no/' /etc/ssh/sshd_config
-else
-    echo "UseDNS no" >> /etc/ssh/sshd_config
-fi
+sed -i "/^[#[:space:]]*UseDNS[[:space:]]/d" /etc/ssh/sshd_config
+echo "UseDNS no" >> /etc/ssh/sshd_config
 
 # SSH ENHANCED: Compression no
-if grep -qE "^[#[:space:]]*Compression" /etc/ssh/sshd_config; then
-    sed -i 's/^[#[:space:]]*Compression.*/Compression no/' /etc/ssh/sshd_config
-else
-    echo "Compression no" >> /etc/ssh/sshd_config
-fi
+sed -i "/^[#[:space:]]*Compression[[:space:]]/d" /etc/ssh/sshd_config
+echo "Compression no" >> /etc/ssh/sshd_config
 
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 echo -e "${GREEN}SSH Enhanced diaktifkan.${NC}"
