@@ -2235,7 +2235,7 @@ promo_menu() {
                 line=$(sed -n "${ln}p" /root/natssh/config/promo/promo_schedule.conf 2>/dev/null)
                 [ -z "$line" ] && { echo -e "${RED}Baris tidak ada${NC}"; pause; continue; }
                 # toggle field 5
-                new=$(echo "$line" | awk -F'|' '{if($5=="1") $5="0"; else $5="1"; print $1"|"$2"|"$3"|"$4"|"$5"|"$6}')
+                new=$(echo "$line" | awk -F'|' '{if($5=="1") $5="0"; else $5="1"; print $1"|"$2"|"$3"|"$4"|"$5"|"$6"|"$7}')
                 # replace line
                 tmp=$(mktemp)
                 awk -v n="$ln" -v r="$new" 'NR==n{print r; next} {print}' /root/natssh/config/promo/promo_schedule.conf > "$tmp" && mv "$tmp" /root/natssh/config/promo/promo_schedule.conf
