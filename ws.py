@@ -112,16 +112,6 @@ def _header(req: str, name: str) -> str:
     return ""
 
 
-def _cdn_label(edge: str) -> str:
-    """Label CDN dari IP edge; fallback 'Langsung' kalau tidak cocok rentang resmi."""
-    if edge.startswith(("52.", "99.", "18.", "13.32", "13.33", "3.5")):
-        return "CloudFront"
-    if edge.startswith(("104.", "172.64", "172.68", "172.69", "172.70", "172.71",
-                        "188.114", "162.158", "141.101", "108.162", "190.93", "103.2")):
-        return "Cloudflare"
-    return "Langsung"
-
-
 def forward(src, dst, conn=None, field=None):
     """Salur satu arah; tutup dua-duanya saat satu arah berhenti.
     conn/field opsional: menghitung byte lewat (statistik trafik per koneksi)."""
@@ -226,7 +216,7 @@ def handle_client(client_socket, ip):
                         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
                 except OSError:
                     pass
-        cdn = _cdn_label(edge)
+        cdn = _header(request, "X-CDN") or "Langsung"
         _log(f"JEMBAT {real_ip} (edge={edge}, ua='{ua}', total={_total})")
         conn = {"start": round(time.time(), 3), "ip": real_ip, "edge": edge,
                 "ua": ua, "city": city, "cc": cc, "cdn": cdn, "port_ws": port_ws,

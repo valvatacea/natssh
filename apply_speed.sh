@@ -86,6 +86,21 @@ fi
 [ -f "$TMP_CF" ] && mv "$TMP_CF" "$CF_CACHE"
 [ -f "$TMP_CFRONT" ] && mv "$TMP_CFRONT" "$CFRONT_CACHE"
 
+# --- Generate nginx geo config for CDN labeling ---
+CDN_GEO=/root/natssh/config/cdn_geo.conf
+{
+    if [ -f "$CF_CACHE" ]; then
+        while IFS= read -r ip; do
+            [ -n "$ip" ] && echo "$ip    \"Cloudflare\";"
+        done < "$CF_CACHE"
+    fi
+    if [ -f "$CFRONT_CACHE" ]; then
+        while IFS= read -r ip; do
+            [ -n "$ip" ] && echo "$ip    \"CloudFront\";"
+        done < "$CFRONT_CACHE"
+    fi
+} > "$CDN_GEO"
+
 # --- Load IPs from cache ---
 CF_IPS=$(cat "$CF_CACHE" 2>/dev/null)
 CFRONT_IPS=$(cat "$CFRONT_CACHE" 2>/dev/null)

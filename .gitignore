@@ -16,3 +16,4 @@ promo_targets.conf
 banners/.default_backup
 promo.log
 pending_sess.json
+config/cdn_geo.conf
