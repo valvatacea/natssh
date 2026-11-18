@@ -1327,7 +1327,7 @@ conf_speed() {
 }
 
 conf_restart_schedule() {
-    echo -e "${YELLOW}--- JADWAL RESTART OTOMATIS PER-LAYANAN ---${NC}"
+    echo -e "${YELLOW}--- JADWAL OTOMATIS PER-LAYANAN ---${NC}"
     echo ""
     # Tampilkan daftar cron restart aktif per layanan
     for svc in natssh-ws natssh-udpgw nginx; do
@@ -1339,18 +1339,34 @@ conf_restart_schedule() {
         fi
     done
     echo ""
+    # Tampilkan jadwal apply_speed dan generate_cdn_geo
+    if crontab -l 2>/dev/null | grep -q "apply_speed.sh"; then
+        echo -e "  ${CYAN}apply_speed${NC}: ${GREEN}AKTIF${NC} | $(crontab -l 2>/dev/null | grep 'apply_speed.sh' | head -1)"
+    else
+        echo -e "  ${CYAN}apply_speed${NC}: ${RED}TIDAK ADA JADWAL${NC}"
+    fi
+    if crontab -l 2>/dev/null | grep -q "generate_cdn_geo.sh"; then
+        echo -e "  ${CYAN}generate_cdn_geo${NC}: ${GREEN}AKTIF${NC} | $(crontab -l 2>/dev/null | grep 'generate_cdn_geo.sh' | head -1)"
+    else
+        echo -e "  ${CYAN}generate_cdn_geo${NC}: ${RED}TIDAK ADA JADWAL${NC}"
+    fi
+    echo ""
     echo "Pilih layanan untuk diatur:"
     echo "1. natssh-ws (WebSocket)"
     echo "2. natssh-udpgw (UDP Gateway)"
     echo "3. nginx (Reverse Proxy)"
+    echo "4. apply_speed.sh (Refresh IP + limit speed)"
+    echo "5. generate_cdn_geo.sh (Generate cdn_geo.conf)"
     echo -e "${RED}0. Batal${NC}"
-    read -p "Pilih (0-3): " p
+    read -p "Pilih (0-5): " p
     case $p in
         1) toggle_service_cron "natssh-ws" "/usr/bin/systemctl restart natssh-ws" "WebSocket" ;;
         2) toggle_service_cron "natssh-udpgw" "/usr/bin/systemctl restart 'natssh-udpgw@*'" "UDP Gateway" ;;
         3) toggle_service_cron "nginx" "/usr/bin/systemctl restart nginx" "Nginx Reverse Proxy" ;;
-        0) echo -e "${YELLOW}Dibatalkan.${NC}";;
-        *) echo -e "${RED}Pilihan tidak valid!${NC}";;
+        4) toggle_script_cron "apply_speed" "/root/natssh/apply_speed.sh" "Apply Speed Limit" ;;
+        5) toggle_script_cron "generate_cdn_geo" "/root/natssh/generate_cdn_geo.sh" "Generate CDN Geo" ;;
+        0) echo -e "${YELLOW}Dibatalkan.${NC};;
+        *) echo -e "${RED}Pilihan tidak valid!${NC};;
     esac
 }
 
@@ -1392,6 +1408,53 @@ toggle_service_cron() {
                 if [[ "$y" =~ ^[Yy]$ ]] && [ -n "$cron" ]; then
                     (crontab -l 2>/dev/null; echo "${cron} ${restart_cmd} >/dev/null 2>&1") | crontab -
                     echo -e "${GREEN}${svc_label}: jadwal custom tersimpan.${NC}"
+                else
+                    echo -e "${YELLOW}Dibatalkan.${NC}"
+                fi
+                ;;
+            0) echo -e "${YELLOW}Dibatalkan.${NC};;
+            *) echo -e "${RED}Pilihan tidak valid!${NC};;
+        esac
+    fi
+}
+toggle_script_cron() {
+    local script_name="$1"
+    local script_path="$2"
+    local script_label="$3"
+
+    if crontab -l 2>/dev/null | grep -q "${script_path}"; then
+        echo -e "${YELLOW}${script_label} sudah aktif di jadwal cron:${NC}"
+        crontab -l | grep "${script_path}"
+        echo ""
+        read -p "Hapus jadwal cron ${script_label}? (y/N): " h
+        if [[ "$h" =~ ^[Yy]$ ]]; then
+            (crontab -l 2>/dev/null | grep -v "${script_path}") | crontab -
+            echo -e "${GREEN}Jadwal cron ${script_label} dihapus.${NC}"
+        else
+            echo -e "${YELLOW}Jadwal cron ${script_label} tetap aktif.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}${script_label} belum ada jadwal cron.${NC}"
+        echo ""
+        echo "Pilih jadwal:"
+        echo "1. Setiap jam"
+        echo "2. Setiap 6 jam"
+        echo "3. Setiap 12 jam"
+        echo "4. Setiap hari jam 03:00"
+        echo "5. Custom"
+        echo -e "${RED}0. Batal${NC}"
+        read -p "Pilih (0-5): " sp
+        case $sp in
+            1) (crontab -l 2>/dev/null; echo "0 * * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap jam.${NC}";;
+            2) (crontab -l 2>/dev/null; echo "0 */6 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap 6 jam.${NC}";;
+            3) (crontab -l 2>/dev/null; echo "0 */12 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap 12 jam.${NC}";;
+            4) (crontab -l 2>/dev/null; echo "0 3 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap hari jam 03:00.${NC}";;
+            5)
+                read -p "Masukkan cron (contoh: 0 3 * * *): " cron
+                read -p "Lanjut? (y/N): " y
+                if [[ "$y" =~ ^[Yy]$ ]] && [ -n "$cron" ]; then
+                    (crontab -l 2>/dev/null; echo "${cron} ${script_path} >/dev/null 2>&1") | crontab -
+                    echo -e "${GREEN}${script_label}: jadwal custom tersimpan.${NC}"
                 else
                     echo -e "${YELLOW}Dibatalkan.${NC}"
                 fi
