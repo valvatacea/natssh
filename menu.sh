@@ -1350,6 +1350,11 @@ conf_restart_schedule() {
     else
         echo -e "  ${CYAN}generate_cdn_geo${NC}: ${RED}TIDAK ADA JADWAL${NC}"
     fi
+    if crontab -l 2>/dev/null | grep -q "/usr/sbin/reboot"; then
+        echo -e "  ${CYAN}reboot${NC}: ${GREEN}AKTIF${NC} | $(crontab -l 2>/dev/null | grep '/usr/sbin/reboot' | head -1)"
+    else
+        echo -e "  ${CYAN}reboot${NC}: ${RED}TIDAK ADA JADWAL${NC}"
+    fi
     echo ""
     echo "Pilih layanan untuk diatur:"
     echo "1. natssh-ws (WebSocket)"
