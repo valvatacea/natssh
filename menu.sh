@@ -1357,14 +1357,16 @@ conf_restart_schedule() {
     echo "3. nginx (Reverse Proxy)"
     echo "4. apply_speed.sh (Refresh IP + limit speed)"
     echo "5. generate_cdn_geo.sh (Generate cdn_geo.conf)"
+    echo "6. Atur Jadwal Reboot"
     echo -e "${RED}0. Batal${NC}"
-    read -p "Pilih (0-5): " p
+    read -p "Pilih (0-6): " p
     case $p in
         1) toggle_service_cron "natssh-ws" "/usr/bin/systemctl restart natssh-ws" "WebSocket" ;;
         2) toggle_service_cron "natssh-udpgw" "/usr/bin/systemctl restart 'natssh-udpgw@*'" "UDP Gateway" ;;
         3) toggle_service_cron "nginx" "/usr/bin/systemctl restart nginx" "Nginx Reverse Proxy" ;;
         4) toggle_script_cron "apply_speed" "/root/natssh/apply_speed.sh" "Apply Speed Limit" ;;
         5) toggle_script_cron "generate_cdn_geo" "/root/natssh/generate_cdn_geo.sh" "Generate CDN Geo" ;;
+        6) conf_reboot_schedule ;;
         0) echo -e "${YELLOW}Dibatalkan.${NC};;
         *) echo -e "${RED}Pilihan tidak valid!${NC};;
     esac
@@ -1980,13 +1982,12 @@ menu_conf() {
         printf "  %-3s %-46s\n" "8." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
         printf "  %-3s %-46s\n" "9." "Kontrol Layanan Nginx (Start/Stop/Restart)"
         printf "  %-3s %-46s\n" "10." "Penjadwalan"
-        printf "  %-3s %-46s\n" "11." "Atur Jadwal Reboot"
         echo -e "${CYAN}  -- Lainnya --${NC}"
-        printf "  %-3s %-46s\n" "12." "Ubah Banner Pelanggan"
-        printf "  %-3s %-46s\n" "13." "Ubah Durasi Suspend (menit)"
-        printf "  %-3s %-46s\n" "14." "Test Ping (Cek Koneksi Internet)"
+        printf "  %-3s %-46s\n" "11." "Ubah Banner Pelanggan"
+        printf "  %-3s %-46s\n" "12." "Ubah Durasi Suspend (menit)"
+        printf "  %-3s %-46s\n" "13." "Test Ping (Cek Koneksi Internet)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-14): " p || exit 0
+        read -p "Pilih (0-13): " p || exit 0
         case $p in
             1) conf_port_submenu ;;
             2) conf_domain ;;
@@ -1998,14 +1999,13 @@ menu_conf() {
             8) conf_service ;;
             9) conf_nginx_service ;;
             10) conf_restart_schedule ;;
-            11) conf_reboot_schedule ;;
-            12) conf_banner ;;
-            13) conf_suspend_minutes ;;
-            14) conf_test_ping ;;
+            11) conf_banner ;;
+            12) conf_suspend_minutes ;;
+            13) conf_test_ping ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "4" ] && [ "$p" != "6" ] && [ "$p" != "7" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && [ "$p" != "14" ] && pause
+        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "4" ] && [ "$p" != "6" ] && [ "$p" != "7" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && pause
     done
 }
 
