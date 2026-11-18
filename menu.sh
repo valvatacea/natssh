@@ -559,12 +559,12 @@ status_sistem() {
     top -bn1 | grep load | awk '{printf "CPU Load  : %.2f\n", $(NF-2)}'
     echo -e "Disk      : $(df -h / | awk 'NR==2{print $3 " / " $2 " (" $5 ")"}')"
     # ── RESOURCE SSH ──
-    local nsess=$(ps -eo user:40=,args= | awk '$1!="root" && /sshd/ && !/priv/ {c++} END{print c+0}')
+    local nsess=$(ps -eo user:40=,comm= | awk '$1!="root" && $2=="sshd" {c++} END{print c+0}')
     local rss_ssh=0
     for u in $(ps -eo user:40=,comm= | awk '$2=="sshd" && $1!="root" {print $1}' | sort -u); do
         local shell=$(awk -F: -v u="$u" '$1==u {print $7}' /etc/passwd 2>/dev/null)
         [ "$shell" == "/bin/false" ] || continue
-        local ru=$(ps -eo rss,user,comm | awk -v u="$u" '$2==u && $3=="sshd" {s+=$1} END{printf "%d", s}')
+        local ru=$(ps -eo rss,user:40=,comm | awk -v u="$u" '$2==u && $3=="sshd" {s+=$1} END{printf "%d", s}')
         rss_ssh=$((rss_ssh + ru))
     done
     rss_ssh=$((rss_ssh / 1024))
