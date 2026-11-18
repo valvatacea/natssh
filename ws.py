@@ -152,7 +152,7 @@ def handle_client(client_socket, ip):
     via_cdn = False
     admitted = False
     try:
-        buf = client_socket.recv(4096)                      # RAW (bytes): utk diteruskan
+        buf = client_socket.recv(8192)                      # RAW (bytes): utk diteruskan
         request = buf.decode("utf-8", errors="ignore")     # hanya utk deteksi header
     except OSError:
         try:
