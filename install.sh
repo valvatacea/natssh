@@ -1,6 +1,7 @@
 #!/bin/bash
 # Installer for natssh (SSH WebSocket Proxy & Autokill untuk VPS NAT)
 # Repo: https://github.com/valvatacea/natssh.git
+# Path dinamis: $(pwd) = direktori tempat installer dijalankan
 
 RED='\u001b[0;31m'
 GREEN='\u001b[0;32m'
@@ -39,36 +40,38 @@ if ss -tln | grep -q ":${ws_port} "; then
     echo -e "${RED}Port ${ws_port} sudah dipakai proses lain!${NC}"; exit 1
 fi
 
-echo -e "\n[*] Membuat direktori..."
-mkdir -p /root/natssh/config
-mkdir -p /root/natssh/config/promo
-mkdir -p /root/natssh/logs
-mkdir -p /root/natssh/suspended
+DIR=$(pwd)
+echo -e "\n[*] Direktori instalasi: $DIR"
+
+mkdir -p "$DIR/config"
+mkdir -p "$DIR/config/promo"
+mkdir -p "$DIR/logs"
+mkdir -p "$DIR/suspended"
 mkdir -p /etc/nginx/ssl
 
 echo -e "\n[*] Mengunduh file dari repositori..."
-wget -qO /root/natssh/menu.sh https://raw.githubusercontent.com/valvatacea/natssh/main/menu.sh
-wget -qO /root/natssh/ws.py https://raw.githubusercontent.com/valvatacea/natssh/main/ws.py
-wget -qO /root/natssh/autokill.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autokill.sh
-wget -qO /root/natssh/unsuspend.sh https://raw.githubusercontent.com/valvatacea/natssh/main/unsuspend.sh
-wget -qO /root/natssh/autobackup.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autobackup.sh
-wget -qO /root/natssh/uninstall.sh https://raw.githubusercontent.com/valvatacea/natssh/main/uninstall.sh
-wget -qO /root/natssh/apply_speed.sh https://raw.githubusercontent.com/valvatacea/natssh/main/apply_speed.sh
-wget -qO /root/natssh/apply_cf_marks.sh https://raw.githubusercontent.com/valvatacea/natssh/main/apply_cf_marks.sh
-wget -qO /root/natssh/promo_rotate.sh https://raw.githubusercontent.com/valvatacea/natssh/main/promo_rotate.sh
-wget -qO /root/natssh/sess_audit.py https://raw.githubusercontent.com/valvatacea/natssh/main/sess_audit.py
-wget -qO /root/natssh/reap.py https://raw.githubusercontent.com/valvatacea/natssh/main/reap.py
-wget -qO /root/natssh/audit_kill.py https://raw.githubusercontent.com/valvatacea/natssh/main/audit_kill.py
-wget -qO /root/natssh/ws_match.py https://raw.githubusercontent.com/valvatacea/natssh/main/ws_match.py
-wget -qO /root/natssh/generate_cdn_geo.sh https://raw.githubusercontent.com/valvatacea/natssh/main/generate_cdn_geo.sh
+wget -qO "$DIR/menu.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/menu.sh
+wget -qO "$DIR/ws.py" https://raw.githubusercontent.com/valvatacea/natssh/main/ws.py
+wget -qO "$DIR/autokill.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/autokill.sh
+wget -qO "$DIR/unsuspend.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/unsuspend.sh
+wget -qO "$DIR/autobackup.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/autobackup.sh
+wget -qO "$DIR/uninstall.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/uninstall.sh
+wget -qO "$DIR/apply_speed.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/apply_speed.sh
+wget -qO "$DIR/apply_cf_marks.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/apply_cf_marks.sh
+wget -qO "$DIR/promo_rotate.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/promo_rotate.sh
+wget -qO "$DIR/sess_audit.py" https://raw.githubusercontent.com/valvatacea/natssh/main/sess_audit.py
+wget -qO "$DIR/reap.py" https://raw.githubusercontent.com/valvatacea/natssh/main/reap.py
+wget -qO "$DIR/audit_kill.py" https://raw.githubusercontent.com/valvatacea/natssh/main/audit_kill.py
+wget -qO "$DIR/ws_match.py" https://raw.githubusercontent.com/valvatacea/natssh/main/ws_match.py
+wget -qO "$DIR/generate_cdn_geo.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/generate_cdn_geo.sh
 
 for f in menu.sh ws.py autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh apply_cf_marks.sh promo_rotate.sh sess_audit.py reap.py audit_kill.py ws_match.py generate_cdn_geo.sh; do
-    [ -s "/root/natssh/$f" ] || { echo "Gagal mengunduh $f (repo privat/offline?)"; exit 1; }
+    [ -s "$DIR/$f" ] || { echo "Gagal mengunduh $f (repo privat/offline?)"; exit 1; }
 done
 echo -e "\n[*] Port WebSocket akan disetel via Environment systemd (ws.py v2): ${ws_port}"
 
 echo -e "\n[*] Mengatur izin eksekusi..."
-chmod +x /root/natssh/menu.sh /root/natssh/autokill.sh /root/natssh/unsuspend.sh /root/natssh/autobackup.sh /root/natssh/uninstall.sh /root/natssh/apply_speed.sh /root/natssh/apply_cf_marks.sh /root/natssh/promo_rotate.sh /root/natssh/sess_audit.py /root/natssh/reap.py /root/natssh/audit_kill.py /root/natssh/ws_match.py /root/natssh/generate_cdn_geo.sh
+chmod +x "$DIR/menu.sh" "$DIR/autokill.sh" "$DIR/unsuspend.sh" "$DIR/autobackup.sh" "$DIR/uninstall.sh" "$DIR/apply_speed.sh" "$DIR/apply_cf_marks.sh" "$DIR/promo_rotate.sh" "$DIR/sess_audit.py" "$DIR/reap.py" "$DIR/audit_kill.py" "$DIR/ws_match.py" "$DIR/generate_cdn_geo.sh"
 
 echo -e "\n[*] Mengatur Service Systemd untuk WebSocket Proxy (ws.py)..."
 cat > /etc/systemd/system/natssh-ws.service <<EOF
@@ -79,10 +82,10 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/natssh
+WorkingDirectory=$DIR
 Environment=NATSSH_WS_PORT=${ws_port}
 Environment=NATSSH_MAX_TOTAL=150
-ExecStart=/usr/bin/python3 /root/natssh/ws.py
+ExecStart=/usr/bin/python3 $DIR/ws.py
 Restart=always
 RestartSec=3
 
@@ -151,7 +154,7 @@ fi
 
 rm -f /etc/nginx/sites-enabled/default
 
-ssl_domain=$(cat /root/natssh/config/host.conf 2>/dev/null || echo "id1.xenonblue.qzz.io")
+ssl_domain=$(cat "$DIR/config/host.conf" 2>/dev/null || echo "id1.xenonblue.qzz.io")
 if [ ! -f /etc/nginx/ssl/natssh.crt ] || [ ! -f /etc/nginx/ssl/natssh.key ]; then
     echo -e "\n[*] Membuat sertifikat SSL self-signed untuk nginx (WSS)..."
     openssl req -x509 -newkey rsa:2048 -keyout /etc/nginx/ssl/natssh.key -out /etc/nginx/ssl/natssh.crt -days 3650 -nodes \
@@ -195,7 +198,7 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/root/natssh/apply_speed.sh
+ExecStart=$DIR/apply_speed.sh
 RemainAfterExit=yes
 
 [Install]
@@ -206,20 +209,20 @@ echo -e "${GREEN}Service natssh-speed disiapkan (belum diaktifkan). Aktif setela
 
 echo -e "\n[*] Mengatur Cronjob untuk Autokill..."
 if ! crontab -l 2>/dev/null | grep -q "autokill.sh"; then
-    (crontab -l 2>/dev/null; echo "*/1 * * * * MAX_LOGIN=$max_login /root/natssh/autokill.sh") | crontab -
-    echo 15 > /root/natssh/config/suspend_minutes.conf
+    (crontab -l 2>/dev/null; echo "*/1 * * * * MAX_LOGIN=$max_login $DIR/autokill.sh") | crontab -
+    echo 15 > "$DIR/config/suspend_minutes.conf"
     echo -e "${GREEN}Cronjob Autokill berhasil ditambahkan (berjalan setiap 1 menit).${NC}"
 else
     echo -e "${GREEN}Cronjob Autokill sudah ada.${NC}"
 fi
 
 if ! crontab -l 2>/dev/null | grep -q "unsuspend.sh"; then
-    (crontab -l 2>/dev/null; echo "* * * * * /root/natssh/unsuspend.sh >> /root/natssh/logs/autokill.log 2>&1") | crontab -
+    (crontab -l 2>/dev/null; echo "* * * * * $DIR/unsuspend.sh >> $DIR/logs/autokill.log 2>&1") | crontab -
 fi
-[ -f /root/natssh/config/suspend_minutes.conf ] || echo 15 > /root/natssh/config/suspend_minutes.conf
+[ -f "$DIR/config/suspend_minutes.conf" ] || echo 15 > "$DIR/config/suspend_minutes.conf"
 
 if ! crontab -l 2>/dev/null | grep -q "sess_audit"; then
-    (crontab -l 2>/dev/null; echo "*/2 * * * * /usr/bin/python3 /root/natssh/sess_audit.py >/dev/null 2>&1") | crontab -
+    (crontab -l 2>/dev/null; echo "*/2 * * * * /usr/bin/python3 $DIR/sess_audit.py >/dev/null 2>&1") | crontab -
 fi
 
 if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
@@ -297,9 +300,9 @@ systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 echo -e "${GREEN}SSH Enhanced diaktifkan.${NC}"
 
 echo -e "\n[*] Membuat perintah pintas 'natssh'..."
-cat > /usr/local/bin/natssh << 'EOF'
+cat > /usr/local/bin/natssh << EOF
 #!/bin/bash
-exec /root/natssh/menu.sh "$@"
+exec $DIR/menu.sh \$@
 EOF
 chmod +x /usr/local/bin/natssh
 echo -e "${GREEN}Perintah 'natssh' telah dibuat. Ketik 'natssh' untuk membuka menu.${NC}"
