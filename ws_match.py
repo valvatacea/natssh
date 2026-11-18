@@ -194,8 +194,6 @@ for user, ep in [(u, int(e)) for u, e in raw]:
                 bkey = key
                 best = c
 
-    if best and not best["_live"]:
-        best = None   # koneksi sudah selesai -> jangan duplikat riwayat di seksi live
     if best:
         seen.add(id(best))
         matched.append(best)
@@ -228,8 +226,11 @@ for user, ep in [(u, int(e)) for u, e in raw]:
         line = (f"   {wt} {C_WHITE}{best['ip']:<16}\033[0m"
                 f"{durasi:>7} {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193 {status}{jalur}{geo}{port_info}")
         extra_ua = best.get('ua') or '-'
-    if not best:
-        continue
+    else:
+        # Tidak ada kecocokan di conns.json, tapi proses sshd masih hidup menurut ps
+        line = f"   {wt} {C_WHITE}??.?.?.?{C_RESET:<16}     ??m??s ?↑?↓ {C_DIM}live (ws tidak terdeteksi){C_RESET}"
+        extra_ua = '-'
+
     print(line)
     print(f"              {C_DIM}UA: {extra_ua}{C_RESET}")
 
