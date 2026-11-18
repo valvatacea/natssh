@@ -1979,7 +1979,7 @@ menu_conf() {
         echo -e "${CYAN}  -- Layanan --${NC}"
         printf "  %-3s %-46s\n" "8." "Kontrol Layanan natssh-ws (Start/Stop/Restart)"
         printf "  %-3s %-46s\n" "9." "Kontrol Layanan Nginx (Start/Stop/Restart)"
-        printf "  %-3s %-46s\n" "10." "Atur Jadwal Restart Otomatis (WS + UDPGW)"
+        printf "  %-3s %-46s\n" "10." "Penjadwalan"
         printf "  %-3s %-46s\n" "11." "Atur Jadwal Reboot"
         echo -e "${CYAN}  -- Lainnya --${NC}"
         printf "  %-3s %-46s\n" "12." "Ubah Banner Pelanggan"
