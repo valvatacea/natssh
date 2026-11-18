@@ -1411,12 +1411,18 @@ toggle_service_cron() {
             4) (crontab -l 2>/dev/null; echo "0 4 * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap hari jam 04:00.${NC}";;
             5)
                 read -p "Masukkan cron (contoh: 0 4 * * *): " cron
-                read -p "Lanjut? (y/N): " y
-                if [[ "$y" =~ ^[Yy]$ ]] && [ -n "$cron" ]; then
-                    (crontab -l 2>/dev/null; echo "${cron} ${restart_cmd} >/dev/null 2>&1") | crontab -
-                    echo -e "${GREEN}${svc_label}: jadwal custom tersimpan.${NC}"
-                else
+                if [ -z "$cron" ]; then
                     echo -e "${YELLOW}Dibatalkan.${NC}"
+                elif [[ ! "$cron" =~ ^[0-9*/,\-]+([[:space:]]+[0-9*/,\-]+){4} ]]; then
+                    echo -e "${RED}Gagal: format cron tidak valid!${NC}"
+                else
+                    read -p "Lanjut? (y/N): " y
+                    if [[ "$y" =~ ^[Yy]$ ]]; then
+                        (crontab -l 2>/dev/null; echo "${cron} ${restart_cmd} >/dev/null 2>&1") | crontab -
+                        echo -e "${GREEN}${svc_label}: jadwal custom tersimpan.${NC}"
+                    else
+                        echo -e "${YELLOW}Dibatalkan.${NC}"
+                    fi
                 fi
                 ;;
             0) echo -e "${YELLOW}Dibatalkan.${NC};;
@@ -1455,15 +1461,21 @@ toggle_script_cron() {
             1) (crontab -l 2>/dev/null; echo "0 * * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap jam.${NC}";;
             2) (crontab -l 2>/dev/null; echo "0 */6 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap 6 jam.${NC}";;
             3) (crontab -l 2>/dev/null; echo "0 */12 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap 12 jam.${NC}";;
-            4) (crontab -l 2>/dev/null; echo "0 3 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap hari jam 03:00.${NC}";;
+            4) (crontab -l 2>/dev/null; echo "0 4 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap hari jam 04:00.${NC}";;
             5)
-                read -p "Masukkan cron (contoh: 0 3 * * *): " cron
-                read -p "Lanjut? (y/N): " y
-                if [[ "$y" =~ ^[Yy]$ ]] && [ -n "$cron" ]; then
-                    (crontab -l 2>/dev/null; echo "${cron} ${script_path} >/dev/null 2>&1") | crontab -
-                    echo -e "${GREEN}${script_label}: jadwal custom tersimpan.${NC}"
-                else
+                read -p "Masukkan cron (contoh: 0 4 * * *): " cron
+                if [ -z "$cron" ]; then
                     echo -e "${YELLOW}Dibatalkan.${NC}"
+                elif [[ ! "$cron" =~ ^[0-9*/,\-]+([[:space:]]+[0-9*/,\-]+){4} ]]; then
+                    echo -e "${RED}Gagal: format cron tidak valid!${NC}"
+                else
+                    read -p "Lanjut? (y/N): " y
+                    if [[ "$y" =~ ^[Yy]$ ]]; then
+                        (crontab -l 2>/dev/null; echo "${cron} ${script_path} >/dev/null 2>&1") | crontab -
+                        echo -e "${GREEN}${script_label}: jadwal custom tersimpan.${NC}"
+                    else
+                        echo -e "${YELLOW}Dibatalkan.${NC}"
+                    fi
                 fi
                 ;;
             0) echo -e "${YELLOW}Dibatalkan.${NC};;
@@ -1475,7 +1487,7 @@ toggle_script_cron() {
 toggle_reboot_cron() {
     if crontab -l 2>/dev/null | grep -q "/usr/sbin/reboot"; then
         echo -e "${YELLOW}Jadwal reboot sudah aktif:${NC}"
-        crontab -l | grep "/usr/sbin/reboot"
+        crontab -l 2>/dev/null | grep "/usr/sbin/reboot"
         echo ""
         read -p "Hapus jadwal reboot? (y/N): " h
         if [[ "$h" =~ ^[Yy]$ ]]; then
@@ -1495,17 +1507,23 @@ toggle_reboot_cron() {
         echo -e "${RED}0. Batal${NC}"
         read -p "Pilih (0-4): " sp
         case $sp in
-            1) (crontab -l 2>/dev/null; echo "0 3 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap hari 03:00.${NC}";;
+            1) (crontab -l 2>/dev/null; echo "0 4 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap hari 04:00.${NC}";;
             2) (crontab -l 2>/dev/null; echo "0 4 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap hari 04:00.${NC}";;
             3) (crontab -l 2>/dev/null; echo "0 */12 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap 12 jam.${NC}";;
             4)
-                read -p "Masukkan cron (contoh: 0 2 * * *): " cron
-                read -p "Lanjut? (y/N): " y
-                if [[ "$y" =~ ^[Yy]$ ]] && [ -n "$cron" ]; then
-                    (crontab -l 2>/dev/null; echo "${cron} /usr/sbin/reboot >/dev/null 2>&1") | crontab -
-                    echo -e "${GREEN}Jadwal reboot custom tersimpan.${NC}"
-                else
+                read -p "Masukkan cron (contoh: 0 4 * * *): " cron
+                if [ -z "$cron" ]; then
                     echo -e "${YELLOW}Dibatalkan.${NC}"
+                elif [[ ! "$cron" =~ ^[0-9*/,\-]+([[:space:]]+[0-9*/,\-]+){4} ]]; then
+                    echo -e "${RED}Gagal: format cron tidak valid!${NC}"
+                else
+                    read -p "Lanjut? (y/N): " y
+                    if [[ "$y" =~ ^[Yy]$ ]]; then
+                        (crontab -l 2>/dev/null; echo "${cron} /usr/sbin/reboot >/dev/null 2>&1") | crontab -
+                        echo -e "${GREEN}Jadwal reboot custom tersimpan.${NC}"
+                    else
+                        echo -e "${YELLOW}Dibatalkan.${NC}"
+                    fi
                 fi
                 ;;
             0) echo -e "${YELLOW}Dibatalkan.${NC};;
