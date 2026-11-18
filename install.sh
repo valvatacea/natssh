@@ -2,24 +2,22 @@
 # Installer for natssh (SSH WebSocket Proxy & Autokill untuk VPS NAT)
 # Repo: https://github.com/valvatacea/natssh.git
 
-RED='[0;31m'
-GREEN='[0;32m'
-YELLOW='[0;33m'
-CYAN='[0;36m'
-NC='[0m'
+RED='\u001b[0;31m'
+GREEN='\u001b[0;32m'
+YELLOW='\u001b[0;33m'
+CYAN='\u001b[0;36m'
+NC='\u001b[0m'
 
 echo -e "${CYAN}================================================${NC}"
 echo -e "${YELLOW}   INSTALASI NATSSH (WebSocket Proxy & Autokill)  ${NC}"
 echo -e "${CYAN}================================================${NC}"
 
-# Cek apakah dijalankan sebagai root
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Tolong jalankan skrip ini sebagai root (sudo -i).${NC}"
   exit 1
 fi
 
-echo -e "
-[*] Memeriksa dependensi..."
+echo -e "\n[*] Memeriksa dependensi..."
 if ! command -v python3 &> /dev/null; then
     echo -e "${YELLOW}Python3 belum terinstal. Menginstal...${NC}"
     apt-get update && apt-get install -y python3
@@ -27,7 +25,6 @@ else
     echo -e "${GREEN}Python3 sudah terinstal.${NC}"
 fi
 
-# Tanya port interaktif
 read -p "Masukkan Port NAT kosong untuk WebSocket (default: 20865): " ws_port
 ws_port=${ws_port:-20865}
 read -p "Maksimal perangkat per akun / batas autokill (default: 5): " max_login
@@ -42,32 +39,38 @@ if ss -tln | grep -q ":${ws_port} "; then
     echo -e "${RED}Port ${ws_port} sudah dipakai proses lain!${NC}"; exit 1
 fi
 
-# Download file utama
-echo -e "
-[*] Mengunduh file dari repositori..."
-wget -qO menu.sh https://raw.githubusercontent.com/valvatacea/natssh/main/menu.sh
-wget -qO ws.py https://raw.githubusercontent.com/valvatacea/natssh/main/ws.py
-wget -qO autokill.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autokill.sh
-wget -qO unsuspend.sh https://raw.githubusercontent.com/valvatacea/natssh/main/unsuspend.sh
-wget -qO autobackup.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autobackup.sh
-wget -qO uninstall.sh https://raw.githubusercontent.com/valvatacea/natssh/main/uninstall.sh
-wget -qO apply_speed.sh https://raw.githubusercontent.com/valvatacea/natssh/main/apply_speed.sh
-wget -qO apply_cf_marks.sh https://raw.githubusercontent.com/valvatacea/natssh/main/apply_cf_marks.sh
-wget -qO promo_rotate.sh https://raw.githubusercontent.com/valvatacea/natssh/main/promo_rotate.sh
+echo -e "\n[*] Membuat direktori..."
+mkdir -p /root/natssh/config
+mkdir -p /root/natssh/config/promo
+mkdir -p /root/natssh/logs
+mkdir -p /root/natssh/suspended
+mkdir -p /etc/nginx/ssl
 
-# Unduhan gagal = file kosong -> service crash-loop; cek ukuran
-for f in menu.sh ws.py autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh apply_cf_marks.sh promo_rotate.sh; do
-    [ -s "$f" ] || { echo "Gagal mengunduh $f (repo privat/offline?)"; exit 1; }
+echo -e "\n[*] Mengunduh file dari repositori..."
+wget -qO /root/natssh/menu.sh https://raw.githubusercontent.com/valvatacea/natssh/main/menu.sh
+wget -qO /root/natssh/ws.py https://raw.githubusercontent.com/valvatacea/natssh/main/ws.py
+wget -qO /root/natssh/autokill.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autokill.sh
+wget -qO /root/natssh/unsuspend.sh https://raw.githubusercontent.com/valvatacea/natssh/main/unsuspend.sh
+wget -qO /root/natssh/autobackup.sh https://raw.githubusercontent.com/valvatacea/natssh/main/autobackup.sh
+wget -qO /root/natssh/uninstall.sh https://raw.githubusercontent.com/valvatacea/natssh/main/uninstall.sh
+wget -qO /root/natssh/apply_speed.sh https://raw.githubusercontent.com/valvatacea/natssh/main/apply_speed.sh
+wget -qO /root/natssh/apply_cf_marks.sh https://raw.githubusercontent.com/valvatacea/natssh/main/apply_cf_marks.sh
+wget -qO /root/natssh/promo_rotate.sh https://raw.githubusercontent.com/valvatacea/natssh/main/promo_rotate.sh
+wget -qO /root/natssh/sess_audit.py https://raw.githubusercontent.com/valvatacea/natssh/main/sess_audit.py
+wget -qO /root/natssh/reap.py https://raw.githubusercontent.com/valvatacea/natssh/main/reap.py
+wget -qO /root/natssh/audit_kill.py https://raw.githubusercontent.com/valvatacea/natssh/main/audit_kill.py
+wget -qO /root/natssh/ws_match.py https://raw.githubusercontent.com/valvatacea/natssh/main/ws_match.py
+wget -qO /root/natssh/generate_cdn_geo.sh https://raw.githubusercontent.com/valvatacea/natssh/main/generate_cdn_geo.sh
+
+for f in menu.sh ws.py autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh apply_cf_marks.sh promo_rotate.sh sess_audit.py reap.py audit_kill.py ws_match.py generate_cdn_geo.sh; do
+    [ -s "/root/natssh/$f" ] || { echo "Gagal mengunduh $f (repo privat/offline?)"; exit 1; }
 done
-echo -e "
-[*] Port WebSocket akan disetel via Environment systemd (ws.py v2): ${ws_port}"
+echo -e "\n[*] Port WebSocket akan disetel via Environment systemd (ws.py v2): ${ws_port}"
 
-echo -e "
-[*] Mengatur izin eksekusi..."
-chmod +x menu.sh autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh apply_cf_marks.sh promo_rotate.sh
+echo -e "\n[*] Mengatur izin eksekusi..."
+chmod +x /root/natssh/menu.sh /root/natssh/autokill.sh /root/natssh/unsuspend.sh /root/natssh/autobackup.sh /root/natssh/uninstall.sh /root/natssh/apply_speed.sh /root/natssh/apply_cf_marks.sh /root/natssh/promo_rotate.sh /root/natssh/sess_audit.py /root/natssh/reap.py /root/natssh/audit_kill.py /root/natssh/ws_match.py /root/natssh/generate_cdn_geo.sh
 
-echo -e "
-[*] Mengatur Service Systemd untuk WebSocket Proxy (ws.py)..."
+echo -e "\n[*] Mengatur Service Systemd untuk WebSocket Proxy (ws.py)..."
 cat > /etc/systemd/system/natssh-ws.service <<EOF
 [Unit]
 Description=NATSSH WebSocket Proxy Service
@@ -76,10 +79,10 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=$(pwd)
+WorkingDirectory=/root/natssh
 Environment=NATSSH_WS_PORT=${ws_port}
 Environment=NATSSH_MAX_TOTAL=150
-ExecStart=/usr/bin/python3 $(pwd)/ws.py
+ExecStart=/usr/bin/python3 /root/natssh/ws.py
 Restart=always
 RestartSec=3
 
@@ -92,7 +95,6 @@ systemctl enable natssh-ws.service
 systemctl start natssh-ws.service
 echo -e "${GREEN}Service natssh-ws berhasil dibuat dan dijalankan!${NC}"
 
-# Port badvpn-udpgw (UDP-over-TCP gateway), internal localhost saja
 udpgw_ports="7100 7200 7300 7400 7500"
 
 echo -e "\n[*] Menginstal dependensi build badvpn-udpgw..."
@@ -136,25 +138,20 @@ for pp in $udpgw_ports; do
 done
 echo -e "${GREEN}Service natssh-udpgw aktif di: ${udpgw_ports} (localhost only).${NC}"
 
-# ===== Nginx (Reverse Proxy TLS untuk WebSocket) =====
 echo -e "\n[*] Menginstal nginx (reverse proxy WebSocket)..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y nginx >/dev/null 2>&1
 if ! command -v nginx &> /dev/null; then
     echo -e "${RED}Gagal menginstal nginx.${NC}"; exit 1
 fi
 
-# Nginx listen di port publik WebSocket (20865), proxy ke ws.py
 nginx_port=20865
 if ss -tln | grep -q ":${nginx_port} "; then
     echo -e "${RED}Port ${nginx_port} sudah dipakai proses lain!${NC}"; exit 1
 fi
 
-# Hapus default site nginx agar tidak bentrok
 rm -f /etc/nginx/sites-enabled/default
 
-# Sertifikat SSL self-signed untuk WSS (port 20865)
 ssl_domain=$(cat /root/natssh/config/host.conf 2>/dev/null || echo "id1.xenonblue.qzz.io")
-mkdir -p /etc/nginx/ssl
 if [ ! -f /etc/nginx/ssl/natssh.crt ] || [ ! -f /etc/nginx/ssl/natssh.key ]; then
     echo -e "\n[*] Membuat sertifikat SSL self-signed untuk nginx (WSS)..."
     openssl req -x509 -newkey rsa:2048 -keyout /etc/nginx/ssl/natssh.key -out /etc/nginx/ssl/natssh.crt -days 3650 -nodes \
@@ -163,14 +160,13 @@ if [ ! -f /etc/nginx/ssl/natssh.crt ] || [ ! -f /etc/nginx/ssl/natssh.key ]; the
     chmod 644 /etc/nginx/ssl/natssh.crt
 fi
 
-# Buat konfigurasi reverse proxy nginx untuk WebSocket (SSL/TLS di port 20865)
 cat > /etc/nginx/sites-available/natssh-ws <<EOF
 server {
     listen ${nginx_port} ssl;
     server_name _;
 
     ssl_certificate /etc/nginx/ssl/natssh.crt;
-    ssl_certificate_key /etc/nginx/ssl/natssl.key;
+    ssl_certificate_key /etc/nginx/ssl/natssh.key;
 
     location / {
         proxy_pass http://127.0.0.1:${ws_port};
@@ -181,6 +177,7 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-CDN \$cdn_label;
         proxy_read_timeout 300s;
         proxy_send_timeout 300s;
     }
@@ -189,9 +186,6 @@ EOF
 ln -sf /etc/nginx/sites-available/natssh-ws /etc/nginx/sites-enabled/natssh-ws
 nginx -t && systemctl enable --now nginx
 echo -e "${GREEN}Service nginx berhasil dibuat dan dijalankan di port ${nginx_port} SSL -> 127.0.0.1:${ws_port}!${NC}"
-
-
-echo -e "\n[*] Cronjob apply speed digabung dengan restart (lihat bawah)..."
 
 echo -e "\n[*] Menyiapkan service NATSSH speed limit (tidak diaktifkan otomatis)..."
 cat > /etc/systemd/system/natssh-speed.service <<'EOF'
@@ -210,48 +204,44 @@ EOF
 systemctl daemon-reload
 echo -e "${GREEN}Service natssh-speed disiapkan (belum diaktifkan). Aktif setelah konfigurasi limit speed.${NC}"
 
-echo -e "
-[*] Mengatur Cronjob untuk Autokill..."
-# Cek apakah cronjob sudah ada agar tidak duplikat
+echo -e "\n[*] Mengatur Cronjob untuk Autokill..."
 if ! crontab -l 2>/dev/null | grep -q "autokill.sh"; then
-    (crontab -l 2>/dev/null; echo "*/1 * * * * MAX_LOGIN=$max_login $(pwd)/autokill.sh") | crontab -
-    echo 15 > suspend_minutes.conf
+    (crontab -l 2>/dev/null; echo "*/1 * * * * MAX_LOGIN=$max_login /root/natssh/autokill.sh") | crontab -
+    echo 15 > /root/natssh/config/suspend_minutes.conf
     echo -e "${GREEN}Cronjob Autokill berhasil ditambahkan (berjalan setiap 1 menit).${NC}"
 else
     echo -e "${GREEN}Cronjob Autokill sudah ada.${NC}"
 fi
-mkdir -p /root/natssh/suspended 2>/dev/null
-# Cron unsuspend (tiap 1 menit)
+
 if ! crontab -l 2>/dev/null | grep -q "unsuspend.sh"; then
-    (crontab -l 2>/dev/null; echo "* * * * * $(pwd)/unsuspend.sh >> $(pwd)/logs/autokill.log 2>&1") | crontab -
+    (crontab -l 2>/dev/null; echo "* * * * * /root/natssh/unsuspend.sh >> /root/natssh/logs/autokill.log 2>&1") | crontab -
 fi
-[ -f suspend_minutes.conf ] || echo 15 > suspend_minutes.conf
-# Cron sess_audit (tiap 2 menit) — riwayat sesi per user
+[ -f /root/natssh/config/suspend_minutes.conf ] || echo 15 > /root/natssh/config/suspend_minutes.conf
+
 if ! crontab -l 2>/dev/null | grep -q "sess_audit"; then
-    (crontab -l 2>/dev/null; echo "*/2 * * * * /usr/bin/python3 $(pwd)/sess_audit.py >/dev/null 2>&1") | crontab -
+    (crontab -l 2>/dev/null; echo "*/2 * * * * /usr/bin/python3 /root/natssh/sess_audit.py >/dev/null 2>&1") | crontab -
 fi
-# Auto restart natssh-ws (jam 04:00)
+
 if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
     (crontab -l 2>/dev/null; echo "0 4 * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab -
 fi
-# Auto restart natssh-udpgw (jam 04:15)
+
 if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-udpgw"; then
     (crontab -l 2>/dev/null; echo "0 4,15 * * * /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab -
 fi
-# Auto restart nginx (jam 04:30)
+
 if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*nginx"; then
     (crontab -l 2>/dev/null; echo "0 4,30 * * * /usr/bin/systemctl restart nginx >/dev/null 2>&1") | crontab -
 fi
+
 echo -e "${GREEN}Cronjob auto-restart per-layanan berhasil ditambahkan (ws 04:00, udpgw 04:15, nginx 04:30).${NC}"
 
-echo -e ""
-echo -e "[*] Backup sshd_config untuk rollback..."
+echo -e "\n[*] Backup sshd_config untuk rollback..."
 if [ ! -f /etc/ssh/sshd_config.natssh_backup ]; then
     cp /etc/ssh/sshd_config /etc/ssh/sshd_config.natssh_backup
 fi
 
-echo -e ""
-echo -e "[*] Mengatur Banner Pesan SSH..."
+echo -e "\n[*] Mengatur Banner Pesan SSH..."
 cat > /etc/issue.net <<EOF
 <br>
 <center>
@@ -266,65 +256,47 @@ cat > /etc/issue.net <<EOF
 <font color="orange">⚔ Auto-Kill AKTIF</font><br>
 <font color="white">──────────────────</font><br>
 <font color="red">⛔ Dilarang: Torrent · DDoS · Data Waster · Hack</font><br>
-<font color="grey">🛡 Support : </font><font color="magenta"><a href="https://wa.me/6281223711096?text=Halo%2C%20saya%20ingin%20membeli%20layanan%20SSH%2FVPN.%20Bisa%20info%20paket%20dan%20harganya%3F" target="_blank" rel="noopener">+6281223711096</a></font><br>
+<font color="grey">🛡 Support : </font><font color="magenta"><a href="https://wa.me/6281223711096?text=Halo%2C%20saya%20ingin%20membeli%20layanan%20SSH%2FVPN.%20Bisa%20info%20paket%20dan%20harganya%3F" target="_blank" rel="noopener">+628****1096</a></font><br>
 <font color="cyan">╚═══════════════════════╝</font><br>
 <font color="green"><b>═══ SELAMAT MENIKMATI ═══</b></font><br>
 </p>
 </center>
 EOF
 
-# Aktifkan banner di sshd_config (aman diulang: bila 'Banner' sudah ada, cukup pastikan arahnya benar)
 if grep -qE "^#?\s*Banner" /etc/ssh/sshd_config; then
-    sed -i 's/^#\s*Banner.*/Banner \/etc\/issue.net/' /etc/ssh/sshd_config
+    sed -i 's/^\s*#\s*Banner.*/Banner \/etc\/issue.net/' /etc/ssh/sshd_config
 else
     echo "Banner /etc/issue.net" >> /etc/ssh/sshd_config
 fi
 
-# Izinkan TCP forwarding untuk tunnel udpgw (localhost)
 sed -i "/^[#[:space:]]*AllowTcpForwarding[[:space:]]/d" /etc/ssh/sshd_config
 echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config
-# Aktifkan keepalive SSH (server-side) agar sesi tidak idle/putus
 sed -i "/^[#[:space:]]*ClientAliveInterval[[:space:]]/d" /etc/ssh/sshd_config
 echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config
 sed -i "/^[#[:space:]]*ClientAliveCountMax[[:space:]]/d" /etc/ssh/sshd_config
 echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config
 
-echo -e ""
-echo -e "[*] Mengaktifkan SSH Enhanced (TCP forwarding, tunnel, keep-alive, kapasitas)..."
+echo -e "\n[*] Mengaktifkan SSH Enhanced (TCP forwarding, tunnel, keep-alive, kapasitas)..."
 
-# SSH ENHANCED: PermitTunnel yes
 sed -i "/^[#[:space:]]*PermitTunnel[[:space:]]/d" /etc/ssh/sshd_config
 echo "PermitTunnel yes" >> /etc/ssh/sshd_config
-
-# SSH ENHANCED: GatewayPorts no
 sed -i "/^[#[:space:]]*GatewayPorts[[:space:]]/d" /etc/ssh/sshd_config
 echo "GatewayPorts no" >> /etc/ssh/sshd_config
-
-# SSH ENHANCED: TCPKeepAlive yes
 sed -i "/^[#[:space:]]*TCPKeepAlive[[:space:]]/d" /etc/ssh/sshd_config
 echo "TCPKeepAlive yes" >> /etc/ssh/sshd_config
-
-# SSH ENHANCED: MaxSessions 100
 sed -i "/^[#[:space:]]*MaxSessions[[:space:]]/d" /etc/ssh/sshd_config
 echo "MaxSessions 100" >> /etc/ssh/sshd_config
-
-# SSH ENHANCED: MaxStartups 100:30:200
 sed -i "/^[#[:space:]]*MaxStartups[[:space:]]/d" /etc/ssh/sshd_config
 echo "MaxStartups 100:30:200" >> /etc/ssh/sshd_config
-
-# SSH ENHANCED: UseDNS no
 sed -i "/^[#[:space:]]*UseDNS[[:space:]]/d" /etc/ssh/sshd_config
 echo "UseDNS no" >> /etc/ssh/sshd_config
-
-# SSH ENHANCED: Compression no
 sed -i "/^[#[:space:]]*Compression[[:space:]]/d" /etc/ssh/sshd_config
 echo "Compression no" >> /etc/ssh/sshd_config
 
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 echo -e "${GREEN}SSH Enhanced diaktifkan.${NC}"
 
-echo -e ""
-echo -e "[*] Membuat perintah pintas 'natssh'..."
+echo -e "\n[*] Membuat perintah pintas 'natssh'..."
 cat > /usr/local/bin/natssh << 'EOF'
 #!/bin/bash
 exec /root/natssh/menu.sh "$@"
@@ -332,8 +304,7 @@ EOF
 chmod +x /usr/local/bin/natssh
 echo -e "${GREEN}Perintah 'natssh' telah dibuat. Ketik 'natssh' untuk membuka menu.${NC}"
 
-echo -e ""
-echo -e "${CYAN}================================================${NC}"
+echo -e "\n${CYAN}================================================${NC}"
 echo -e "${GREEN} INSTALASI SELESAI!                             ${NC}"
 echo -e "${CYAN}================================================${NC}"
 echo -e "1. Untuk mengelola akun, jalankan: ${YELLOW}natssh${NC}"
