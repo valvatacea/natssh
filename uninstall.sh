@@ -53,6 +53,7 @@ echo -e "${GREEN}Service nginx berhasil dihapus.${NC}"
 (crontab -l 2>/dev/null | grep -v "apply_speed.sh") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "systemctl.*restart.*natssh-ws") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "systemctl.*restart.*nginx") | crontab - 2>/dev/null
+(crontab -l 2>/dev/null | grep -v "systemctl.*restart.*natssh-udpgw") | crontab - 2>/dev/null
 (crontab -l 2>/dev/null | grep -v "sess_audit") | crontab - 2>/dev/null
 rm -rf /root/natssh/suspended
 
