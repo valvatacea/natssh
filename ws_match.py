@@ -223,8 +223,7 @@ for user, ep in [(u, int(e)) for u, e in raw]:
         _pw = best.get("port_ws") or "-"
         port_info = f"  {C_DIM}ws:{_pw}{C_RESET}" if _pw != "-" else ""
 
-        line = (f"   {wt} {C_WHITE}{best['ip']:<16}\033[0m"
-                f"{durasi:>7} {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193 {status}{jalur}{geo}{port_info}")
+        line = f"   {wt} {C_WHITE}{best['ip']:<16}{C_RESET}  {durasi:>7} {best['up']/1048576:.1f}\u2191{best['down']/1048576:.1f}\u2193 {status}{jalur}{geo}{port_info}"
         extra_ua = best.get('ua') or '-'
     else:
         # Tidak ada kecocokan di conns.json, tapi proses sshd masih hidup menurut ps
