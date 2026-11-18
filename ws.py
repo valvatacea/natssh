@@ -277,7 +277,12 @@ def _watchdog():
         for cid in stale:
             try:
                 with _lock:
-                    _CONNS.pop(cid, None)
+                    c = _CONNS.pop(cid, None)
+                    if c is not None:
+                        c["end"] = round(time.time(), 3)
+                        c["alasan"] = "watchdog_timeout"
+                        _LAST.append(c)
+                _dump()
                 _log(f"WATCHDOG hapus koneksi usia > {MAX_CONN_AGE}s cid={cid}")
             except Exception:
                 pass
