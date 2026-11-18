@@ -1327,7 +1327,7 @@ conf_speed() {
 }
 
 conf_restart_schedule() {
-    echo -e "${YELLOW}--- PENJADWALAN OTOMATIS PER-LAYANAN ---${NC}"
+    echo -e "${YELLOW}--- PENJADWALAN ---${NC}"
     echo ""
     # Tampilkan daftar cron restart aktif per layanan
     for svc in natssh-ws natssh-udpgw nginx; do
