@@ -1366,7 +1366,7 @@ conf_restart_schedule() {
         3) toggle_service_cron "nginx" "/usr/bin/systemctl restart nginx" "Nginx Reverse Proxy" ;;
         4) toggle_script_cron "apply_speed" "/root/natssh/apply_speed.sh" "Apply Speed Limit" ;;
         5) toggle_script_cron "generate_cdn_geo" "/root/natssh/generate_cdn_geo.sh" "Generate CDN Geo" ;;
-        6) conf_reboot_schedule ;;
+        6) toggle_reboot_cron ;;
         0) echo -e "${YELLOW}Dibatalkan.${NC};;
         *) echo -e "${RED}Pilihan tidak valid!${NC};;
     esac
@@ -1457,6 +1457,48 @@ toggle_script_cron() {
                 if [[ "$y" =~ ^[Yy]$ ]] && [ -n "$cron" ]; then
                     (crontab -l 2>/dev/null; echo "${cron} ${script_path} >/dev/null 2>&1") | crontab -
                     echo -e "${GREEN}${script_label}: jadwal custom tersimpan.${NC}"
+                else
+                    echo -e "${YELLOW}Dibatalkan.${NC}"
+                fi
+                ;;
+            0) echo -e "${YELLOW}Dibatalkan.${NC};;
+            *) echo -e "${RED}Pilihan tidak valid!${NC};;
+        esac
+    fi
+}
+
+toggle_reboot_cron() {
+    if crontab -l 2>/dev/null | grep -q "/usr/sbin/reboot"; then
+        echo -e "${YELLOW}Jadwal reboot sudah aktif:${NC}"
+        crontab -l | grep "/usr/sbin/reboot"
+        echo ""
+        read -p "Hapus jadwal reboot? (y/N): " h
+        if [[ "$h" =~ ^[Yy]$ ]]; then
+            (crontab -l 2>/dev/null | grep -v "/usr/sbin/reboot") | crontab -
+            echo -e "${GREEN}Jadwal reboot dihapus.${NC}"
+        else
+            echo -e "${YELLOW}Jadwal reboot tetap aktif.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Belum ada jadwal reboot.${NC}"
+        echo ""
+        echo "Pilih jadwal:"
+        echo "1. Setiap hari 03:00"
+        echo "2. Setiap hari 04:00"
+        echo "3. Setiap 12 jam"
+        echo "4. Custom"
+        echo -e "${RED}0. Batal${NC}"
+        read -p "Pilih (0-4): " sp
+        case $sp in
+            1) (crontab -l 2>/dev/null; echo "0 3 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap hari 03:00.${NC}";;
+            2) (crontab -l 2>/dev/null; echo "0 4 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap hari 04:00.${NC}";;
+            3) (crontab -l 2>/dev/null; echo "0 */12 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap 12 jam.${NC}";;
+            4)
+                read -p "Masukkan cron (contoh: 0 2 * * *): " cron
+                read -p "Lanjut? (y/N): " y
+                if [[ "$y" =~ ^[Yy]$ ]] && [ -n "$cron" ]; then
+                    (crontab -l 2>/dev/null; echo "${cron} /usr/sbin/reboot >/dev/null 2>&1") | crontab -
+                    echo -e "${GREEN}Jadwal reboot custom tersimpan.${NC}"
                 else
                     echo -e "${YELLOW}Dibatalkan.${NC}"
                 fi
