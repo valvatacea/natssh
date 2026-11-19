@@ -2048,14 +2048,14 @@ menu_conf() {
         printf "  %-3s %-46s\n" "1." "Ubah Port Layanan (WebSocket, Nginx, UDPGW)"
         printf "  %-3s %-46s\n" "2." "Ubah Domain/Host di Kartu Akun"
         printf "  %-3s %-46s\n" "3." "Hide IP"
-        echo -e "${CYAN}  -- Batas --${NC}"
-        printf "  %-3s %-46s\n" "4." "Atur Batas Login per Akun (Max Login)"
-        printf "  %-3s %-46s\n" "5." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
-        printf "  %-3s %-46s\n" "6." "Ubah Batas Koneksi per IP (MAX_PER_IP)"
-        printf "  %-3s %-46s\n" "7." "Atur Limit Speed per CDN (CF/CFront)"
         echo -e "${CYAN}  -- Layanan --${NC}"
-        printf "  %-3s %-46s\n" "8." "Kontrol Layanan WS"
-        printf "  %-3s %-46s\n" "9." "Kontrol Nginx"
+        printf "  %-3s %-46s\n" "4." "Kontrol Layanan WS"
+        printf "  %-3s %-46s\n" "5." "Kontrol Nginx"
+        echo -e "${CYAN}  -- Batas --${NC}"
+        printf "  %-3s %-46s\n" "6." "Atur Batas Login per Akun (Max Login)"
+        printf "  %-3s %-46s\n" "7." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
+        printf "  %-3s %-46s\n" "8." "Ubah Batas Koneksi per IP (MAX_PER_IP)"
+        printf "  %-3s %-46s\n" "9." "Atur Limit Speed per CDN (CF/CFront)"
         printf "  %-3s %-46s\n" "10." "Penjadwalan"
         echo -e "${CYAN}  -- Lainnya --${NC}"
         printf "  %-3s %-46s\n" "11." "Ubah Banner Pelanggan"
@@ -2067,12 +2067,12 @@ menu_conf() {
             1) conf_port_submenu ;;
             2) conf_domain ;;
             3) conf_hide_ip ;;
-            4) conf_maxlogin ;;
-            5) conf_maxtotal ;;
-            6) conf_maxperip ;;
-            7) conf_speed ;;
-            8) conf_service ;;
-            9) conf_nginx_service ;;
+            4) conf_service ;;
+            5) conf_nginx_service ;;
+            6) conf_maxlogin ;;
+            7) conf_maxtotal ;;
+            8) conf_maxperip ;;
+            9) conf_speed ;;
             10) conf_restart_schedule ;;
             11) conf_banner ;;
             12) conf_suspend_minutes ;;
@@ -2080,7 +2080,7 @@ menu_conf() {
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "4" ] && [ "$p" != "6" ] && [ "$p" != "7" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && pause
+        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "4" ] && [ "$p" != "5" ] && [ "$p" != "6" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && pause
     done
 }
 
