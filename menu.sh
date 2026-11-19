@@ -1086,8 +1086,9 @@ conf_service() {
         echo "3. Restart"
         echo "4. Toggle Keepalive SSH"
         echo "5. Toggle Heartbeat WS"
+        echo "6. Ubah Port WebSocket"
         echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-6): " p || exit 0
+        read -p "Pilih (0-7): " p || exit 0
         case $p in
             1)
                 echo -e "${YELLOW}Menjalankan natssh-ws...${NC}"
@@ -1124,6 +1125,7 @@ conf_service() {
                 ;;
             4) conf_keepalive; continue ;;
             5) conf_heartbeat; continue ;;
+            6) conf_port ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
         esac
@@ -1144,8 +1146,9 @@ conf_nginx_service() {
         echo "1. Start"
         echo "2. Stop"
         echo "3. Restart"
+        echo "4. Ubah Port Nginx"
         echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-3): " p || exit 0
+        read -p "Pilih (0-4): " p || exit 0
         case $p in
             1)
                 echo -e "${YELLOW}Menjalankan nginx...${NC}"
@@ -1180,6 +1183,7 @@ conf_nginx_service() {
                 fi
                 pause
                 ;;
+            4) conf_nginx_port ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
         esac
@@ -2023,15 +2027,11 @@ conf_port_submenu() {
         garis
         echo -e "${YELLOW}   UBAH PORT LAYANAN${NC}"
         garis
-        printf "  %-3s %-46s\n" "1." "Ubah Port WebSocket (natssh-ws)"
-        printf "  %-3s %-46s\n" "2." "Ubah Port Nginx (Reverse Proxy)"
-        printf "  %-3s %-46s\n" "3." "badvpn-udpgw (UDP Gateway)"
+        printf "  %-3s %-46s\n" "1." "badvpn-udpgw (UDP Gateway)"
         echo -e "${RED}  0.  Kembali${NC}"
-        read -p "Pilih (0-3): " p || exit 0
+        read -p "Pilih (0-1): " p || exit 0
         case $p in
-            1) conf_port ;;
-            2) conf_nginx_port ;;
-            3) conf_udpgw ;;
+            1) conf_udpgw ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
