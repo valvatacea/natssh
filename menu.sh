@@ -1405,10 +1405,10 @@ toggle_service_cron() {
         echo -e "${RED}0. Batal${NC}"
         read -p "Pilih (0-5): " sp
         case $sp in
-            1) (crontab -l 2>/dev/null; echo "0 * * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap jam.${NC}";;
-            2) (crontab -l 2>/dev/null; echo "0 */6 * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap 6 jam.${NC}";;
-            3) (crontab -l 2>/dev/null; echo "0 */12 * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap 12 jam.${NC}";;
-            4) (crontab -l 2>/dev/null; echo "0 4 * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap hari jam 04:00.${NC}";;
+            1) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 * * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap jam.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
+            2) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 */6 * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap 6 jam.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
+            3) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 */12 * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap 12 jam.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
+            4) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 4 * * * ${restart_cmd} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${svc_label}: setiap hari jam 04:00.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
             5)
                 read -p "Masukkan cron (contoh: 0 4 * * *): " cron
                 if [ -z "$cron" ]; then
@@ -1458,10 +1458,10 @@ toggle_script_cron() {
         echo -e "${RED}0. Batal${NC}"
         read -p "Pilih (0-5): " sp
         case $sp in
-            1) (crontab -l 2>/dev/null; echo "0 * * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap jam.${NC}";;
-            2) (crontab -l 2>/dev/null; echo "0 */6 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap 6 jam.${NC}";;
-            3) (crontab -l 2>/dev/null; echo "0 */12 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap 12 jam.${NC}";;
-            4) (crontab -l 2>/dev/null; echo "0 4 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap hari jam 04:00.${NC}";;
+            1) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 * * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap jam.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
+            2) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 */6 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap 6 jam.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
+            3) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 */12 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap 12 jam.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
+            4) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 4 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap hari jam 04:00.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
             5)
                 read -p "Masukkan cron (contoh: 0 4 * * *): " cron
                 if [ -z "$cron" ]; then
@@ -1507,9 +1507,9 @@ toggle_reboot_cron() {
         echo -e "${RED}0. Batal${NC}"
         read -p "Pilih (0-4): " sp
         case $sp in
-            1) (crontab -l 2>/dev/null; echo "0 3 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap hari 03:00.${NC}";;
-            2) (crontab -l 2>/dev/null; echo "0 4 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap hari 04:00.${NC}";;
-            3) (crontab -l 2>/dev/null; echo "0 */12 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap 12 jam.${NC}";;
+            1) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 3 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap hari 03:00.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
+            2) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 4 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap hari 04:00.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
+            3) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 */12 * * * /usr/sbin/reboot >/dev/null 2>&1") | crontab - && echo -e "${GREEN}Jadwal reboot: setiap 12 jam.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
             4)
                 read -p "Masukkan cron (contoh: 0 4 * * *): " cron
                 if [ -z "$cron" ]; then
@@ -1800,18 +1800,24 @@ conf_reboot_schedule() {
         read -p "Pilih (0-5): " p || return
         case $p in
             1)
+                read -p "Lanjut? (y/N): " y
+                [[ "$y" =~ ^[Yy]$ ]] || { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
                 crontab -l 2>/dev/null | grep -v "reboot" | crontab -
                 (crontab -l 2>/dev/null; echo "0 3 * * * /usr/sbin/reboot") | crontab -
                 echo -e "${GREEN}Jadwal reboot: setiap hari 03:00${NC}"
                 pause
                 ;;
             2)
+                read -p "Lanjut? (y/N): " y
+                [[ "$y" =~ ^[Yy]$ ]] || { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
                 crontab -l 2>/dev/null | grep -v "reboot" | crontab -
                 (crontab -l 2>/dev/null; echo "0 4 * * * /usr/sbin/reboot") | crontab -
                 echo -e "${GREEN}Jadwal reboot: setiap hari 04:00${NC}"
                 pause
                 ;;
             3)
+                read -p "Lanjut? (y/N): " y
+                [[ "$y" =~ ^[Yy]$ ]] || { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
                 crontab -l 2>/dev/null | grep -v "reboot" | crontab -
                 (crontab -l 2>/dev/null; echo "0 */12 * * * /usr/sbin/reboot") | crontab -
                 echo -e "${GREEN}Jadwal reboot: setiap 12 jam${NC}"
