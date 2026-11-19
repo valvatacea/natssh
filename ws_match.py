@@ -205,7 +205,7 @@ for user, ep in [(u, int(e)) for u, e in raw]:
         if best["_live"]:
             status = "\033[32mLIVE\033[0m"
         else:
-            status = f"\033[33mselesai {time.strftime('%H:%M', time.localtime(end))}\033[0m"
+            status = f"\033[32mLIVE\033[0m \033[33m{time.strftime('%H:%M', time.localtime(end))}\033[0m"
         # Jalur CDN: prioritas field cdn dari ws.py, fallback heuristik edge
         _cdn = best.get("cdn") or ""
         if not _cdn or _cdn == "-":
