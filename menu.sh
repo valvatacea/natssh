@@ -1461,7 +1461,7 @@ toggle_script_cron() {
             1) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 * * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap jam.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
             2) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 */6 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap 6 jam.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
             3) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 */12 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap 12 jam.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
-            4) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 4 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap hari jam 04:00.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
+            4) read -p "Lanjut? (y/N): " y; if [[ "$y" =~ ^[Yy]$ ]]; then (crontab -l 2>/dev/null; echo "0 3 * * * ${script_path} >/dev/null 2>&1") | crontab - && echo -e "${GREEN}${script_label}: setiap hari jam 03:00.${NC}"; else echo -e "${YELLOW}Dibatalkan.${NC}"; fi;;
             5)
                 read -p "Masukkan cron (contoh: 0 4 * * *): " cron
                 if [ -z "$cron" ]; then
