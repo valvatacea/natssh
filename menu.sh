@@ -1078,6 +1078,8 @@ conf_service() {
         garis
         status=$(systemctl is-active natssh-ws 2>/dev/null)
         echo -e "Status saat ini: ${GREEN}${status}${NC}"
+        ws_port=$(port_ws 2>/dev/null || echo "-")
+        echo -e "Port WebSocket: ${YELLOW}${ws_port}${NC}"
         echo ""
         echo "1. Start"
         echo "2. Stop"
@@ -1136,6 +1138,8 @@ conf_nginx_service() {
         garis
         status=$(systemctl is-active nginx 2>/dev/null)
         echo -e "Status saat ini: ${GREEN}${status}${NC}"
+        nginx_port=$(grep "listen" /etc/nginx/sites-available/natssh-ws 2>/dev/null | head -1 | awk '{print $2}' | tr -d ';' || echo "-")
+        echo -e "Port Nginx: ${YELLOW}${nginx_port}${NC}"
         echo ""
         echo "1. Start"
         echo "2. Stop"
