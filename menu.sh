@@ -1159,6 +1159,7 @@ conf_udpgw_service() {
                 i=1
                 for pp in $ports_list; do
                     st=$(systemctl is-active natssh-udpgw@${pp} 2>/dev/null)
+                    [ "$st" = "active" ] && st="active" || st="inactive"
                     echo "$i) $pp  [$st]"
                     i=$((i+1))
                 done
@@ -1952,6 +1953,7 @@ conf_udpgw() {
                 i=1
                 for pp in $ports_list; do
                     st=$(systemctl is-active natssh-udpgw@${pp} 2>/dev/null)
+                    [ "$st" = "active" ] && st="active" || st="inactive"
                     echo "$i) $pp  [$st]"
                     i=$((i+1))
                 done
