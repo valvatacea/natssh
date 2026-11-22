@@ -2096,44 +2096,42 @@ menu_conf() {
         echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
         garis
         echo -e "${CYAN}  -- Port --${NC}"
-        printf "  %-3s %-46s\\n" "1." "Ubah Port Layanan (WebSocket, Nginx)"
-        printf "  %-3s %-46s\\n" "2." "Ubah Domain/Host di Kartu Akun"
-        printf "  %-3s %-46s\\n" "3." "Hide IP"
+        printf "  %-3s %-46s\\n" "1." "Ubah Domain/Host di Kartu Akun"
+        printf "  %-3s %-46s\\n" "2." "Hide IP"
         echo -e "${CYAN}  -- Layanan --${NC}"
-        printf "  %-3s %-46s\\n" "4." "Kontrol Layanan WS"
-        printf "  %-3s %-46s\\n" "5." "Kontrol Layanan UDPGW"
-        printf "  %-3s %-46s\\n" "6." "Kontrol Nginx"
+        printf "  %-3s %-46s\\n" "3." "Kontrol Layanan WS"
+        printf "  %-3s %-46s\\n" "4." "Kontrol Layanan UDPGW"
+        printf "  %-3s %-46s\\n" "5." "Kontrol Nginx"
         echo -e "${CYAN}  -- Batas --${NC}"
-        printf "  %-3s %-46s\\n" "7." "Atur Batas Login per Akun (Max Login)"
-        printf "  %-3s %-46s\\n" "8." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
-        printf "  %-3s %-46s\\n" "9." "Ubah Batas Koneksi per IP (MAX_PER_IP)"
-        printf "  %-3s %-46s\\n" "10." "Atur Limit Speed per CDN (CF/CFront)"
+        printf "  %-3s %-46s\\n" "6." "Atur Batas Login per Akun (Max Login)"
+        printf "  %-3s %-46s\\n" "7." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
+        printf "  %-3s %-46s\\n" "8." "Ubah Batas Koneksi per IP (MAX_PER_IP)"
+        printf "  %-3s %-46s\\n" "9." "Atur Limit Speed per CDN (CF/CFront)"
         echo -e "${CYAN}  -- Lainnya --${NC}"
-        printf "  %-3s %-46s\\n" "11." "Penjadwalan"
-        printf "  %-3s %-46s\\n" "12." "Ubah Banner Pelanggan"
-        printf "  %-3s %-46s\\n" "13." "Ubah Durasi Suspend (menit)"
-        printf "  %-3s %-46s\\n" "14." "Test Ping (Cek Koneksi Internet)"
+        printf "  %-3s %-46s\\n" "10." "Penjadwalan"
+        printf "  %-3s %-46s\\n" "11." "Ubah Banner Pelanggan"
+        printf "  %-3s %-46s\\n" "12." "Ubah Durasi Suspend (menit)"
+        printf "  %-3s %-46s\\n" "13." "Test Ping (Cek Koneksi Internet)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-14): " p || exit 0
+        read -p "Pilih (0-13): " p || exit 0
         case $p in
-            1) conf_port_submenu ;;
-            2) conf_domain ;;
-            3) conf_hide_ip ;;
-            4) conf_service ;;
-            5) conf_udpgw_service ;;
-            6) conf_nginx_service ;;
-            7) conf_maxlogin ;;
-            8) conf_maxtotal ;;
-            9) conf_maxperip ;;
-            10) conf_speed ;;
-            11) conf_restart_schedule ;;
-            12) conf_banner ;;
-            13) conf_suspend_minutes ;;
-            14) conf_test_ping ;;
+            1) conf_domain ;;
+            2) conf_hide_ip ;;
+            3) conf_service ;;
+            4) conf_udpgw_service ;;
+            5) conf_nginx_service ;;
+            6) conf_maxlogin ;;
+            7) conf_maxtotal ;;
+            8) conf_maxperip ;;
+            9) conf_speed ;;
+            10) conf_restart_schedule ;;
+            11) conf_banner ;;
+            12) conf_suspend_minutes ;;
+            13) conf_test_ping ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "4" ] && [ "$p" != "5" ] && [ "$p" != "6" ] && [ "$p" != "7" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && [ "$p" != "14" ] && pause
+        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "3" ] && [ "$p" != "4" ] && [ "$p" != "5" ] && [ "$p" != "6" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && pause
     done
 }
 
