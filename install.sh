@@ -339,6 +339,23 @@ if [ -z "$CF_Token" ] && [ -z "${CF_Key}" ]; then
     echo -e "${RED}Cloudflare API Token tidak diisi. Instalasi dibatalkan.${NC}"; exit 1
 fi
 
+echo -e "\n[*] Memeriksa perintah idn2 (untuk domain internasional)..."
+if ! command -v idn2 >/dev/null 2>&1; then
+    echo -e "${YELLOW}idn2 belum terpasang. Memasang...${NC}"
+    if command -v apt-get >/dev/null 2>&1; then
+        apt-get update -qq && apt-get install -y idn2
+    elif command -v apk >/dev/null 2>&1; then
+        apk add idn2
+    else
+        echo -e "${RED}Gagal memasang idn2 (paket manager tidak didukung).${NC}"
+    fi
+fi
+if ! command -v idn2 >/dev/null 2>&1; then
+    echo -e "${RED}idn2 tidak tersedia, sertifikat untuk domain IDN mungkin gagal.${NC}"
+else
+    echo -e "${GREEN}idn2 siap.${NC}"
+fi
+
 echo -e "\n[*] Menerbitkan sertifikat SSL via acme.sh (Cloudflare DNS challenge)..."
 "$HOME/.acme.sh/acme.sh" --issue --dns dns_cf -d "*.${root_domain}" -d "${root_domain}" \
     --cert-file /etc/nginx/ssl/natssh.crt \
