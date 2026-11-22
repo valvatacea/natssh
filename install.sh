@@ -1,3 +1,22 @@
+<br>
+<center>
+<p align="center">
+<font color="cyan">╔═════════════════════╗</font><br>
+<font color="yellow"><b>⚡ PREMIUM VPN SERVICE ⚡</b></font><br>
+<font color="cyan">╠═════════════════════╣</font><br>
+<font color="green">✅ KONEKSI BERHASIL</font><br>
+<font color="orange">🌍 Server : Indonesia — Premium</font><br>
+<font color="aqua">🚀 Speed : up 100 Mbps</font><br>
+<font color="lime">📱 Maksimal 4 Perangkat/Akun</font><br>
+<font color="orange">⚔ Auto-Kill AKTIF</font><br>
+<font color="white">────────────────────</font><br>
+<font color="red">⛔ Dilarang: Torrent · DDoS</font><br>
+<font color="red">               Data Waster · Hack</font><br>
+<font color="grey">🛡 Support : </font><font color="magenta"><a href="https://wa.me/6281223711096?text=Halo%2C%20saya%20ingin%20membeli%20layanan%20SSH%2FVPN.%20Bisa%20info%20paket%20dan%20harganya%3F" target="_blank" rel="noopener">+6281223711096</a></font><br>
+<font color="cyan">╚═════════════════════╝</font><br>
+<font color="green"><b>═══ SELAMAT MENIKMATI ═══</b></font><br>
+</p>
+</center>
 #!/bin/bash
 # Installer for natssh (SSH WebSocket Proxy & Autokill untuk VPS NAT)
 # Repo: https://github.com/valvatacea/natssh.git
@@ -17,6 +36,7 @@ if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Tolong jalankan skrip ini sebagai root (sudo -i).${NC}"
   exit 1
 fi
+ulimit -n 65535
 
 echo -e "\n[*] Memeriksa dependensi..."
 if ! command -v python3 &> /dev/null; then
@@ -188,6 +208,13 @@ server {
 EOF
 ln -sf /etc/nginx/sites-available/natssh-ws /etc/nginx/sites-enabled/natssh-ws
 nginx -t && systemctl enable --now nginx
+
+echo -e "\n[*] Mengoptimalkan nginx untuk WebSocket (file descriptor & connections)..."
+sed -i 's/^[[:space:]]*worker_connections .*/    worker_connections 4096;/' /etc/nginx/nginx.conf
+if ! grep -q 'worker_rlimit_nofile' /etc/nginx/nginx.conf; then
+    sed -i '/^pid \/run\/nginx\.pid;$/a worker_rlimit_nofile 65535;' /etc/nginx/nginx.conf
+fi
+nginx -t && systemctl restart nginx
 echo -e "${GREEN}Service nginx berhasil dibuat dan dijalankan di port ${nginx_port} SSL -> 127.0.0.1:${ws_port}!${NC}"
 
 echo -e "\n[*] Menyiapkan service NATSSH speed limit (tidak diaktifkan otomatis)..."
