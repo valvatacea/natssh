@@ -73,7 +73,8 @@ sudo bash install.sh
 
 Installer juga akan:
 - Memasang acme.sh otomatis (jika belum ada)
-- Meminta Cloudflare API Token untuk DNS challenge
+- Muat variabel dari `config/.env` (jika ada) — termasuk `CF_Token` / `CF_Key`
+- Meminta Cloudflare API Token untuk DNS challenge (jika tidak ada di env atau `.env`)
 - Menerbitkan sertifikat TLS wildcard via acme.sh (Cloudflare API)
 - Memasang Nginx sebagai reverse proxy TLS
 - Menulis konfigurasi Nginx ke `/etc/nginx/sites-available/natssh-ws`

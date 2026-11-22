@@ -254,6 +254,16 @@ if [ ! -f "$HOME/.acme.sh/acme.sh" ]; then
     curl https://get.acme.sh | sh -s email=admin@example.com
 fi
 
+echo -e "\n[*] Muat variabel dari config/.env (jika ada)..."
+if [ -f "$DIR/config/.env" ]; then
+    set -a
+    . "$DIR/config/.env"
+    set +a
+    echo -e "${GREEN}Variabel .env dimuat.${NC}"
+else
+    echo -e "${YELLOW}File config/.env tidak ditemukan, lewati.${NC}"
+fi
+
 echo -e "\n[*] Konfigurasi Cloudflare API Token (untuk DNS challenge)..."
 if [ -z "${CF_Token}" ] && [ -z "${CF_Key}" ]; then
     read -p "Masukkan Cloudflare API Token (kosongkan jika sudah di environment): " CF_Token
