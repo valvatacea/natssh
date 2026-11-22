@@ -1171,9 +1171,9 @@ conf_udpgw_service() {
                     1) pp=7100 ;; 2) pp=7200 ;; 3) pp=7300 ;; 4) pp=7400 ;; 5) pp=7500 ;; *) echo -e "${RED}Tidak valid${NC}"; pause; return ;;
                 esac
                 if systemctl is-active --quiet natssh-udpgw@${pp}; then
-                    systemctl disable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} nonaktif${NC}" || echo -e "${RED}Gagal${NC}"
+                    systemctl disable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} nonaktif${NC}" || echo -e "${RED}non-active${NC}"
                 else
-                    systemctl enable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} aktif${NC}" || echo -e "${RED}Gagal${NC}"
+                    systemctl enable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} aktif${NC}" || echo -e "${RED}non-active${NC}"
                 fi
                 ;;
             0) return ;;
@@ -1964,9 +1964,9 @@ conf_udpgw() {
                     1) pp=7100 ;; 2) pp=7200 ;; 3) pp=7300 ;; 4) pp=7400 ;; 5) pp=7500 ;; *) echo -e "${RED}Tidak valid${NC}"; pause; return ;;
                 esac
                 if systemctl is-active --quiet natssh-udpgw@${pp}; then
-                    systemctl disable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} nonaktif${NC}" || echo -e "${RED}Gagal${NC}"
+                    systemctl disable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} nonaktif${NC}" || echo -e "${RED}non-active${NC}"
                 else
-                    systemctl enable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} aktif${NC}" || echo -e "${RED}Gagal${NC}"
+                    systemctl enable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} aktif${NC}" || echo -e "${RED}non-active${NC}"
                 fi
                 ;;
             0) return ;;
@@ -2096,7 +2096,7 @@ menu_conf() {
         echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
         garis
         echo -e "${CYAN}  -- Port --${NC}"
-        printf "  %-3s %-46s\\n" "1." "Ubah Domain/Host di Kartu Akun"
+        printf "  %-3s %-46s\\n" "1." "Ubah Domain/Host"
         printf "  %-3s %-46s\\n" "2." "Hide IP"
         echo -e "${CYAN}  -- Layanan --${NC}"
         printf "  %-3s %-46s\\n" "3." "Kontrol Layanan WS"
