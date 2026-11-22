@@ -209,14 +209,13 @@ server {
 }
 EOF
 ln -sf /etc/nginx/sites-available/natssh-ws /etc/nginx/sites-enabled/natssh-ws
-nginx -t && systemctl enable --now nginx
 
 echo -e "\n[*] Mengoptimalkan nginx untuk WebSocket (file descriptor & connections)..."
 sed -i 's/^[[:space:]]*worker_connections .*/    worker_connections 4096;/' /etc/nginx/nginx.conf
 if ! grep -q 'worker_rlimit_nofile' /etc/nginx/nginx.conf; then
     sed -i '/^pid \/run\/nginx\.pid;$/a worker_rlimit_nofile 65535;' /etc/nginx/nginx.conf
 fi
-nginx -t && systemctl restart nginx
+nginx -t && systemctl enable --now nginx
 echo -e "${GREEN}Service nginx berhasil dibuat dan dijalankan di port ${nginx_port} SSL -> 127.0.0.1:${ws_port}!${NC}"
 
 echo -e "\n[*] Menyiapkan service NATSSH speed limit (tidak diaktifkan otomatis)..."
