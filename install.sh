@@ -38,6 +38,8 @@ if [ "$EUID" -ne 0 ]; then
 fi
 ulimit -n 65535
 
+ulimit -n 65535
+
 echo -e "\n[*] Memeriksa dependensi..."
 if ! command -v python3 &> /dev/null; then
     echo -e "${YELLOW}Python3 belum terinstal. Menginstal...${NC}"
