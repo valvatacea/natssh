@@ -1106,9 +1106,9 @@ cek_acme_sh() {
 
 # Muat variabel dari config/.env (jika ada)
 muat_env() {
-    if [ -f "/root/natssh/config/.env" ]; then
+    if [ -f "${DIR}/config/.env" ]; then
         set -a
-        . "/root/natssh/config/.env"
+        . "${DIR}/config/.env"
         set +a
         echo -e "${GREEN}Variabel .env dimuat.${NC}"
     fi
@@ -1117,7 +1117,7 @@ muat_env() {
 # Terbitkan ulang sertifikat SSL via acme.sh (Cloudflare DNS challenge)
 terbitkan_ulang_sertifikat() {
     local ssl_domain root_domain
-    ssl_domain=$(cat /root/natssh/config/host.conf 2>/dev/null)
+    ssl_domain=$(cat "${DIR}/config/host.conf" 2>/dev/null)
     if [ -z "$ssl_domain" ]; then
         echo -e "${RED}Domain/Host kosong di host.conf! Tidak dapat menerbitkan sertifikat.${NC}"
         return 1
@@ -1126,7 +1126,7 @@ terbitkan_ulang_sertifikat() {
     echo -e "\n[*] Mengecek Public Suffix List..."
     PSL_FILE="${DIR}/config/public_suffix_list.dat"
     root_domain=""
-    if [ -f "$PSL_FILE" ]; then
+    if [ -s "$PSL_FILE" ]; then
         echo -e "${GREEN}PSL sudah tersedia di $PSL_FILE, lewati unduhan.${NC}"
     else
         echo -e "[*] Mengunduh Public Suffix List..."
@@ -1137,12 +1137,17 @@ terbitkan_ulang_sertifikat() {
         fi
     fi
 
-    if [ -f "$PSL_FILE" ]; then
+    if [ -s "$PSL_FILE" ]; then
         root_domain=$(extract_root_domain "$ssl_domain" "$PSL_FILE")
         if [ -z "$root_domain" ]; then
             echo -e "${YELLOW}Public Suffix List tidak dapat menentukan root domain, pakai fallback host.conf${NC}"
             root_domain="$ssl_domain"
         fi
+    fi
+
+    if [ -z "$root_domain" ]; then
+        echo -e "${YELLOW}PSL tidak tersedia, pakai fallback host.conf${NC}"
+        root_domain="$ssl_domain"
     fi
 
     # Validasi suffix
