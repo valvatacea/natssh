@@ -1023,9 +1023,23 @@ conf_port() {
             fi
             systemctl restart natssh-ws
             sleep 1
-            systemctl is-active --quiet natssh-ws && \
-                echo -e "${GREEN}SUKSES! WebSocket kini di port $new_port (ingat: update forwarding Cloudflare/NAT!).${NC}" || \
+            if systemctl is-active --quiet natssh-ws; then
+                echo -e "${GREEN}SUKSES! WebSocket kini di port $new_port.${NC}"
+                # Update nginx proxy_forward ke port ws baru
+                ngconf=/etc/nginx/sites-available/natssh-ws
+                if [ -f "$ngconf" ]; then
+                    sed -i "s|proxy_pass http://127.0.0.1:[0-9]*;|proxy_pass http://127.0.0.1:$new_port;|" "$ngconf"
+                    if nginx -t >/dev/null 2>&1 && systemctl restart nginx; then
+                        echo -e "${GREEN}Nginx diupdate forward ke port $new_port.${NC}"
+                    else
+                        echo -e "${RED}Nginx gagal restart! Cek: journalctl -u nginx -n 20${NC}"
+                    fi
+                else
+                    echo -e "${YELLOW}Config nginx tidak ditemukan di $ngconf, lewati.${NC}"
+                fi
+            else
                 echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+            fi
         else
             echo -e "${RED}Gagal: unit natssh-ws.service tidak ditemukan (install dulu).${NC}"
         fi
