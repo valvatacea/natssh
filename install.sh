@@ -28,6 +28,45 @@ YELLOW='\u001b[0;33m'
 CYAN='\u001b[0;36m'
 NC='\u001b[0m'
 
+# Ekstraksi root domain menggunakan Public Suffix List (unduh dari publicsuffix.org)
+extract_root_domain() {
+    local domain="$1"
+    local psl_file="$2"
+    local rev_domain parts count i suffix rev_suffix
+    rev_domain=$(echo "$domain" | awk -F. '{for(i=NF;i>0;i--) printf "%s.", $i}' | sed 's/\.$//')
+    parts=$(echo "$domain" | awk -F. '{print NF}')
+
+    local best_suffix="" best_len=0
+    while IFS= read -r line; do
+        line=$(echo "$line" | xargs)
+        [[ -z "$line" || "$line" == \/\/ ]] && continue
+        # Hilangkan leading *. dari wildcard rules
+        if [[ "$line" == \*.* ]]; then
+            line="${line#*.}"
+        fi
+        # Lewati exceptions (!rule)
+        [[ "$line" == !* ]] && continue
+        [[ -z "$line" ]] && continue
+
+        rev_suffix=$(echo "$line" | awk -F. '{for(i=NF;i>0;i--) printf "%s.", $i}' | sed 's/\.$//')
+        count=$(echo "$line" | awk -F. '{print NF}')
+
+        if [[ "$rev_domain" == "$rev_suffix"* ]] && [ "$count" -gt "$best_len" ]; then
+            if [ "$parts" -gt "$count" ]; then
+                best_suffix="$line"
+                best_len="$count"
+            fi
+        fi
+    done < "$psl_file"
+
+    if [ -n "$best_suffix" ]; then
+        local start=$((parts - best_len + 1))
+        echo "$domain" | awk -F. -v s="$start" '{for(i=s;i<=NF;i++) printf "%s%s", $i, (i<NF?".":"")}'
+        return 0
+    fi
+    return 1
+}
+
 echo -e "${CYAN}================================================${NC}"
 echo -e "${YELLOW}   INSTALASI NATSSH (WebSocket Proxy & Autokill)  ${NC}"
 echo -e "${CYAN}================================================${NC}"
@@ -70,6 +109,35 @@ mkdir -p "$DIR/config/promo"
 mkdir -p "$DIR/logs"
 mkdir -p "$DIR/suspended"
 mkdir -p /etc/nginx/ssl
+
+echo -e "\n[*] Konfigurasi Domain/Host (wajib diisi)"
+while true; do
+    read -p "Masukkan Domain/Host (Contoh: id1.xenonblue.qzz.io): " ssl_domain
+    ssl_domain=$(echo "$ssl_domain" | xargs)
+    if [ -z "$ssl_domain" ]; then
+        echo -e "${RED}Domain/Host wajib diisi, tidak boleh kosong!${NC}"
+    else
+        break
+    fi
+done
+echo "$ssl_domain" > "$DIR/config/host.conf"
+echo -e "${GREEN}Domain disimpan ke $DIR/config/host.conf${NC}"
+
+# Ekstraksi root domain via Public Suffix List, fallback ke host.conf jika gagal
+echo -e "\n[*] Mengunduh Public Suffix List untuk ekstraksi root domain..."
+PSL_FILE="/tmp/public_suffix_list.dat"
+root_domain=""
+if wget -q "https://publicsuffix.org/list/public_suffix_list.dat" -O "$PSL_FILE" 2>/dev/null; then
+    root_domain=$(extract_root_domain "$ssl_domain" "$PSL_FILE")
+    if [ -z "$root_domain" ]; then
+        echo -e "${YELLOW}Public Suffix List tidak dapat menentukan root domain, pakai fallback host.conf${NC}"
+        root_domain="$ssl_domain"
+    fi
+else
+    echo -e "${YELLOW}Gagal unduh Public Suffix List, pakai fallback host.conf${NC}"
+    root_domain="$ssl_domain"
+fi
+echo -e "${GREEN}Root domain untuk sertifikat: ${root_domain}${NC}"
 
 echo -e "\n[*] Mengunduh file dari repositori..."
 wget -qO "$DIR/menu.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/menu.sh
@@ -176,14 +244,34 @@ fi
 
 rm -f /etc/nginx/sites-enabled/default
 
-ssl_domain=$(cat "$DIR/config/host.conf" 2>/dev/null || echo "id1.xenonblue.qzz.io")
-if [ ! -f /etc/nginx/ssl/natssh.crt ] || [ ! -f /etc/nginx/ssl/natssh.key ]; then
-    echo -e "\n[*] Membuat sertifikat SSL self-signed untuk nginx (WSS)..."
-    openssl req -x509 -newkey rsa:2048 -keyout /etc/nginx/ssl/natssh.key -out /etc/nginx/ssl/natssh.crt -days 3650 -nodes \
-        -subj "/CN=${ssl_domain}/O=NATSSH/C=ID" >/dev/null 2>&1
-    chmod 600 /etc/nginx/ssl/natssh.key
-    chmod 644 /etc/nginx/ssl/natssh.crt
+ssl_domain=$(cat "$DIR/config/host.conf" 2>/dev/null)
+if [ -z "$ssl_domain" ]; then
+    echo -e "${RED}Domain/Host kosong di $DIR/config/host.conf! Instalasi dibatalkan.${NC}"; exit 1
 fi
+
+echo -e "\n[*] Memasang acme.sh (jika belum ada)..."
+if [ ! -f "$HOME/.acme.sh/acme.sh" ]; then
+    curl https://get.acme.sh | sh -s email=admin@example.com
+fi
+
+echo -e "\n[*] Konfigurasi Cloudflare API Token (untuk DNS challenge)..."
+if [ -z "${CF_Token}" ] && [ -z "${CF_Key}" ]; then
+    read -p "Masukkan Cloudflare API Token (kosongkan jika sudah di environment): " CF_Token
+fi
+export CF_Token="${CF_Token}"
+
+if [ -z "$CF_Token" ] && [ -z "${CF_Key}" ]; then
+    echo -e "${RED}Cloudflare API Token tidak diisi. Instalasi dibatalkan.${NC}"; exit 1
+fi
+
+echo -e "\n[*] Menerbitkan sertifikat SSL via acme.sh (Cloudflare DNS challenge)..."
+"$HOME/.acme.sh/acme.sh" --issue --dns dns_cf -d "*.${root_domain}" -d "${root_domain}" \
+    --cert-file /etc/nginx/ssl/natssh.crt \
+    --key-file /etc/nginx/ssl/natssh.key \
+    --fullchain-file /etc/nginx/ssl/natssh_fullchain.crt \
+    --reloadcmd "systemctl reload nginx" || {
+    echo -e "${RED}Gagal menerbitkan sertifikat SSL.${NC}"; exit 1
+    }
 
 cat > /etc/nginx/sites-available/natssh-ws <<EOF
 server {

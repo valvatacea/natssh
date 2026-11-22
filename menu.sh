@@ -1145,10 +1145,12 @@ conf_udpgw_service() {
         done
         if [ -z "$active" ]; then
             st_text="inactive"
+            st_color="${RED}"
         else
             st_text="active"
+            st_color="${GREEN}"
         fi
-        echo -e "Status : ${GREEN}${st_text}${NC}  Port aktif:${YELLOW}${active:- (none)}${NC}"
+        echo -e "Status : ${st_color}${st_text}${NC}  Port aktif:${YELLOW}${active:- (none)}${NC}"
         echo -e "Tunnel contoh: ssh -N -L 7300:127.0.0.1:7300 user@host"
         garis
         echo "1. Ubah Port (pilih port untuk aktif/nonaktif)"
@@ -1944,10 +1946,12 @@ conf_udpgw() {
         done
         if [ -z "$active" ]; then
             st_text="inactive"
+            st_color="${RED}"
         else
             st_text="active"
+            st_color="${GREEN}"
         fi
-        echo -e "Status : ${GREEN}${st_text}${NC}  Port aktif:${YELLOW}${active:- (none)}${NC}"
+        echo -e "Status : ${st_color}${st_text}${NC}  Port aktif:${YELLOW}${active:- (none)}${NC}"
         echo -e "Tunnel contoh: ssh -N -L 7300:127.0.0.1:7300 user@host"
         garis
         echo "1. Ubah Port (pilih port untuk aktif/nonaktif)"
@@ -2107,7 +2111,7 @@ menu_conf() {
         garis
         echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
         garis
-        echo -e "${CYAN}  -- Port --${NC}"
+        echo -e "${CYAN}  -- Domain/IP --${NC}"
         printf "  %-3s %-46s\\n" "1." "Ubah Domain/Host"
         printf "  %-3s %-46s\\n" "2." "Hide IP"
         echo -e "${CYAN}  -- Layanan --${NC}"

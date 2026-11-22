@@ -7,7 +7,7 @@ NATSSH adalah ekosistem manajemen VPN SSH yang dirancang khusus untuk lingkungan
 ## ✨ Fitur Unggulan
 
 *   **Bypass Cloudflare (`ws.py` v2):** Menjembatani port NAT eksternal ke SSH lokal (port 22) dengan **rate-limit banjir pra-autentikasi** (default 10 koneksi/IP, 30 total; env `NATSSH_MAX_PER_IP`/`NATSSH_MAX_TOTAL`) — banjir scanner dari internet ditahan sebelum menyentuh `sshd` (mencegah insiden *MaxStartups throttling* yang membuat SSH "mati"). Koneksi, penolakan, dan kegagalan dicatat di `ws.log` dengan rotasi otomatis 500KB.
-*   **TLS Termination via Nginx:** Nginx terminate TLS di port publik (port stunnel lama) dan forward plain WS ke `ws.py` di `127.0.0.1:<NATSSH_WS_PORT>`. Sertifikat TLS self-signed (10 tahun) disimpan di `/etc/nginx/ssl/natssh.{crt,key}`.
+*   **TLS Termination via Nginx:** Nginx terminate TLS di port publik (port stunnel lama) dan forward plain WS ke `ws.py` di `127.0.0.1:<NATSSH_WS_PORT>`. Sertifikat TLS diterbitkan melalui **Cloudflare API (acme.sh, DNS challenge)** dan disimpan di `/etc/nginx/ssl/natssh.{crt,key}`.
 *   **Menu Manajemen v4.0 (`menu.sh`):** Antarmuka terminal interaktif — buat akun, **browser daftar akun** (suspend/unsuspend/perpanjang/hapus di satu tempat, dengan konfirmasi + catatan audit), monitoring online/autokill/sistem, backup portabel, dan konfigurasi sistem.
 *   **Kartu Akun Siap Salin:** Setiap akun baru menampilkan blok DETAIL AKUN — Domain Cloudflare + Domain CloudFront (bila diatur), IP, Port WS, daftar port CDN, username/password, tanggal kedaluwarsa, dan limit perangkat.
 *   **Sistem Backup Portabel:** Mengekstrak seluruh akun aktif beserta kata sandi terenkripsinya menjadi satu skrip mandiri (`backup_akun_ssh.sh`, mode 700) yang siap di-*restore* di VPS mana pun.
@@ -69,11 +69,13 @@ cd natssh
 sudo bash install.sh
 ```
 
-**Catatan saat instalasi:** Skrip akan meminta **Port NAT kosong** (pastikan sudah di-forward oleh provider) dan **batas perangkat per akun** (default 5). Port disetel via `Environment=NATSSH_WS_PORT` di unit systemd — aman diubah kapan pun lewat menu tanpa menyentuh source.
+**Catatan saat instalasi:** Skrip akan meminta **Domain/Host (wajib diisi)**, **Port NAT kosong** (pastikan sudah di-forward oleh provider) dan **batas perangkat per akun** (default 5). Domain disimpan ke `config/host.conf`; root domain diekstraksi melalui **Public Suffix List** (fallback ke `host.conf` jika gagal). Port disetel via `Environment=NATSSH_WS_PORT` di unit systemd — aman diubah kapan pun lewat menu tanpa menyentuh source.
 
 Installer juga akan:
+- Memasang acme.sh otomatis (jika belum ada)
+- Meminta Cloudflare API Token untuk DNS challenge
+- Menerbitkan sertifikat TLS wildcard via acme.sh (Cloudflare API)
 - Memasang Nginx sebagai reverse proxy TLS
-- Membuat sertifikat TLS self-signed di `/etc/nginx/ssl/natssh.{crt,key}`
 - Menulis konfigurasi Nginx ke `/etc/nginx/sites-available/natssh-ws`
 - Menghapus Stunnel4 bila masih terpasang (migrasi otomatis)
 
@@ -158,7 +160,7 @@ Setelah terinstal, Anda dapat memanggil menu manajemen kapan saja dengan mengeti
 
 | File | Isi | Bila kosong |
 |---|---|---|
-| `host.conf` | Domain di kartu akun | host = IP publik |
+| `host.conf` | Domain/Host di kartu akun (wajib diisi saat install; root domain diekstraksi via PSL untuk sertifikat) | host = IP publik |
 | `ip.conf` | IP di kartu akun | auto-detect via ifconfig.me |
 | `port.conf` | Port Cloudflare di kartu akun | default 2086 |
 | `hide_ip.conf` | Toggle sembunyikan IP kartu akun | IP ditampilkan |
