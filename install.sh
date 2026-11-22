@@ -38,7 +38,7 @@ extract_root_domain() {
 
     local best_suffix="" best_len=0
     while IFS= read -r line; do
-        line=$(echo "$line" | xargs)
+        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         [[ -z "$line" || "$line" == \/\/ ]] && continue
         # Hilangkan leading *. dari wildcard rules
         if [[ "$line" == \*.* ]]; then
@@ -138,6 +138,16 @@ else
     root_domain="$ssl_domain"
 fi
 echo -e "${GREEN}Root domain untuk sertifikat: ${root_domain}${NC}"
+
+# Validasi suffix domain terhadap Public Suffix List
+if [ "$root_domain" = "$ssl_domain" ]; then
+    echo -e "${YELLOW}Peringatan: Suffix domain '${ssl_domain}' tidak ditemukan dalam Public Suffix List.${NC}"
+    echo -e "${YELLOW}Sertifikat SSL mungkin tidak valid untuk domain dengan suffix tidak dikenal.${NC}"
+    read -p "Lanjutkan terbitkan sertifikat untuk ${root_domain}? (y/N): " confirm_suffix
+    if [[ ! "$confirm_suffix" =~ ^[Yy]$ ]]; then
+        echo -e "${RED}Instalasi dibatalkan.${NC}"; exit 1
+    fi
+fi
 
 echo -e "\n[*] Mengunduh file dari repositori..."
 wget -qO "$DIR/menu.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/menu.sh
@@ -253,6 +263,16 @@ echo -e "\n[*] Memasang acme.sh (jika belum ada)..."
 if [ ! -f "$HOME/.acme.sh/acme.sh" ]; then
     curl https://get.acme.sh | sh -s email=admin@example.com
 fi
+
+# Pemeriksaan acme.sh
+if [ ! -x "$HOME/.acme.sh/acme.sh" ]; then
+    echo -e "${RED}acme.sh tidak ditemukan atau tidak dapat dieksekusi di $HOME/.acme.sh/acme.sh${NC}"; exit 1
+fi
+acme_version=$("$HOME/.acme.sh/acme.sh" --version 2>/dev/null | head -1)
+if [ -z "$acme_version" ]; then
+    echo -e "${RED}Gagal menjalankan acme.sh. Periksa koneksi internet dan instalasi acme.sh.${NC}"; exit 1
+fi
+echo -e "${GREEN}acme.sh siap: $acme_version${NC}"
 
 echo -e "\n[*] Muat variabel dari config/.env (jika ada)..."
 if [ -f "$DIR/config/.env" ]; then

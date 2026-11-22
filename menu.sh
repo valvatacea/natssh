@@ -1032,6 +1032,144 @@ conf_port() {
     fi
 }
 
+# Ekstraksi root domain menggunakan Public Suffix List (unduh dari publicsuffix.org)
+extract_root_domain() {
+    local domain="$1"
+    local psl_file="$2"
+    local rev_domain parts count i suffix rev_suffix
+    rev_domain=$(echo "$domain" | awk -F. '{for(i=NF;i>0;i--) printf "%s.", $i}' | sed 's/\.$//')
+    parts=$(echo "$domain" | awk -F. '{print NF}')
+
+    local best_suffix="" best_len=0
+    while IFS= read -r line; do
+        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        [[ -z "$line" || "$line" == \/\/ ]] && continue
+        # Hilangkan leading *. dari wildcard rules
+        if [[ "$line" == \*.* ]]; then
+            line="${line#*.}"
+        fi
+        # Lewati exceptions (!rule)
+        [[ "$line" == !* ]] && continue
+        [[ -z "$line" ]] && continue
+
+        rev_suffix=$(echo "$line" | awk -F. '{for(i=NF;i>0;i--) printf "%s.", $i}' | sed 's/\.$//')
+        count=$(echo "$line" | awk -F. '{print NF}')
+
+        if [[ "$rev_domain" == "$rev_suffix"* ]] && [ "$count" -gt "$best_len" ]; then
+            if [ "$parts" -gt "$count" ]; then
+                best_suffix="$line"
+                best_len="$count"
+            fi
+        fi
+    done < "$psl_file"
+
+    if [ -n "$best_suffix" ]; then
+        local start=$((parts - best_len + 1))
+        echo "$domain" | awk -F. -v s="$start" '{for(i=s;i<=NF;i++) printf "%s%s", $i, (i<NF?".":"")}'
+        return 0
+    fi
+    return 1
+}
+
+# Pemeriksaan acme.sh (pasang otomatis jika belum ada)
+cek_acme_sh() {
+    if [ ! -x "$HOME/.acme.sh/acme.sh" ]; then
+        echo -e "${YELLOW}acme.sh belum terpasang. Memasang acme.sh...${NC}"
+        curl https://get.acme.sh | sh -s email=admin@example.com
+    fi
+    if [ ! -x "$HOME/.acme.sh/acme.sh" ]; then
+        echo -e "${RED}acme.sh tidak dapat dieksekusi. Terbit ulang sertifikat dibatalkan.${NC}"
+        return 1
+    fi
+    acme_version=$("$HOME/.acme.sh/acme.sh" --version 2>/dev/null | head -1)
+    if [ -z "$acme_version" ]; then
+        echo -e "${RED}Gagal menjalankan acme.sh. Periksa koneksi internet.${NC}"
+        return 1
+    fi
+    echo -e "${GREEN}acme.sh siap: $acme_version${NC}"
+    return 0
+}
+
+# Muat variabel dari config/.env (jika ada)
+muat_env() {
+    if [ -f "/root/natssh/config/.env" ]; then
+        set -a
+        . "/root/natssh/config/.env"
+        set +a
+        echo -e "${GREEN}Variabel .env dimuat.${NC}"
+    fi
+}
+
+# Terbitkan ulang sertifikat SSL via acme.sh (Cloudflare DNS challenge)
+terbitkan_ulang_sertifikat() {
+    local ssl_domain root_domain
+    ssl_domain=$(cat /root/natssh/config/host.conf 2>/dev/null)
+    if [ -z "$ssl_domain" ]; then
+        echo -e "${RED}Domain/Host kosong di host.conf! Tidak dapat menerbitkan sertifikat.${NC}"
+        return 1
+    fi
+
+    echo -e "\n[*] Mengunduh Public Suffix List untuk ekstraksi root domain..."
+    PSL_FILE="/tmp/public_suffix_list.dat"
+    root_domain=""
+    if wget -q "https://publicsuffix.org/list/public_suffix_list.dat" -O "$PSL_FILE" 2>/dev/null; then
+        root_domain=$(extract_root_domain "$ssl_domain" "$PSL_FILE")
+        if [ -z "$root_domain" ]; then
+            echo -e "${YELLOW}Public Suffix List tidak dapat menentukan root domain, pakai fallback host.conf${NC}"
+            root_domain="$ssl_domain"
+        fi
+    else
+        echo -e "${YELLOW}Gagal unduh Public Suffix List, pakai fallback host.conf${NC}"
+        root_domain="$ssl_domain"
+    fi
+
+    # Validasi suffix
+    if [ "$root_domain" = "$ssl_domain" ]; then
+        echo -e "${YELLOW}Peringatan: Suffix domain '${ssl_domain}' tidak ditemukan dalam Public Suffix List.${NC}"
+        echo -e "${YELLOW}Sertifikat SSL mungkin tidak valid untuk domain dengan suffix tidak dikenal.${NC}"
+        read -p "Lanjutkan terbitkan sertifikat untuk ${root_domain}? (y/N): " confirm_suffix
+        if [[ ! "$confirm_suffix" =~ ^[Yy]$ ]]; then
+            echo -e "${RED}Terbit ulang sertifikat dibatalkan.${NC}"
+            return 1
+        fi
+    fi
+
+    echo -e "${GREEN}Root domain untuk sertifikat: ${root_domain}${NC}"
+
+    # Pemeriksaan acme.sh
+    if ! cek_acme_sh; then
+        return 1
+    fi
+
+    # Muat .env
+    muat_env
+
+    # Cek kredensial Cloudflare
+    if [ -z "${CF_Token}" ] && [ -z "${CF_Key}" ]; then
+        read -p "Masukkan Cloudflare API Token (kosongkan jika sudah di environment): " CF_Token
+    fi
+    export CF_Token="${CF_Token}"
+
+    if [ -z "$CF_Token" ] && [ -z "${CF_Key}" ]; then
+        echo -e "${RED}Cloudflare API Token tidak diisi. Terbit ulang sertifikat dibatalkan.${NC}"
+        return 1
+    fi
+
+    echo -e "\n[*] Menerbitkan sertifikat SSL via acme.sh (Cloudflare DNS challenge)..."
+    "$HOME/.acme.sh/acme.sh" --issue --dns dns_cf -d "*.${root_domain}" -d "${root_domain}" \
+        --cert-file /etc/nginx/ssl/natssh.crt \
+        --key-file /etc/nginx/ssl/natssh.key \
+        --fullchain-file /etc/nginx/ssl/natssh_fullchain.crt \
+        --reloadcmd "systemctl reload nginx" || {
+        echo -e "${RED}Gagal menerbitkan sertifikat SSL. Sertifikat lama tetap dipakai.${NC}"
+        return 1
+    }
+
+    echo -e "${GREEN}Sertifikat SSL berhasil diperbarui untuk ${root_domain}.${NC}"
+    echo -e "${GREEN}Nginx akan di-reload otomatis oleh acme.sh reloadcmd.${NC}"
+    return 0
+}
+
 conf_domain() {
     # satu pintu domain: Cloudflare (biasa) + CloudFront — dua-duanya ke kartu akun
     local cur curcf
@@ -1067,6 +1205,13 @@ conf_domain_edit() {
     else
         echo "$h" > /root/natssh/config/host.conf
         echo -e "${GREEN}Domain tersimpan: $h — dipakai otomatis di kartu akun berikutnya.${NC}"
+        echo ""
+        read -p "Terbitkan ulang sertifikat SSL untuk domain ini sekarang? (y/N): " terbit_ssl
+        if [[ "$terbit_ssl" =~ ^[Yy]$ ]]; then
+            terbitkan_ulang_sertifikat
+        else
+            echo -e "${YELLOW}Sertifikat tidak ditampilkan ulang. Jalankan kembali nanti lewat menu ini.${NC}"
+        fi
     fi
 }
 
