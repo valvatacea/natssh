@@ -1136,79 +1136,50 @@ conf_udpgw_service() {
     while true; do
         clear
         garis
-        echo -e "${YELLOW}   KONTROL LAYANAN UDPGW${NC}"
+        echo -e "${YELLOW}   BADVPN-UDPGW (UDP GATEWAY)${NC}"
         garis
-        udpgw_active=0
+        active=""
         for pp in 7100 7200 7300 7400 7500; do
-            if systemctl is-active --quiet "natssh-udpgw@${pp}" 2>/dev/null; then
-                udpgw_active=1
-                break
-            fi
+            st=$(systemctl is-active natssh-udpgw@${pp} 2>/dev/null)
+            [ "$st" = "active" ] && active="$active $pp"
         done
-        if [ "$udpgw_active" -eq 1 ]; then
-            status="active"
-        else
-            status="inactive"
-        fi
-        echo -e "Status saat ini: ${GREEN}${status}${NC}"
-        echo ""
-        echo "1. Start"
-        echo "2. Stop"
-        echo "3. Restart"
+        echo -e "Status : ${GREEN}active${NC}  Port aktif:${YELLOW}${active:- (none)}${NC}"
+        echo -e "Tunnel contoh: ssh -N -L 7300:127.0.0.1:7300 user@host"
+        garis
+        echo "1. Ubah Port (pilih port untuk aktif/nonaktif)"
         echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-3): " p || exit 0
+        read -p "Pilih (0-1): " p || return
         case $p in
             1)
-                echo -e "${YELLOW}Menjalankan natssh-udpgw...${NC}"
-                for pp in 7100 7200 7300 7400 7500; do
-                    systemctl start natssh-udpgw@${pp} 2>/dev/null
+                ports_list="7100 7200 7300 7400 7500"
+                clear
+                garis
+                echo -e "${YELLOW}   KELOLA PORT UDGPW${NC}"
+                garis
+                i=1
+                for pp in $ports_list; do
+                    st=$(systemctl is-active natssh-udpgw@${pp} 2>/dev/null)
+                    echo "$i) $pp  [$st]"
+                    i=$((i+1))
                 done
-                sleep 2
-                udpgw_active=0
-                for pp in 7100 7200 7300 7400 7500; do
-                    if systemctl is-active --quiet "natssh-udpgw@${pp}" 2>/dev/null; then
-                        udpgw_active=1
-                        break
-                    fi
-                done
-                [ "$udpgw_active" -eq 1 ] && echo -e "${GREEN}SUKSES! UDPGW berjalan.${NC}" || echo -e "${RED}Gagal start!${NC}"
-                pause
-                ;;
-            2)
-                echo -e "${YELLOW}Menghentikan natssh-udpgw...${NC}"
-                for pp in 7100 7200 7300 7400 7500; do
-                    systemctl stop natssh-udpgw@${pp} 2>/dev/null
-                done
-                sleep 2
-                udpgw_active=0
-                for pp in 7100 7200 7300 7400 7500; do
-                    if systemctl is-active --quiet "natssh-udpgw@${pp}" 2>/dev/null; then
-                        udpgw_active=1
-                        break
-                    fi
-                done
-                [ "$udpgw_active" -eq 1 ] && echo -e "${RED}Masih berjalan!${NC}" || echo -e "${GREEN}Berhasil dihentikan.${NC}"
-                pause
-                ;;
-            3)
-                echo -e "${YELLOW}Me-restart natssh-udpgw...${NC}"
-                for pp in 7100 7200 7300 7400 7500; do
-                    systemctl restart natssh-udpgw@${pp} 2>/dev/null
-                done
-                sleep 3
-                udpgw_active=0
-                for pp in 7100 7200 7300 7400 7500; do
-                    if systemctl is-active --quiet "natssh-udpgw@${pp}" 2>/dev/null; then
-                        udpgw_active=1
-                        break
-                    fi
-                done
-                [ "$udpgw_active" -eq 1 ] && echo -e "${GREEN}SUKSES! UDPGW berjalan kembali.${NC}" || echo -e "${RED}Gagal restart!${NC}"
-                pause
+                echo "0) Batal"
+                echo -e "${YELLOW}Catatan: pilih port aktif -> nonaktifkan; nonaktif -> aktifkan.${NC}"
+                garis
+                read -p "Pilih nomor port (0 batal): " n
+                [ "$n" = "0" ] && return
+                case $n in
+                    1) pp=7100 ;; 2) pp=7200 ;; 3) pp=7300 ;; 4) pp=7400 ;; 5) pp=7500 ;; *) echo -e "${RED}Tidak valid${NC}"; pause; return ;;
+                esac
+                if systemctl is-active --quiet natssh-udpgw@${pp}; then
+                    systemctl disable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} nonaktif${NC}" || echo -e "${RED}Gagal${NC}"
+                else
+                    systemctl enable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} aktif${NC}" || echo -e "${RED}Gagal${NC}"
+                fi
                 ;;
             0) return ;;
-            *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
+        [ "$p" != "0" ] && pause
     done
 }
 
@@ -2125,43 +2096,44 @@ menu_conf() {
         echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
         garis
         echo -e "${CYAN}  -- Port --${NC}"
-
-        printf "  %-3s %-46s\n" "1." "Ubah Domain/Host di Kartu Akun"
-        printf "  %-3s %-46s\n" "2." "Hide IP"
+        printf "  %-3s %-46s\\n" "1." "Ubah Port Layanan (WebSocket, Nginx)"
+        printf "  %-3s %-46s\\n" "2." "Ubah Domain/Host di Kartu Akun"
+        printf "  %-3s %-46s\\n" "3." "Hide IP"
         echo -e "${CYAN}  -- Layanan --${NC}"
-        printf "  %-3s %-46s\n" "3." "Kontrol Layanan WS"
-        printf "  %-3s %-46s\n" "4." "Kontrol Layanan UDPGW"
-        printf "  %-3s %-46s\\n" "5." "Kontrol Nginx"
+        printf "  %-3s %-46s\\n" "4." "Kontrol Layanan WS"
+        printf "  %-3s %-46s\\n" "5." "Kontrol Layanan UDPGW"
+        printf "  %-3s %-46s\\n" "6." "Kontrol Nginx"
         echo -e "${CYAN}  -- Batas --${NC}"
-        printf "  %-3s %-46s\n" "6." "Atur Batas Login per Akun (Max Login)"
-        printf "  %-3s %-46s\n" "7." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
-        printf "  %-3s %-46s\n" "8." "Ubah Batas Koneksi per IP (MAX_PER_IP)"
-        printf "  %-3s %-46s\n" "9." "Atur Limit Speed per CDN (CF/CFront)"
+        printf "  %-3s %-46s\\n" "7." "Atur Batas Login per Akun (Max Login)"
+        printf "  %-3s %-46s\\n" "8." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
+        printf "  %-3s %-46s\\n" "9." "Ubah Batas Koneksi per IP (MAX_PER_IP)"
+        printf "  %-3s %-46s\\n" "10." "Atur Limit Speed per CDN (CF/CFront)"
         echo -e "${CYAN}  -- Lainnya --${NC}"
-        printf "  %-3s %-46s\n" "10." "Penjadwalan"
-        printf "  %-3s %-46s\n" "11." "Ubah Banner Pelanggan"
-        printf "  %-3s %-46s\n" "12." "Ubah Durasi Suspend (menit)"
-        printf "  %-3s %-46s\n" "13." "Test Ping (Cek Koneksi Internet)"
+        printf "  %-3s %-46s\\n" "11." "Penjadwalan"
+        printf "  %-3s %-46s\\n" "12." "Ubah Banner Pelanggan"
+        printf "  %-3s %-46s\\n" "13." "Ubah Durasi Suspend (menit)"
+        printf "  %-3s %-46s\\n" "14." "Test Ping (Cek Koneksi Internet)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-13): " p || exit 0
+        read -p "Pilih (0-14): " p || exit 0
         case $p in
-            1) conf_domain ;;
-            2) conf_hide_ip ;;
-            3) conf_service ;;
-            4) conf_udpgw_service ;;
-            5) conf_nginx_service ;;
-            6) conf_maxlogin ;;
-            7) conf_maxtotal ;;
-            8) conf_maxperip ;;
-            9) conf_speed ;;
-            10) conf_restart_schedule ;;
-            11) conf_banner ;;
-            12) conf_suspend_minutes ;;
-            13) conf_test_ping ;;
+            1) conf_port_submenu ;;
+            2) conf_domain ;;
+            3) conf_hide_ip ;;
+            4) conf_service ;;
+            5) conf_udpgw_service ;;
+            6) conf_nginx_service ;;
+            7) conf_maxlogin ;;
+            8) conf_maxtotal ;;
+            9) conf_maxperip ;;
+            10) conf_speed ;;
+            11) conf_restart_schedule ;;
+            12) conf_banner ;;
+            13) conf_suspend_minutes ;;
+            14) conf_test_ping ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && [ "$p" != "3" ] && [ "$p" != "4" ] && [ "$p" != "5" ] && [ "$p" != "6" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && pause
+        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "4" ] && [ "$p" != "5" ] && [ "$p" != "6" ] && [ "$p" != "7" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && [ "$p" != "14" ] && pause
     done
 }
 
