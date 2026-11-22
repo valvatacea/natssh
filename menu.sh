@@ -1087,10 +1087,15 @@ extract_root_domain() {
 
 # Pemeriksaan acme.sh (pasang otomatis jika belum ada)
 cek_acme_sh() {
-    if [ ! -x "$HOME/.acme.sh/acme.sh" ]; then
+    echo -e "\n[*] Memeriksa acme.sh..."
+    if [ -x "$HOME/.acme.sh/acme.sh" ]; then
+        acme_version=$("$HOME/.acme.sh/acme.sh" --version 2>/dev/null | head -1)
+        echo -e "${GREEN}acme.sh sudah terinstal: ${acme_version:-versi tidak terbaca}, lewati instalasi.${NC}"
+    else
         echo -e "${YELLOW}acme.sh belum terpasang. Memasang acme.sh...${NC}"
         curl https://get.acme.sh | sh -s email=admin@example.com
     fi
+
     if [ ! -x "$HOME/.acme.sh/acme.sh" ]; then
         echo -e "${RED}acme.sh tidak dapat dieksekusi. Terbit ulang sertifikat dibatalkan.${NC}"
         return 1
