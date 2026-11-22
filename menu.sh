@@ -1143,7 +1143,12 @@ conf_udpgw_service() {
             st=$(systemctl is-active natssh-udpgw@${pp} 2>/dev/null)
             [ "$st" = "active" ] && active="$active $pp"
         done
-        echo -e "Status : ${GREEN}active${NC}  Port aktif:${YELLOW}${active:- (none)}${NC}"
+        if [ -z "$active" ]; then
+            st_text="inactive"
+        else
+            st_text="active"
+        fi
+        echo -e "Status : ${GREEN}${st_text}${NC}  Port aktif:${YELLOW}${active:- (none)}${NC}"
         echo -e "Tunnel contoh: ssh -N -L 7300:127.0.0.1:7300 user@host"
         garis
         echo "1. Ubah Port (pilih port untuk aktif/nonaktif)"
@@ -1937,7 +1942,12 @@ conf_udpgw() {
             st=$(systemctl is-active natssh-udpgw@${pp} 2>/dev/null)
             [ "$st" = "active" ] && active="$active $pp"
         done
-        echo -e "Status : ${GREEN}active${NC}  Port aktif:${YELLOW}${active:- (none)}${NC}"
+        if [ -z "$active" ]; then
+            st_text="inactive"
+        else
+            st_text="active"
+        fi
+        echo -e "Status : ${GREEN}${st_text}${NC}  Port aktif:${YELLOW}${active:- (none)}${NC}"
         echo -e "Tunnel contoh: ssh -N -L 7300:127.0.0.1:7300 user@host"
         garis
         echo "1. Ubah Port (pilih port untuk aktif/nonaktif)"
