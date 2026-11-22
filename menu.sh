@@ -1123,18 +1123,26 @@ terbitkan_ulang_sertifikat() {
         return 1
     fi
 
-    echo -e "\n[*] Mengunduh Public Suffix List untuk ekstraksi root domain..."
+    echo -e "\n[*] Mengecek Public Suffix List..."
     PSL_FILE="${DIR}/config/public_suffix_list.dat"
     root_domain=""
-    if wget -q "https://publicsuffix.org/list/public_suffix_list.dat" -O "$PSL_FILE" 2>/dev/null; then
+    if [ -f "$PSL_FILE" ]; then
+        echo -e "${GREEN}PSL sudah tersedia di $PSL_FILE, lewati unduhan.${NC}"
+    else
+        echo -e "[*] Mengunduh Public Suffix List..."
+        if wget -q "https://publicsuffix.org/list/public_suffix_list.dat" -O "$PSL_FILE" 2>/dev/null; then
+            echo -e "${GREEN}PSL tersimpan di $PSL_FILE.${NC}"
+        else
+            echo -e "${YELLOW}Gagal unduh Public Suffix List, pakai fallback host.conf${NC}"
+        fi
+    fi
+
+    if [ -f "$PSL_FILE" ]; then
         root_domain=$(extract_root_domain "$ssl_domain" "$PSL_FILE")
         if [ -z "$root_domain" ]; then
             echo -e "${YELLOW}Public Suffix List tidak dapat menentukan root domain, pakai fallback host.conf${NC}"
             root_domain="$ssl_domain"
         fi
-    else
-        echo -e "${YELLOW}Gagal unduh Public Suffix List, pakai fallback host.conf${NC}"
-        root_domain="$ssl_domain"
     fi
 
     # Validasi suffix
