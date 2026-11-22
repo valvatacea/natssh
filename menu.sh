@@ -1124,7 +1124,7 @@ terbitkan_ulang_sertifikat() {
     fi
 
     echo -e "\n[*] Mengunduh Public Suffix List untuk ekstraksi root domain..."
-    PSL_FILE="/tmp/public_suffix_list.dat"
+    PSL_FILE="${DIR}/config/public_suffix_list.dat"
     root_domain=""
     if wget -q "https://publicsuffix.org/list/public_suffix_list.dat" -O "$PSL_FILE" 2>/dev/null; then
         root_domain=$(extract_root_domain "$ssl_domain" "$PSL_FILE")

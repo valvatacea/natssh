@@ -17,3 +17,4 @@ banners/.default_backup
 promo.log
 pending_sess.json
 config/cdn_geo.conf
+config/public_suffix_list.dat
