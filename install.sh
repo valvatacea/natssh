@@ -32,36 +32,64 @@ NC='\u001b[0m'
 extract_root_domain() {
     local domain="$1"
     local psl_file="$2"
-    local rev_domain parts count i suffix rev_suffix
-    rev_domain=$(echo "$domain" | awk -F. '{for(i=NF;i>0;i--) printf "%s.", $i}' | sed 's/\.$//')
-    parts=$(echo "$domain" | awk -F. '{print NF}')
-
+    local parts count best_len line trimmed
     local best_suffix="" best_len=0
+
+    # Hitung jumlah label domain (titik + 1)
+    local ddots="${domain//[^.]/}"
+    parts=${#ddots}
+    parts=$((parts + 1))
+
+    local line_count=0
     while IFS= read -r line; do
-        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        line_count=$((line_count + 1))
+        # Progress tiap 2000 baris
+        if [ $((line_count % 2000)) -eq 0 ]; then
+            echo -e "${YELLOW}   ... memproses baris ke-$line_count${NC}"
+        fi
+
+        # Trim whitespace (bash only, tidak pakai sed)
+        trimmed="${line#"${line%%[![:space:]]*}"}"
+        trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+        line="$trimmed"
+
         [[ -z "$line" || "$line" == \/\/ ]] && continue
+
         # Hilangkan leading *. dari wildcard rules
         if [[ "$line" == \*.* ]]; then
             line="${line#*.}"
         fi
+
         # Lewati exceptions (!rule)
         [[ "$line" == !* ]] && continue
         [[ -z "$line" ]] && continue
 
-        rev_suffix=$(echo "$line" | awk -F. '{for(i=NF;i>0;i--) printf "%s.", $i}' | sed 's/\.$//')
-        count=$(echo "$line" | awk -F. '{print NF}')
+        # Hitung jumlah label suffix (titik + 1)
+        local sdots="${line//[^.]/}"
+        count=${#sdots}
+        count=$((count + 1))
 
-        if [[ "$rev_domain" == "$rev_suffix"* ]] && [ "$count" -gt "$best_len" ]; then
-            if [ "$parts" -gt "$count" ]; then
+        # Cek apakah domain cocok dengan suffix (sama atau diakhiri dengan .suffix)
+        if [[ "$domain" == "$line" || "$domain" == *".$line" ]]; then
+            if [ "$count" -gt "$best_len" ] && [ "$parts" -gt "$count" ]; then
                 best_suffix="$line"
                 best_len="$count"
             fi
         fi
     done < "$psl_file"
 
+    echo -e "${GREEN}   Selesai memproses $line_count baris PSL${NC}"
+
     if [ -n "$best_suffix" ]; then
-        local start=$((parts - best_len + 1))
-        echo "$domain" | awk -F. -v s="$start" '{for(i=s;i<=NF;i++) printf "%s%s", $i, (i<NF?".":"")}'
+        # Ekstrak root domain: hilangkan label di depan sampai tersisa best_len label
+        local start=$((parts - best_len))
+        local remaining="$domain"
+        local idx=1
+        while [ $idx -lt $start ]; do
+            remaining="${remaining#*.}"
+            idx=$((idx + 1))
+        done
+        echo "$remaining"
         return 0
     fi
     return 1
