@@ -2824,8 +2824,8 @@ menu_conf() {
         printf "  %-3s %-46s\\n" "10." "Limit Speed per CDN (CF/CFront)"
         echo -e "${CYAN}  -- Lainnya --${NC}"
         printf "  %-3s %-46s\\n" "11." "Penjadwalan"
-        printf "  %-3s %-46s\\n" "12." "Ubah Banner Pelanggan"
-        printf "  %-3s %-46s\\n" "13." "Ubah Durasi Suspend (menit)"
+        printf "  %-3s %-46s\\n" "12." "Banner Pelanggan"
+        printf "  %-3s %-46s\\n" "13." "Durasi Suspend (menit)"
         printf "  %-3s %-46s\\n" "14." "Test Ping (Cek Koneksi Internet)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-14): " p || exit 0
