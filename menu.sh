@@ -71,6 +71,8 @@ akun_baru() {
                 sisa_hari=$(( sisa_hari / 86400 ))
                 [ $sisa_hari -lt 0 ] && sisa_hari=0
                 hostcf=$(cat "${DIR}/config/host_cf.conf" 2>/dev/null)
+                udpgw_ports=$(ss -tln 2>/dev/null | awk '{print $4}' | grep -oE ':7[1-4][0-9][0-9]$' | tr -d ':' | sort -n | paste -sd, -)
+                [ -z "$udpgw_ports" ] && udpgw_ports="7100,7200,7300,7400,7500"
                 template=$(cat "$card_template")
                 template=${template//\{domain\}/$host}
                 template=${template//\{domain_cf\}/$hostcf}
@@ -110,7 +112,9 @@ akun_baru() {
                 nginx_reverse=${nginx_reverse:-20865}
                 nginx_stream=$(grep -E 'listen [0-9]+' /etc/nginx/stream.conf 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
                 nginx_stream=${nginx_stream:-20869}
-                echo "Port UDPGW: ${udpgw_ports:-7300}"
+                udpgw_ports=$(ss -tln 2>/dev/null | awk '{print $4}' | grep -oE ':7[1-4][0-9][0-9]$' | tr -d ':' | sort -n | paste -sd, -)
+                [ -z "$udpgw_ports" ] && udpgw_ports="7100,7200,7300,7400,7500"
+                echo "Port UDPGW: ${udpgw_ports}"
                 echo "Port Direct : ${nginx_reverse} (reverse), ${nginx_stream} (stream)"
                 echo "Username  : $user"
                 echo "Password  : $pass"
