@@ -141,7 +141,15 @@ def info(x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
     host = ""
     try:
-        host = open(os.path.join(BASE, "host.conf")).read().strip()
+        host = os.environ.get("DOMAIN", "")
+        if not host:
+            env_path = os.path.join(BASE, "config", ".env")
+            if os.path.exists(env_path):
+                for line in open(env_path):
+                    line = line.strip()
+                    if line.startswith("DOMAIN="):
+                        host = line.split("=", 1)[1].strip()
+                        break
     except Exception:
         pass
     wsport = ""
@@ -353,8 +361,22 @@ def set_port(body: PortIn, x_api_token: str | None = Header(default=None)):
 @app.post("/config/domain")
 def set_domain(body: DomainIn, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
-    with open(os.path.join(BASE, "host.conf"), "w") as f:
-        f.write(body.domain)
+    if os.path.join(BASE, "config", ".env"):
+        if os.path.exists(os.path.join(BASE, "config", ".env")):
+            env_path = os.path.join(BASE, "config", ".env")
+            lines = open(env_path).read().splitlines()
+            out = []
+            found = False
+            for ln in lines:
+                if ln.startswith("DOMAIN="):
+                    out.append(f"DOMAIN={body.domain}")
+                    found = True
+                else:
+                    out.append(ln)
+            if not found:
+                out.append(f"DOMAIN={body.domain}")
+            with open(env_path, "w") as f:
+                f.write("\n".join(out) + "\n")
     return {"ok": True}
 
 
@@ -387,8 +409,21 @@ def restore(filename: str, x_api_token: str | None = Header(default=None)):
 @app.post("/config/speed")
 def set_speed(body: SpeedIn, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
-    with open(os.path.join(BASE, "speed.conf"), "w") as f:
-        f.write(body.value)
+    env_path = os.path.join(BASE, "config", ".env")
+    if os.path.exists(env_path):
+        lines = open(env_path).read().splitlines()
+        out = []
+        found = False
+        for ln in lines:
+            if ln.startswith("SPEED_CONFIG="):
+                out.append(f"SPEED_CONFIG={body.value}")
+                found = True
+            else:
+                out.append(ln)
+        if not found:
+            out.append(f"SPEED_CONFIG={body.value}")
+        with open(env_path, "w") as f:
+            f.write("\n".join(out) + "\n")
     return {"ok": True}
 @app.post("/udpgw/{port}/toggle")
 def udpgw_toggle(port: int, x_api_token: str | None = Header(default=None)):
@@ -435,7 +470,15 @@ class SuspendMinutesIn(BaseModel):
 def get_host_cf(x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
     try:
-        return {"domain": open(os.path.join(BASE, "host_cf.conf")).read().strip()}
+        host_cf = ""
+        env_path = os.path.join(BASE, "config", ".env")
+        if os.path.exists(env_path):
+            for line in open(env_path):
+                line = line.strip()
+                if line.startswith("DOMAIN_CF="):
+                    host_cf = line.split("=", 1)[1].strip()
+                    break
+        return {"domain": host_cf}
     except FileNotFoundError:
         return {"domain": ""}
 
@@ -443,8 +486,22 @@ def get_host_cf(x_api_token: str | None = Header(default=None)):
 @app.post("/config/host_cf")
 def set_host_cf(body: HostCfIn, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
-    with open(os.path.join(BASE, "host_cf.conf"), "w") as f:
-        f.write(body.domain)
+    if os.path.join(BASE, "config", ".env"):
+        env_path = os.path.join(BASE, "config", ".env")
+        if os.path.exists(env_path):
+            lines = open(env_path).read().splitlines()
+            out = []
+            found = False
+            for ln in lines:
+                if ln.startswith("DOMAIN_CF="):
+                    out.append(f"DOMAIN_CF={body.domain}")
+                    found = True
+                else:
+                    out.append(ln)
+            if not found:
+                out.append(f"DOMAIN_CF={body.domain}")
+            with open(env_path, "w") as f:
+                f.write("\n".join(out) + "\n")
     return {"ok": True}
 
 
@@ -452,7 +509,15 @@ def set_host_cf(body: HostCfIn, x_api_token: str | None = Header(default=None)):
 def get_suspend_minutes(x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
     try:
-        return {"minutes": int(open(os.path.join(BASE, "suspend_minutes.conf")).read().strip())}
+        suspend_minutes = 15
+        env_path = os.path.join(BASE, "config", ".env")
+        if os.path.exists(env_path):
+            for line in open(env_path):
+                line = line.strip()
+                if line.startswith("SUSPEND_MINUTES="):
+                    suspend_minutes = int(line.split("=", 1)[1].strip())
+                    break
+        return {"minutes": suspend_minutes}
     except Exception:
         return {"minutes": 15}
 
@@ -462,8 +527,22 @@ def set_suspend_minutes(body: SuspendMinutesIn, x_api_token: str | None = Header
     auth(x_api_token)
     if body.minutes < 1:
         raise HTTPException(400, "invalid")
-    with open(os.path.join(BASE, "suspend_minutes.conf"), "w") as f:
-        f.write(str(body.minutes))
+    if os.path.join(BASE, "config", ".env"):
+        env_path = os.path.join(BASE, "config", ".env")
+        if os.path.exists(env_path):
+            lines = open(env_path).read().splitlines()
+            out = []
+            found = False
+            for ln in lines:
+                if ln.startswith("SUSPEND_MINUTES="):
+                    out.append(f"SUSPEND_MINUTES={body.minutes}")
+                    found = True
+                else:
+                    out.append(ln)
+            if not found:
+                out.append(f"SUSPEND_MINUTES={body.minutes}")
+            with open(env_path, "w") as f:
+                f.write("\n".join(out) + "\n")
     return {"ok": True}
 class MaxTotalIn(BaseModel):
     value: int
@@ -564,7 +643,7 @@ class SpeedApplyIn(BaseModel):
     down: str
 
 
-@app.post("/config/speed/apply")
+@api.post("/config/speed/apply")
 def apply_speed(body: SpeedApplyIn, x_api_token: str | None = Header(default=None)):
     auth(x_api_token)
     if not re.fullmatch(r"[a-zA-Z0-9._-]+", body.iface):
@@ -586,11 +665,27 @@ tc qdisc add dev $IFACE parent 1:10 handle 10: fq_codel
 tc qdisc add dev $IFACE parent 1:30 handle 30: fq_codel
 tc filter add dev $IFACE parent 1: protocol ip prio 1 u32 match ip sport 22 0xffff flowid 1:10 2>/dev/null
 tc filter add dev $IFACE parent 1: protocol ip prio 1 u32 match ip dport 22 0xffff flowid 1:10 2>/dev/null
-echo "IFACE=$IFACE" > /root/natssh/config/speed.conf
-echo "UP={up}" >> /root/natssh/config/speed.conf
-echo "DOWN={down}" >> /root/natssh/config/speed.conf
-echo "MODE=ssh-only" >> /root/natssh/config/speed.conf
+# Speed config now written to .env below
 """
+    # Update .env
+    env_path = os.path.join(BASE, "config", ".env")
+    if os.path.exists(env_path):
+        lines = open(env_path).read().splitlines()
+        out = []
+        keys = {"IFACE": body.iface, "UP_CF": body.up, "DOWN_CF": body.down}
+        found_keys = set()
+        for ln in lines:
+            key = ln.split("=", 1)[0] if "=" in ln else ""
+            if key in keys:
+                out.append(f"{key}={keys[key]}")
+                found_keys.add(key)
+            else:
+                out.append(ln)
+        for key in keys:
+            if key not in found_keys:
+                out.append(f"{key}={keys[key]}")
+        with open(env_path, "w") as f:
+            f.write("\n".join(out) + "\n")
     r = sh(cmds)
     return {"ok": r.returncode == 0, "stderr": r.stderr}
 @app.post("/accounts/{user}/suspend")

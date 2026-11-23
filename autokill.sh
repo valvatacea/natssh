@@ -2,13 +2,20 @@
 # Semua timestamp log autokill pakai WIB (GMT+7)
 export TZ=Asia/Jakarta
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Muat konfigurasi terpusat dari config/.env (jika ada)
+if [ -f "$(dirname "$(readlink -f "$0")")/config/.env" ]; then
+    set -a
+    . "$(dirname "$(readlink -f "$0")")/config/.env"
+    set +a
+fi
+
 MAX_LOGIN="${MAX_LOGIN:-5}" # batas perangkat global; env MAX_LOGIN disuntik cron; khusus per akun di limits/<user>
 
 LOG_FILE="/root/natssh/logs/autokill.log"
 MAX_LOG_SIZE=512000 # 500KB
 SUSPEND_DIR="/root/natssh/suspended"
-SUSPEND_MINUTES=$(cat /root/natssh/config/suspend_minutes.conf 2>/dev/null)
-SUSPEND_MINUTES=${SUSPEND_MINUTES:-15}
+SUSPEND_MINUTES="${SUSPEND_MINUTES:-15}"
 SUSPEND_SEC=$(( SUSPEND_MINUTES * 60 ))
 mkdir -p "$SUSPEND_DIR"
 

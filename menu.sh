@@ -52,8 +52,8 @@ akun_baru() {
             useradd -e "$exp" -m -s /bin/false "$user"
             echo "$user:$pass" | chpasswd
             # Detail siap-salin untuk dikirim ke pelanggan
-            # host.conf  = domain Cloudflare (recommended) / IP utk koneksi langsung
-            # port.conf  = port Cloudflare yg dipakai klien (default 2086); asal via Origin Rule ke port NAT
+            # .env: DOMAIN = domain Cloudflare (recommended) / IP utk koneksi langsung
+            # NATSSH_WS_PORT = port Cloudflare yg dipakai klien (default 2086); asal via Origin Rule ke port NAT
             ipaddr=$(cat "${DIR}/config/ip.conf" 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
             ipaddr=${ipaddr:-$(hostname -I | awk '{print $1}')}
             host=${DOMAIN}
@@ -91,7 +91,7 @@ akun_baru() {
                 template=${template//\{expired\}/$exp}
                 template=${template//\{hari\}/$aktif}
                 template=${template//\{limit\}/${maxlog:-5}}
-                # Hide IP jika hide_ip.conf = 1
+                # Hide IP jika HIDE_IP = 1 (dari .env)
                 if [ "${HIDE_IP}" = "1" ]; then
                     template=${template//\{ip\}/}
                     template=$(echo "$template" | sed '/^IP[[:space:]]*:[[:space:]]*$/d')
@@ -107,7 +107,7 @@ akun_baru() {
                 echo "================ DETAIL AKUN ================"
                 echo "Domain    : $host"
                 [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
-                # Hide IP jika hide_ip.conf = 1
+                # Hide IP jika HIDE_IP = 1 (dari .env)
                 if [ "${HIDE_IP}" != "1" ]; then
                     echo "IP        : $ipaddr"
                 fi
@@ -807,11 +807,6 @@ backup_config() {
     local out="$BACKUP_DIR/config_$ts.tar.gz"
     local list=""
     cd /root/natssh
-    [ -f ip.conf ] && list="$list ip.conf"
-    [ -f host.conf ] && list="$list host.conf"
-    [ -f port.conf ] && list="$list port.conf"
-    [ -f hide_ip.conf ] && list="$list hide_ip.conf"
-    [ -f suspend_minutes.conf ] && list="$list suspend_minutes.conf"
     [ -f .env ] && list="$list .env"
     [ -d limits ] && list="$list limits"
     [ -d banners ] && list="$list banners"
@@ -922,7 +917,7 @@ restore_config() {
     local tmpdir="/tmp/natssh_restore_$$"
     mkdir -p "$tmpdir"
     if tar -xzf "$selected" -C "$tmpdir" 2>/dev/null; then
-        for f in ip.conf host.conf port.conf hide_ip.conf suspend_minutes.conf .env; do
+        for f in .env; do
             [ -f "$tmpdir/$f" ] && cp "$tmpdir/$f" "/root/natssh/$f"
         done
         [ -d "$tmpdir/limits" ] && cp -r "$tmpdir/limits" /root/natssh/
@@ -1019,7 +1014,7 @@ conf_maxlogin() {
 }
 
 conf_domain_cf_edit() {
-    # domain CloudFront (jalur AWS) utk kartu akun; host_cf.conf — opsional
+    # domain CloudFront (jalur AWS) utk kartu akun; DOMAIN_CF di .env — opsional
     local cur=${DOMAIN_CF}
     echo -e "Domain CloudFront saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
     read -p "Domain CloudFront baru (kosong = hapus/sembunyikan, 0 = batal): " h
@@ -1386,7 +1381,7 @@ conf_domain() {
 }
 
 conf_domain_edit() {
-    # host/domain Cloudflare di kartu akun; host.conf dipakai akun_baru (fallback: IP publik)
+    # host/domain Cloudflare di kartu akun; DOMAIN di .env (fallback: IP publik)
     local cur=${DOMAIN}
     echo -e "Host kartu akun saat ini: ${YELLOW}${cur:-OTOMATIS (IP publik)}${NC}"
     read -p "Domain/host baru (kosong = otomatis IP, 0 = batal): " h
@@ -1687,7 +1682,7 @@ conf_speed() {
                 for v in up down; do
                     val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
                 done
-                # update only CF fields in speed.conf
+                # update only CF fields in .env
                 iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
                 if [ ! -f "${DIR}/config/.env" ]; then
                     echo "IFACE=$iface" > "${DIR}/config/.env"
