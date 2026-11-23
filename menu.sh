@@ -1067,42 +1067,41 @@ conf_port() {
     elif ss -tln | grep -q ":$new_port "; then
         echo -e "${RED}Gagal: port $new_port sedang dipakai proses lain!${NC}"
     else
-        unit=/etc/systemd/system/natssh-ws.service
-        if [ -f "$unit" ]; then
-            if grep -q "Environment=NATSSH_WS_PORT" "$unit"; then
-                sed -i "s/Environment=NATSSH_WS_PORT=[0-9]*/Environment=NATSSH_WS_PORT=$new_port/" "$unit"
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^NATSSH_WS_PORT=" "${DIR}/config/.env"; then
+                sed -i "s/^NATSSH_WS_PORT=.*/NATSSH_WS_PORT=$new_port/" "${DIR}/config/.env"
             else
-                sed -i "/^\[Service\]/a Environment=NATSSH_WS_PORT=$new_port" "$unit"
-            fi
-            systemctl daemon-reload
-            echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
-            read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr
-            if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
-                echo -e "${YELLOW}Dibatalkan.${NC}"
-                pause
-                continue
-            fi
-            systemctl restart natssh-ws
-            sleep 1
-            if systemctl is-active --quiet natssh-ws; then
-                echo -e "${GREEN}SUKSES! WebSocket kini di port $new_port.${NC}"
-                # Update nginx proxy_forward ke port ws baru
-                ngconf=/etc/nginx/sites-available/natssh-ws
-                if [ -f "$ngconf" ]; then
-                    sed -i "s|proxy_pass http://127.0.0.1:[0-9]*;|proxy_pass http://127.0.0.1:$new_port;|" "$ngconf"
-                    if nginx -t >/dev/null 2>&1 && systemctl restart nginx; then
-                        echo -e "${GREEN}Nginx diupdate forward ke port $new_port.${NC}"
-                    else
-                        echo -e "${RED}Nginx gagal restart! Cek: journalctl -u nginx -n 20${NC}"
-                    fi
-                else
-                    echo -e "${YELLOW}Config nginx tidak ditemukan di $ngconf, lewati.${NC}"
-                fi
-            else
-                echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+                echo "NATSSH_WS_PORT=$new_port" >> "${DIR}/config/.env"
             fi
         else
-            echo -e "${RED}Gagal: unit natssh-ws.service tidak ditemukan (install dulu).${NC}"
+            echo "NATSSH_WS_PORT=$new_port" > "${DIR}/config/.env"
+        fi
+        echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+        read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr
+        if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
+            echo -e "${YELLOW}Dibatalkan.${NC}"
+            pause
+            continue
+        fi
+        systemctl daemon-reload
+        systemctl restart natssh-ws
+        sleep 1
+        if systemctl is-active --quiet natssh-ws; then
+            echo -e "${GREEN}SUKSES! WebSocket kini di port $new_port.${NC}"
+            # Update nginx proxy_forward ke port ws baru
+            ngconf=/etc/nginx/sites-available/natssh-ws
+            if [ -f "$ngconf" ]; then
+                sed -i "s|proxy_pass http://127.0.0.1:[0-9]*;|proxy_pass http://127.0.0.1:$new_port;|" "$ngconf"
+                if nginx -t >/dev/null 2>&1 && systemctl restart nginx; then
+                    echo -e "${GREEN}Nginx diupdate forward ke port $new_port.${NC}"
+                else
+                    echo -e "${RED}Nginx gagal restart! Cek: journalctl -u nginx -n 20${NC}"
+                fi
+            else
+                echo -e "${YELLOW}Config nginx tidak ditemukan di $ngconf, lewati.${NC}"
+            fi
+        else
+            echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
         fi
     fi
 }
@@ -2451,24 +2450,32 @@ conf_keepalive() {
 conf_heartbeat() {
     clear; garis
     echo -e "${YELLOW}   TOGGLE HEARTBEAT WS (TCP keepalive)${NC}"; garis
-    if grep -q "NATSSH_TCP_KEEPALIVE=0" /etc/systemd/system/natssh-ws.service; then echo -e "Status: ${RED}NONAKTIF${NC}"; else echo -e "Status: ${GREEN}AKTIF (default)${NC}"; fi
+    if [ "${NATSSH_TCP_KEEPALIVE}" = "0" ]; then echo -e "Status: ${RED}NONAKTIF${NC}"; else echo -e "Status: ${GREEN}AKTIF (default)${NC}"; fi
     echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo "0. Kembali"
     read -p "Pilih (0-2): " k || return
     case $k in
         1)
-            if grep -q "NATSSH_TCP_KEEPALIVE=" /etc/systemd/system/natssh-ws.service; then
-                sed -i 's/NATSSH_TCP_KEEPALIVE=[01]/NATSSH_TCP_KEEPALIVE=1/' /etc/systemd/system/natssh-ws.service
+            if [ -f "${DIR}/config/.env" ]; then
+                if grep -q "^NATSSH_TCP_KEEPALIVE=" "${DIR}/config/.env"; then
+                    sed -i 's/^NATSSH_TCP_KEEPALIVE=.*/NATSSH_TCP_KEEPALIVE=1/' "${DIR}/config/.env"
+                else
+                    echo "NATSSH_TCP_KEEPALIVE=1" >> "${DIR}/config/.env"
+                fi
             else
-                sed -i '/ExecStart=/i Environment=NATSSH_TCP_KEEPALIVE=1' /etc/systemd/system/natssh-ws.service
+                echo "NATSSH_TCP_KEEPALIVE=1" > "${DIR}/config/.env"
             fi
             systemctl daemon-reload
             systemctl restart natssh-ws.service
             echo -e "${GREEN}Heartbeat WS AKTIF.${NC}" ;;
         2)
-            if grep -q "NATSSH_TCP_KEEPALIVE=" /etc/systemd/system/natssh-ws.service; then
-                sed -i 's/NATSSH_TCP_KEEPALIVE=[01]/NATSSH_TCP_KEEPALIVE=0/' /etc/systemd/system/natssh-ws.service
+            if [ -f "${DIR}/config/.env" ]; then
+                if grep -q "^NATSSH_TCP_KEEPALIVE=" "${DIR}/config/.env"; then
+                    sed -i 's/^NATSSH_TCP_KEEPALIVE=.*/NATSSH_TCP_KEEPALIVE=0/' "${DIR}/config/.env"
+                else
+                    echo "NATSSH_TCP_KEEPALIVE=0" >> "${DIR}/config/.env"
+                fi
             else
-                sed -i '/ExecStart=/i Environment=NATSSH_TCP_KEEPALIVE=0' /etc/systemd/system/natssh-ws.service
+                echo "NATSSH_TCP_KEEPALIVE=0" > "${DIR}/config/.env"
             fi
             systemctl daemon-reload
             systemctl restart natssh-ws.service

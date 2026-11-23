@@ -15,6 +15,16 @@ import socket
 import threading
 import time
 
+# Muat konfigurasi dari config/.env (jika ada) sebagai fallback
+_env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", ".env")
+if os.path.exists(_env_file):
+    with open(_env_file) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _key, _val = _line.split("=", 1)
+                os.environ.setdefault(_key.strip(), _val.strip())
+
 WS_PORT = int(os.environ.get("NATSSH_WS_PORT", "20865"))  # port publik NAT (Cloudflare)
 SSH_PORT = int(os.environ.get("NATSSH_SSH_PORT", "22"))   # sshd lokal
 MAX_PER_IP = int(os.environ.get("NATSSH_MAX_PER_IP", "10"))
