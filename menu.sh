@@ -87,20 +87,18 @@ akun_baru() {
                 template=${template//\{limit\}/${maxlog:-5}}
                 echo -e "$template"
             else
-                echo "================ DETAIL AKUN ================"
                 [ -z "$host" ] && host="$ipaddr"
-                if [ "$host" != "$ipaddr" ]; then
-                    echo "Domain    : $host"
-                fi
+                echo "================ DETAIL AKUN ================"
+                echo "Domain    : $host"
                 [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
-                if [ "$(cat "${DIR}/config/hide_ip.conf" 2>/dev/null)" != "1" ]; then
-                    echo "IP        : $ipaddr"
-                fi
-                echo "Port WS   : $cfport (via Cloudflare)"
-                echo "Port UDPGW: ${udpgw_ports:-7300}"
                 echo "Cloudflare: 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
-                echo "CloudFront: 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443 (HTTPS)"
-                echo "Port NAT  : ${wsport:-20865} (cadangan, koneksi langsung tanpa Cloudflare)"
+                echo "CloudFront: 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443"
+                nginx_reverse=$(grep -E 'listen [0-9]+ ssl' /etc/nginx/sites-available/natssh-ws 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+                nginx_reverse=${nginx_reverse:-20865}
+                nginx_stream=$(grep -E 'listen [0-9]+' /etc/nginx/stream.conf 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+                nginx_stream=${nginx_stream:-20869}
+                echo "Port UDPGW: ${udpgw_ports:-7300}"
+                echo "Port Direct : ${nginx_reverse} (reverse), ${nginx_stream} (stream)"
                 echo "Username  : $user"
                 echo "Password  : $pass"
                 echo "Expired   : $exp ($aktif hari)"
