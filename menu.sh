@@ -65,8 +65,7 @@ akun_baru() {
                 nginx_reverse=${nginx_reverse:-20865}
                 nginx_stream=$(grep -E 'listen [0-9]+' /etc/nginx/stream.conf 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
                 nginx_stream=${nginx_stream:-20869}
-                cf_ports="80, 8080, 8880, 2052, 2082, 2086, 2095"
-                cf_tls_ports="443, 2053, 2083, 2087, 2096, 8443"
+                cf_ports="80, 443, 8080, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443"
                 cf_front_ports="80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443 (HTTPS)"
                 sisa_hari=$(( $(date -d "$exp" +%s) - $(date +%s) ))
                 sisa_hari=$(( sisa_hari / 86400 ))
@@ -75,7 +74,6 @@ akun_baru() {
                 template=${template//\{domain\}/$host}
                 template=${template//\{domain_cf\}/$hostcf}
                 template=${template//\{cf_ports\}/$cf_ports}
-                template=${template//\{cf_tls_ports\}/$cf_tls_ports}
                 template=${template//\{cf_front_ports\}/$cf_front_ports}
                 template=${template//\{udpgw_ports\}/${udpgw_ports:-7300}}
                 template=${template//\{nginx_reverse\}/$nginx_reverse}
@@ -102,7 +100,7 @@ akun_baru() {
                 if [ "$(cat "${DIR}/config/hide_ip.conf" 2>/dev/null)" != "1" ]; then
                     echo "IP        : $ipaddr"
                 fi
-                echo "Cloudflare: 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
+                echo "Cloudflare: 80, 443, 8080, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443"
                 echo "CloudFront: 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443"
                 nginx_reverse=$(grep -E 'listen [0-9]+ ssl' /etc/nginx/sites-available/natssh-ws 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
                 nginx_reverse=${nginx_reverse:-20865}
