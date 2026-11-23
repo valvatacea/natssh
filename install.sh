@@ -552,7 +552,7 @@ echo -e "${GREEN}Service natssh-speed disiapkan (belum diaktifkan). Aktif setela
 echo -e "\n[*] Mengatur Cronjob untuk Autokill..."
 if ! crontab -l 2>/dev/null | grep -q "autokill.sh"; then
     (crontab -l 2>/dev/null; echo "*/1 * * * * MAX_LOGIN=$max_login $DIR/autokill.sh") | crontab -
-    echo "SUSPEND_MINUTES=15" > "$DIR/config/.env"
+    echo "SUSPEND_MINUTES=15" >> "$DIR/config/.env"
     echo -e "${GREEN}Cronjob Autokill berhasil ditambahkan (berjalan setiap 1 menit).${NC}"
 else
     echo -e "${GREEN}Cronjob Autokill sudah ada.${NC}"
