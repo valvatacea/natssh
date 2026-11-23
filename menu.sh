@@ -2080,6 +2080,7 @@ conf_maxperip() {
     else
         echo "NATSSH_MAX_PER_IP=$n" > "${DIR}/config/.env"
     fi
+    muat_env
     echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
     read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr3
     if [[ ! "$cfr3" =~ ^[Yy]$ ]]; then
