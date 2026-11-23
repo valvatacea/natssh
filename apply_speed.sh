@@ -2,7 +2,10 @@
 # Apply NATSSH per-CDN (Cloudflare vs CloudFront) speed limit via tc flower (by IP range).
 # Modified: fetch only if internet available, skip if IPs unchanged.
 
-CONF=/root/natssh/config/.env
+# Direktori natssh (portabel jika dipindah)
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+CONF="${DIR}/config/.env"
 [ -f "$CONF" ] || exit 0
 source "$CONF"
 IFACE=${IFACE:-eth0}
@@ -11,10 +14,10 @@ DOWN_CF=${DOWN_CF:-1000mbit}
 UP_CFRONT=${UP_CFRONT:-1000mbit}
 DOWN_CFRONT=${DOWN_CFRONT:-1000mbit}
 
-CF_CACHE=/root/natssh/config/cf_ips.cache
-CFRONT_CACHE=/root/natssh/config/cfront_ips.cache
-TMP_CF=/root/natssh/.cf_ips.new
-TMP_CFRONT=/root/natssh/.cfront_ips.new
+CF_CACHE="${DIR}/config/cf_ips.cache"
+CFRONT_CACHE="${DIR}/config/cfront_ips.cache"
+TMP_CF="${DIR}/.cf_ips.new"
+TMP_CFRONT="${DIR}/.cfront_ips.new"
 
 # Cleanup temp files on exit
 trap 'rm -f "$TMP_CF" "$TMP_CFRONT"' EXIT
@@ -97,14 +100,14 @@ ip link set dev ifb0 down 2>/dev/null
 ip link del ifb0 2>/dev/null
 
 # egress qdisc (replace = atomik, tidak ada gap)
-tc qdisc replace dev $IFACE root handle 1: htb default 30 r2q 1000
-tc class add dev $IFACE parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
-tc class add dev $IFACE parent 1:1 classid 1:10 htb rate $UP_CF ceil $UP_CF prio 1 burst 32k
-tc class add dev $IFACE parent 1:1 classid 1:20 htb rate $UP_CFRONT ceil $UP_CFRONT prio 1 burst 32k
-tc class add dev $IFACE parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
-tc qdisc add dev $IFACE parent 1:10 handle 10: fq_codel
-tc qdisc add dev $IFACE parent 1:20 handle 20: fq_codel
-tc qdisc add dev $IFACE parent 1:30 handle 30: fq_codel
+tc qdisc replace dev $IFACE root handle 1: htb default 30 r2q 1000 2>> /root/natssh/logs/apply_speed.log || echo "$(date '+%Y-%m-%d %H:%M:%S') - apply_speed: gagal root qdisc eth0" >> /root/natssh/logs/apply_speed.log
+tc class add dev $IFACE parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit 2>> /root/natssh/logs/apply_speed.log || echo "$(date '+%Y-%m-%d %H:%M:%S') - apply_speed: gagal class 1:1 eth0" >> /root/natssh/logs/apply_speed.log
+tc class add dev $IFACE parent 1:1 classid 1:10 htb rate $UP_CF ceil $UP_CF prio 1 burst 32k 2>> /root/natssh/logs/apply_speed.log || echo "$(date '+%Y-%m-%d %H:%M:%S') - apply_speed: gagal class 1:10 eth0" >> /root/natssh/logs/apply_speed.log
+tc class add dev $IFACE parent 1:1 classid 1:20 htb rate $UP_CFRONT ceil $UP_CFRONT prio 1 burst 32k 2>> /root/natssh/logs/apply_speed.log || echo "$(date '+%Y-%m-%d %H:%M:%S') - apply_speed: gagal class 1:20 eth0" >> /root/natssh/logs/apply_speed.log
+tc class add dev $IFACE parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2 2>> /root/natssh/logs/apply_speed.log || echo "$(date '+%Y-%m-%d %H:%M:%S') - apply_speed: gagal class 1:30 eth0" >> /root/natssh/logs/apply_speed.log
+tc qdisc add dev $IFACE parent 1:10 handle 10: fq_codel 2>> /root/natssh/logs/apply_speed.log || true
+tc qdisc add dev $IFACE parent 1:20 handle 20: fq_codel 2>> /root/natssh/logs/apply_speed.log || true
+tc qdisc add dev $IFACE parent 1:30 handle 30: fq_codel 2>> /root/natssh/logs/apply_speed.log || true
 
 # egress filters by dst_ip (server -> CDN)
 for ip in $CF_IPS; do
@@ -129,14 +132,14 @@ for ip in $CFRONT_IPS; do
 done
 
 # ifb qdisc
-tc qdisc replace dev ifb0 root handle 1: htb default 30 r2q 1000
-tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit
-tc class add dev ifb0 parent 1:1 classid 1:10 htb rate $DOWN_CF ceil $DOWN_CF prio 1 burst 32k
-tc class add dev ifb0 parent 1:1 classid 1:20 htb rate $DOWN_CFRONT ceil $DOWN_CFRONT prio 1 burst 32k
-tc class add dev ifb0 parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2
-tc qdisc add dev ifb0 parent 1:10 handle 10: fq_codel
-tc qdisc add dev ifb0 parent 1:20 handle 20: fq_codel
-tc qdisc add dev ifb0 parent 1:30 handle 30: fq_codel
+tc qdisc replace dev ifb0 root handle 1: htb default 30 r2q 1000 2>> /root/natssh/logs/apply_speed.log || echo "$(date '+%Y-%m-%d %H:%M:%S') - apply_speed: gagal root qdisc ifb0" >> /root/natssh/logs/apply_speed.log
+tc class add dev ifb0 parent 1: classid 1:1 htb rate 1000mbit ceil 1000mbit 2>> /root/natssh/logs/apply_speed.log || echo "$(date '+%Y-%m-%d %H:%M:%S') - apply_speed: gagal class 1:1 ifb0" >> /root/natssh/logs/apply_speed.log
+tc class add dev ifb0 parent 1:1 classid 1:10 htb rate $DOWN_CF ceil $DOWN_CF prio 1 burst 32k 2>> /root/natssh/logs/apply_speed.log || echo "$(date '+%Y-%m-%d %H:%M:%S') - apply_speed: gagal class 1:10 ifb0" >> /root/natssh/logs/apply_speed.log
+tc class add dev ifb0 parent 1:1 classid 1:20 htb rate $DOWN_CFRONT ceil $DOWN_CFRONT prio 1 burst 32k 2>> /root/natssh/logs/apply_speed.log || echo "$(date '+%Y-%m-%d %H:%M:%S') - apply_speed: gagal class 1:20 ifb0" >> /root/natssh/logs/apply_speed.log
+tc class add dev ifb0 parent 1:1 classid 1:30 htb rate 1000mbit ceil 1000mbit prio 2 2>> /root/natssh/logs/apply_speed.log || echo "$(date '+%Y-%m-%d %H:%M:%S') - apply_speed: gagal class 1:30 ifb0" >> /root/natssh/logs/apply_speed.log
+tc qdisc add dev ifb0 parent 1:10 handle 10: fq_codel 2>> /root/natssh/logs/apply_speed.log || true
+tc qdisc add dev ifb0 parent 1:20 handle 20: fq_codel 2>> /root/natssh/logs/apply_speed.log || true
+tc qdisc add dev ifb0 parent 1:30 handle 30: fq_codel 2>> /root/natssh/logs/apply_speed.log || true
 
 # ifb filters by src_ip (preserved after redirect)
 for ip in $CF_IPS; do

@@ -9,7 +9,7 @@ mkdir -p "$BACKUP_DIR"
 ts=$(date +%Y%m%d_%H%M%S)
 OUT_CFG="$BACKUP_DIR/config_$ts.tar.gz"
 LIST=""
-[ -f "$DIR/.env" ] && LIST="$LIST .env"
+[ -f "$DIR/config/.env" ] && LIST="$LIST config/.env"
 [ -d "$DIR/limits" ] && LIST="$LIST limits"
 [ -d "$DIR/banners" ] && LIST="$LIST banners"
 [ -f /etc/issue.net ] && cp /etc/issue.net "$DIR/issue.net.bak" && LIST="$LIST issue.net.bak"

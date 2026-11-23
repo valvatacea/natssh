@@ -216,7 +216,7 @@ def handle_client(client_socket, ip):
     cc = _header(request, "CloudFront-Viewer-Country") or _header(request, "CF-IPCountry")
     if os.environ.get("NATSSH_DEBUG_REQ"):
         _log(f"DEBUG-REQ {ip}: {request[:800]!r}")
-    if not _admit(real_ip, False):
+    if not _admit(real_ip, via_cdn):
         try:
             cur = _per_ip.get(real_ip, 0)
             _log(f"TOLAK {real_ip} (edge={edge}, per-ip={cur}, total={_total}, limit {MAX_PER_IP}/{MAX_TOTAL})")
@@ -298,7 +298,7 @@ def handle_client(client_socket, ip):
             except Exception:
                 pass
         if admitted:
-            _release(real_ip, False)
+            _release(real_ip, via_cdn)
 
 
 def handle_direct_client(client_socket, peer_ip):

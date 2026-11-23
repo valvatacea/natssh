@@ -212,7 +212,6 @@ wget -qO "$DIR/unsuspend.sh" https://raw.githubusercontent.com/valvatacea/natssh
 wget -qO "$DIR/autobackup.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/autobackup.sh
 wget -qO "$DIR/uninstall.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/uninstall.sh
 wget -qO "$DIR/apply_speed.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/apply_speed.sh
-wget -qO "$DIR/apply_cf_marks.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/apply_cf_marks.sh
 wget -qO "$DIR/promo_rotate.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/promo_rotate.sh
 wget -qO "$DIR/sess_audit.py" https://raw.githubusercontent.com/valvatacea/natssh/main/sess_audit.py
 wget -qO "$DIR/reap.py" https://raw.githubusercontent.com/valvatacea/natssh/main/reap.py
@@ -226,7 +225,7 @@ done
 echo -e "\n[*] Port WebSocket akan disetel via Environment systemd (ws.py v2): ${ws_port}"
 
 echo -e "\n[*] Mengatur izin eksekusi..."
-chmod +x "$DIR/menu.sh" "$DIR/autokill.sh" "$DIR/unsuspend.sh" "$DIR/autobackup.sh" "$DIR/uninstall.sh" "$DIR/apply_speed.sh" "$DIR/apply_cf_marks.sh" "$DIR/promo_rotate.sh" "$DIR/sess_audit.py" "$DIR/reap.py" "$DIR/audit_kill.py" "$DIR/ws_match.py" "$DIR/generate_cdn_geo.sh"
+chmod +x "$DIR/menu.sh" "$DIR/autokill.sh" "$DIR/unsuspend.sh" "$DIR/autobackup.sh" "$DIR/uninstall.sh" "$DIR/apply_speed.sh" "$DIR/promo_rotate.sh" "$DIR/sess_audit.py" "$DIR/reap.py" "$DIR/audit_kill.py" "$DIR/ws_match.py" "$DIR/generate_cdn_geo.sh"
 
 echo -e "\n[*] Mengatur Service Systemd untuk WebSocket Proxy (ws.py)..."
 cat > /etc/systemd/system/natssh-ws.service <<EOF
@@ -238,11 +237,6 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=$DIR
-Environment=NATSSH_WS_PORT=${ws_port}
-Environment=NATSSH_MAX_TOTAL=150
-Environment=NATSSH_SSH_DIRECT_ENABLED=1
-Environment=NATSSH_SSH_DIRECT_PORT=${direct_port}
-Environment=NATSSH_PROXY_PROTOCOL=1
 ExecStart=/usr/bin/python3 $DIR/ws.py
 Restart=always
 RestartSec=3
@@ -263,8 +257,11 @@ echo "NATSSH_SSH_DIRECT_ENABLED=1" >> "$DIR/config/.env"
 echo "NATSSH_SSH_DIRECT_PORT=$direct_port" >> "$DIR/config/.env"
 echo "NATSSH_PROXY_PROTOCOL=1" >> "$DIR/config/.env"
 echo "NATSSH_TCP_KEEPALIVE=1" >> "$DIR/config/.env"
+echo "NATSSH_IDLE_TIMEOUT=300" >> "$DIR/config/.env"
+echo "NATSSH_MAX_CONN_AGE=3600" >> "$DIR/config/.env"
+echo "NATSSH_SSH_PORT=22" >> "$DIR/config/.env"
 echo "MAX_LOGIN=$max_login" >> "$DIR/config/.env"
-echo "MAX_PER_IP=15" >> "$DIR/config/.env"
+echo "NATSSH_MAX_PER_IP=15" >> "$DIR/config/.env"
 echo "IFACE=eth0" >> "$DIR/config/.env"
 echo "MODE=cdn-split" >> "$DIR/config/.env"
 

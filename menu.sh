@@ -60,7 +60,8 @@ akun_baru() {
             wsport=$(port_ws)
             cfport=$(cat "${DIR}/config/port.conf" 2>/dev/null)
             cfport=${cfport:-2086}
-            maxlog=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+            maxlog=$(grep "^MAX_LOGIN=" "${DIR}/config/.env" 2>/dev/null | cut -d= -f2)
+            maxlog=${maxlog:-5}
             echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC}"
             echo ""
             # Render kartu akun dari template jika ada
@@ -324,7 +325,7 @@ akun_daftar() {
         echo "5. Batas Login Khusus Akun Ini"
         echo "6. Ganti Password"
         echo -e "${RED}0. Kembali ke daftar${NC}"
-        read -p "Aksi (0-6): " a || exit 0
+        read -p "Aksi (0-6): " a || continue
         case $a in
             1) do_suspend "$user"; pause; continue ;;
             2) do_unsuspend "$user"; pause; continue ;;
@@ -806,12 +807,12 @@ backup_config() {
     local ts=$(date +%Y%m%d_%H%M%S)
     local out="$BACKUP_DIR/config_$ts.tar.gz"
     local list=""
-    cd /root/natssh
-    [ -f .env ] && list="$list .env"
-    [ -d limits ] && list="$list limits"
-    [ -d banners ] && list="$list banners"
-    [ -f /etc/issue.net ] && cp /etc/issue.net /root/natssh/issue.net.bak && list="$list issue.net.bak"
-    [ -f /etc/systemd/system/natssh-ws.service ] && cp /etc/systemd/system/natssh-ws.service /root/natssh/natssh-ws.service.bak && list="$list natssh-ws.service.bak"
+    cd "${DIR}"
+    [ -f "${DIR}/config/.env" ] && list="$list ${DIR}/config/.env"
+    [ -d "${DIR}/limits" ] && list="$list ${DIR}/limits"
+    [ -d "${DIR}/banners" ] && list="$list ${DIR}/banners"
+    [ -f /etc/issue.net ] && cp /etc/issue.net "${DIR}/issue.net.bak" && list="$list issue.net.bak"
+    [ -f /etc/systemd/system/natssh-ws.service ] && cp /etc/systemd/system/natssh-ws.service "${DIR}/natssh-ws.service.bak" && list="$list natssh-ws.service.bak"
 
     if [ -z "$list" ]; then
         echo -e "${YELLOW}Tidak ada file konfigurasi untuk dibackup.${NC}"
@@ -917,14 +918,11 @@ restore_config() {
     local tmpdir="/tmp/natssh_restore_$$"
     mkdir -p "$tmpdir"
     if tar -xzf "$selected" -C "$tmpdir" 2>/dev/null; then
-        for f in .env; do
-            [ -f "$tmpdir/$f" ] && cp "$tmpdir/$f" "/root/natssh/$f"
-        done
-        [ -d "$tmpdir/limits" ] && cp -r "$tmpdir/limits" /root/natssh/
-        [ -d "$tmpdir/banners" ] && cp -r "$tmpdir/banners" /root/natssh/
+        [ -f "$tmpdir/.env" ] && cp "$tmpdir/.env" "${DIR}/config/.env"
+        [ -d "$tmpdir/limits" ] && cp -r "$tmpdir/limits" "${DIR}/"
+        [ -d "$tmpdir/banners" ] && cp -r "$tmpdir/banners" "${DIR}/"
         [ -f "$tmpdir/issue.net.bak" ] && cp "$tmpdir/issue.net.bak" /etc/issue.net
         [ -f "$tmpdir/natssh-ws.service.bak" ] && cp "$tmpdir/natssh-ws.service.bak" /etc/systemd/system/natssh-ws.service
-
         rm -rf "$tmpdir"
 
         systemctl daemon-reload 2>/dev/null
@@ -992,24 +990,36 @@ menu_backup() {
     done
 }
 conf_maxlogin() {
-    cur=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
-    cur=${cur:-5}
-    echo -e "Batas saat ini: ${YELLOW}${cur} perangkat/akun${NC} (cron + banner pelanggan)"
+    local selfdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+    # Baca nilai saat ini dari config/.env (sumber tunggal), fallback crontab, fallback 5
+    if [ -f "${selfdir}/config/.env" ] && grep -q "^MAX_LOGIN=" "${selfdir}/config/.env"; then
+        cur=$(grep "^MAX_LOGIN=" "${selfdir}/config/.env" | cut -d= -f2)
+    elif crontab -l 2>/dev/null | grep -q "MAX_LOGIN="; then
+        cur=$(crontab -l 2>/dev/null | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+    else
+        cur=5
+    fi
+    echo -e "Batas saat ini: ${YELLOW}${cur} perangkat/akun${NC} (dari config/.env)"
     read -p "Batas perangkat baru (1-20): " max_login
     if ! [[ "$max_login" =~ ^[0-9]+$ ]] || [ "$max_login" -lt 1 ] || [ "$max_login" -gt 20 ]; then
         echo -e "${RED}Gagal: harus angka 1-20!${NC}"
     else
-        local selfdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-        if crontab -l 2>/dev/null | grep -q "MAX_LOGIN="; then
-            (crontab -l | sed "s/MAX_LOGIN=[0-9]*/MAX_LOGIN=$max_login/") | crontab -
-        elif crontab -l 2>/dev/null | grep -q "autokill.sh"; then
-            (crontab -l | sed "s|\(.*autokill.sh\)|MAX_LOGIN=$max_login \1|") | crontab -
+        # Tulis ke config/.env (sumber tunggal)
+        if [ -f "${selfdir}/config/.env" ]; then
+            if grep -q "^MAX_LOGIN=" "${selfdir}/config/.env"; then
+                sed -i "s/^MAX_LOGIN=.*/MAX_LOGIN=$max_login/" "${selfdir}/config/.env"
+            else
+                echo "MAX_LOGIN=$max_login" >> "${selfdir}/config/.env"
+            fi
         else
-            # crontab kosong / tanpa autokill: TULIS baris penuh — jangan pipa kosong ke crontab
-            (crontab -l 2>/dev/null; echo "*/2 * * * * MAX_LOGIN=$max_login $selfdir/autokill.sh") | crontab -
+            echo "MAX_LOGIN=$max_login" > "${selfdir}/config/.env"
+        fi
+        # Bersihkan injeksi MAX_LOGIN= dari crontab autokill; autokill.sh baca dari .env
+        if crontab -l 2>/dev/null | grep -q "autokill.sh"; then
+            (crontab -l 2>/dev/null | sed 's/MAX_LOGIN=[0-9]* //') | crontab -
         fi
         sed -i "s/Maksimal [0-9]* Perangkat/Maksimal $max_login Perangkat/g" /etc/issue.net
-        echo -e "${GREEN}SUKSES! Batas menjadi ${max_login} perangkat (cron autokill + banner diperbarui).${NC}"
+        echo -e "${GREEN}SUKSES! Batas menjadi ${max_login} perangkat (config/.env + banner diperbarui).${NC}"
     fi
 }
 
@@ -1022,7 +1032,7 @@ conf_domain_cf_edit() {
     if [ -z "$h" ]; then
         if [ -f "${DIR}/config/.env" ]; then
             if grep -q "^DOMAIN_CF=" "${DIR}/config/.env"; then
-                sed -i "s|^DOMAIN_CF=.*|DOMAIN_CF=" "${DIR}/config/.env"
+                sed -i "s|^DOMAIN_CF=.*|DOMAIN_CF=$h|" "${DIR}/config/.env"
             else
                 echo "DOMAIN_CF=" >> "${DIR}/config/.env"
             fi
@@ -1268,13 +1278,13 @@ terbitkan_ulang_sertifikat() {
         case "$cf_pilih" in
             1)
                 read -p "Masukkan Cloudflare API Token: " CF_Token
-                export CF_Token="${CF_Token}"
+                CF_Token="${CF_Token}"
                 ;;
             2)
                 read -p "Masukkan Cloudflare API Key: " CF_Key
                 read -p "Masukkan Cloudflare Account Email: " CF_Email
-                export CF_Key="${CF_Key}"
-                export CF_Email="${CF_Email}"
+                CF_Key="${CF_Key}"
+                CF_Email="${CF_Email}"
                 ;;
             0|"")
                 echo -e "${RED}Dibatalkan.${NC}"; return 1
@@ -1322,6 +1332,7 @@ terbitkan_ulang_sertifikat() {
             echo -e "${GREEN}Cloudflare API Key + Email disimpan ke config/.env${NC}"
         fi
     fi
+    muat_env
 
     if [ -z "$CF_Token" ] && [ -z "${CF_Key}" ]; then
         echo -e "${RED}Kredensial Cloudflare tidak diisi. Terbit ulang sertifikat dibatalkan.${NC}"
@@ -1389,7 +1400,7 @@ conf_domain_edit() {
     if [ -z "$h" ]; then
         if [ -f "${DIR}/config/.env" ]; then
             if grep -q "^DOMAIN=" "${DIR}/config/.env"; then
-                sed -i "s|^DOMAIN=.*|DOMAIN=" "${DIR}/config/.env"
+                sed -i "s|^DOMAIN=.*|DOMAIN=$h|" "${DIR}/config/.env"
             else
                 echo "DOMAIN=" >> "${DIR}/config/.env"
             fi
@@ -1486,7 +1497,7 @@ conf_service_direct() {
         garis
         echo -e "${YELLOW}   KONTROL LAYANAN SSH DIRECT${NC}"
         garis
-        if grep -q "NATSSH_SSH_DIRECT_ENABLED=1" /etc/systemd/system/natssh-ws.service 2>/dev/null; then
+        if grep -q "^NATSSH_SSH_DIRECT_ENABLED=1" "${DIR}/config/.env" 2>/dev/null; then
             echo -e "SSH Direct: ${GREEN}AKTIF${NC}"
         else
             echo -e "SSH Direct: ${RED}NONAKTIF${NC}"
@@ -1582,7 +1593,7 @@ conf_nginx_service() {
         echo "1. Start"
         echo "2. Stop"
         echo "3. Restart"
-        echo "4. Ubah Port Nginx"
+        echo "4. Ubah Port Nginx Reverse"
         echo "5. Ubah Port Nginx Stream"
         echo -e "${RED}0. Kembali${NC}"
         read -p "Pilih (0-5): " p || exit 0
@@ -1656,7 +1667,9 @@ conf_speed() {
         garis
         echo -e "${YELLOW}--- ATUR LIMIT SPEED per CDN ---${NC}"
         garis
-        if tc class show dev eth0 2>/dev/null | grep -q "class htb.*1:10"; then
+        iface_status=$(grep "^IFACE=" "${DIR}/config/.env" 2>/dev/null | cut -d= -f2)
+        iface_status=${iface_status:-eth0}
+        if tc class show dev "$iface_status" 2>/dev/null | grep -q "class htb.*1:10"; then
             _limits=$(grep -E "^(UP|DOWN)_" "${DIR}/config/.env" 2>/dev/null)
             if [ -n "$_limits" ]; then
                 echo -e "${GREEN}Limit AKTIF:${NC}"
@@ -1680,7 +1693,7 @@ conf_speed() {
                 [ "$down" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
                 [ -z "$down" ] && down="25"
                 for v in up down; do
-                    val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
+                    val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; else echo -e "${RED}Gagal: harus angka!${NC}"; pause; continue 2; fi
                 done
                 # update only CF fields in .env
                 iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
@@ -1695,7 +1708,8 @@ conf_speed() {
                 sed -i "s/^UP_CF=.*/UP_CF=$up/" "${DIR}/config/.env"
                 sed -i "s/^DOWN_CF=.*/DOWN_CF=$down/" "${DIR}/config/.env"
                 ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
-                bash /root/natssh/apply_speed.sh 2>/dev/null
+                muat_env
+                bash /root/natssh/apply_speed.sh || { echo -e "${RED}Gagal menerapkan limit! Cek log: /root/natssh/logs/apply_speed.log${NC}"; pause; continue; }
                 _ensure_speed_service
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit Cloudflare diterapkan.${NC}"; pause ;;
@@ -1707,7 +1721,7 @@ conf_speed() {
                 [ "$down" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
                 [ -z "$down" ] && down="25"
                 for v in up down; do
-                    val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
+                    val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; else echo -e "${RED}Gagal: harus angka!${NC}"; pause; continue 2; fi
                 done
                 iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
                 if [ ! -f "${DIR}/config/.env" ]; then
@@ -1721,7 +1735,8 @@ conf_speed() {
                 sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up/" "${DIR}/config/.env"
                 sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down/" "${DIR}/config/.env"
                 ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
-                bash /root/natssh/apply_speed.sh 2>/dev/null
+                muat_env
+                bash /root/natssh/apply_speed.sh || { echo -e "${RED}Gagal menerapkan limit! Cek log: /root/natssh/logs/apply_speed.log${NC}"; pause; continue; }
                 _ensure_speed_service
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit CloudFront diterapkan.${NC}"; pause ;;
@@ -1739,7 +1754,7 @@ conf_speed() {
                 [ "$down_cfront" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; pause; continue; }
                 [ -z "$down_cfront" ] && down_cfront="25"
                 for v in up_cf down_cf up_cfront down_cfront; do
-                    val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
+                    val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; else echo -e "${RED}Gagal: harus angka!${NC}"; pause; continue 2; fi
                 done
                 iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
                 # Update .env dengan semua kecepatan CDN (tanpa menghapus key lain)
@@ -1765,7 +1780,8 @@ conf_speed() {
                     echo "MODE=cdn-split" >> "${DIR}/config/.env"
                 fi
                 ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
-                bash /root/natssh/apply_speed.sh 2>/dev/null
+                muat_env
+                bash /root/natssh/apply_speed.sh || { echo -e "${RED}Gagal menerapkan limit! Cek log: /root/natssh/logs/apply_speed.log${NC}"; pause; continue; }
                 _ensure_speed_service
                 systemctl enable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit semua CDN diterapkan.${NC}"; pause ;;
@@ -1781,6 +1797,7 @@ conf_speed() {
                     sed -i "/^DOWN_CF=/d" "${DIR}/config/.env"
                     sed -i "/^UP_CFRONT=/d" "${DIR}/config/.env"
                     sed -i "/^DOWN_CFRONT=/d" "${DIR}/config/.env"
+                    muat_env
                 fi
                 systemctl disable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit speed dihapus.${NC}"; pause ;;
@@ -2003,10 +2020,12 @@ toggle_reboot_cron() {
 }
 
 conf_maxtotal() {
-    # batas koneksi serentak jembatan (Environment=NATSSH_MAX_TOTAL di unit systemd)
-    local unit=/etc/systemd/system/natssh-ws.service
-    local cur=$(systemctl show natssh-ws -p Environment --value 2>/dev/null | grep -o "NATSSH_MAX_TOTAL=[0-9]*" | cut -d= -f2)
-    cur=${cur:-30}
+    # batas koneksi serentak jembatan (NATSSH_MAX_TOTAL di config/.env)
+    if [ -f "${DIR}/config/.env" ] && grep -q "^NATSSH_MAX_TOTAL=" "${DIR}/config/.env"; then
+        cur=$(grep "^NATSSH_MAX_TOTAL=" "${DIR}/config/.env" | cut -d= -f2)
+    else
+        cur=150
+    fi
     local peak=$(grep -o "total=[0-9]*" "$(dirname "${BASH_SOURCE[0]}")/ws.log" 2>/dev/null | cut -d= -f2 | sort -n | tail -1)
     echo -e "Batas koneksi serentak (MAX_TOTAL) : ${YELLOW}${cur}${NC} slot"
     echo -e "Puncak pemakaian sejauh ini        : ${GREEN}${peak:-0}${NC} slot${NC}"
@@ -2016,16 +2035,15 @@ conf_maxtotal() {
         echo -e "${RED}Gagal: harus angka 10-200!${NC}"
         return
     fi
-    if [ ! -f "$unit" ]; then
-        echo -e "${RED}Gagal: unit natssh-ws.service tidak ditemukan.${NC}"
-        return
-    fi
-    if grep -q "Environment=NATSSH_MAX_TOTAL" "$unit"; then
-        sed -i "s/Environment=NATSSH_MAX_TOTAL=[0-9]*/Environment=NATSSH_MAX_TOTAL=$n/" "$unit"
+    if [ -f "${DIR}/config/.env" ]; then
+        if grep -q "^NATSSH_MAX_TOTAL=" "${DIR}/config/.env"; then
+            sed -i "s/^NATSSH_MAX_TOTAL=.*/NATSSH_MAX_TOTAL=$n/" "${DIR}/config/.env"
+        else
+            echo "NATSSH_MAX_TOTAL=$n" >> "${DIR}/config/.env"
+        fi
     else
-        sed -i "/^\[Service\]/a Environment=NATSSH_MAX_TOTAL=$n" "$unit"
+        echo "NATSSH_MAX_TOTAL=$n" > "${DIR}/config/.env"
     fi
-    systemctl daemon-reload
     echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
     read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr2
     if [[ ! "$cfr2" =~ ^[Yy]$ ]]; then
@@ -2039,10 +2057,12 @@ conf_maxtotal() {
 }
 
 conf_maxperip() {
-    # batas koneksi serentak per IP (Environment=NATSSH_MAX_PER_IP di unit systemd)
-    local unit=/etc/systemd/system/natssh-ws.service
-    local cur=$(systemctl show natssh-ws -p Environment --value 2>/dev/null | grep -o "NATSSH_MAX_PER_IP=[0-9]*" | cut -d= -f2)
-    cur=${cur:-10}
+    # batas koneksi serentak per IP (NATSSH_MAX_PER_IP di config/.env)
+    if [ -f "${DIR}/config/.env" ] && grep -q "^NATSSH_MAX_PER_IP=" "${DIR}/config/.env"; then
+        cur=$(grep "^NATSSH_MAX_PER_IP=" "${DIR}/config/.env" | cut -d= -f2)
+    else
+        cur=10
+    fi
     echo -e "Batas koneksi per IP (MAX_PER_IP)  : ${YELLOW}${cur}${NC} koneksi"
     echo -e "Catatan: jika pakai nginx reverse proxy, IP asli klien dibaca lewat header X-Forwarded-For."
     read -p "Nilai baru (1-100, 0 = batal): " n
@@ -2051,16 +2071,15 @@ conf_maxperip() {
         echo -e "${RED}Gagal: harus angka 1-100!${NC}"
         return
     fi
-    if [ ! -f "$unit" ]; then
-        echo -e "${RED}Gagal: unit natssh-ws.service tidak ditemukan.${NC}"
-        return
-    fi
-    if grep -q "Environment=NATSSH_MAX_PER_IP" "$unit"; then
-        sed -i "s/Environment=NATSSH_MAX_PER_IP=[0-9]*/Environment=NATSSH_MAX_PER_IP=$n/" "$unit"
+    if [ -f "${DIR}/config/.env" ]; then
+        if grep -q "^NATSSH_MAX_PER_IP=" "${DIR}/config/.env"; then
+            sed -i "s/^NATSSH_MAX_PER_IP=.*/NATSSH_MAX_PER_IP=$n/" "${DIR}/config/.env"
+        else
+            echo "NATSSH_MAX_PER_IP=$n" >> "${DIR}/config/.env"
+        fi
     else
-        sed -i "/^\\[Service\\]/a Environment=NATSSH_MAX_PER_IP=$n" "$unit"
+        echo "NATSSH_MAX_PER_IP=$n" > "${DIR}/config/.env"
     fi
-    systemctl daemon-reload
     echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
     read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr3
     if [[ ! "$cfr3" =~ ^[Yy]$ ]]; then
@@ -2097,7 +2116,7 @@ conf_banner() {
                 pause
                 ;;
             2)
-                maxlog=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+                maxlog=$(grep "^MAX_LOGIN=" "${DIR}/config/.env" 2>/dev/null | cut -d= -f2)
                 maxlog=${maxlog:-5}
                 cat > /etc/issue.net <<BEOF
 <br>
@@ -2109,7 +2128,7 @@ conf_banner() {
 <font color="green">✅ KONEKSI BERHASIL</font><br>
 <font color="orange">🌍 Server : Indonesia — Premium</font><br>
 <font color="aqua">🚀 Speed : up 100 Mbps</font><br>
-<font color="lime">📱 Maksimal 4 Perangkat/Akun</font><br>
+<font color="lime">📱 Maksimal $maxlog Perangkat/Akun</font><br>
 <font color="orange">⚔ Auto-Kill AKTIF</font><br>
 <font color="white">──────────────────</font><br>
 <font color="red">⛔ Dilarang: Torrent · DDoS · Data Waster · Hack</font><br>
@@ -2236,6 +2255,7 @@ conf_hide_ip() {
         else
             echo "HIDE_IP=1" > "${DIR}/config/.env"
         fi
+        muat_env
         echo -e "${GREEN}Hide IP diaktifkan.${NC}"
     elif [ "$v" = "0" ]; then
         if [ -f "${DIR}/config/.env" ]; then
@@ -2247,6 +2267,7 @@ conf_hide_ip() {
         else
             echo "HIDE_IP=0" > "${DIR}/config/.env"
         fi
+        muat_env
         echo -e "${GREEN}Hide IP dinonaktifkan.${NC}"
     else
         echo -e "${RED}Pilihan tidak valid!${NC}"
@@ -2272,6 +2293,7 @@ conf_suspend_minutes() {
     else
         echo "SUSPEND_MINUTES=$v" > "${DIR}/config/.env"
     fi
+    muat_env
     echo -e "${GREEN}Durasi suspend diubah menjadi ${v} menit.${NC}"
     pause
 }
@@ -2483,12 +2505,13 @@ conf_heartbeat() {
 
 conf_nginx_port() {
     conf_file="/etc/nginx/sites-available/natssh-ws"
-    if [ ! -f "$conf_file" ]; then
-        echo -e "${RED}Gagal: $conf_file tidak ditemukan.${NC}"
-        pause
-        return
+    if [ -f "${DIR}/config/.env" ] && grep -q "^NGINX_REVERSE_PORT=" "${DIR}/config/.env"; then
+        cur=$(grep "^NGINX_REVERSE_PORT=" "${DIR}/config/.env" | cut -d= -f2)
+    elif [ -f "$conf_file" ]; then
+        cur=$(grep -E 'listen .*ssl' "$conf_file" | head -1 | grep -oE '[0-9]+' | head -1)
+    else
+        cur=""
     fi
-    cur=$(grep -E 'listen .*ssl' "$conf_file" | head -1 | grep -oE '[0-9]+' | head -1)
     echo -e "Port nginx saat ini: ${YELLOW}${cur:-tidak diketahui}${NC}"
     echo -e "${YELLOW}Ketik 0 atau kosong untuk batal.${NC}"
     read -p "Port nginx baru: " new_port
@@ -2515,6 +2538,15 @@ conf_nginx_port() {
         return
     fi
     sed -i "s/listen [0-9]* ssl;/listen $new_port ssl;/" "$conf_file"
+    if [ -f "${DIR}/config/.env" ]; then
+        if grep -q "^NGINX_REVERSE_PORT=" "${DIR}/config/.env"; then
+            sed -i "s/^NGINX_REVERSE_PORT=.*/NGINX_REVERSE_PORT=$new_port/" "${DIR}/config/.env"
+        else
+            echo "NGINX_REVERSE_PORT=$new_port" >> "${DIR}/config/.env"
+        fi
+    else
+        echo "NGINX_REVERSE_PORT=$new_port" > "${DIR}/config/.env"
+    fi
     systemctl restart nginx
     sleep 1
     systemctl is-active --quiet nginx && \
@@ -2524,19 +2556,17 @@ conf_nginx_port() {
 }
 
 port_direct() {
-    # Port SSH Direct (raw TCP listener di ws.py) — baca dari systemd unit
-    local dport
-    dport=$(grep -E '^Environment=NATSSH_SSH_DIRECT_PORT=' /etc/systemd/system/natssh-ws.service 2>/dev/null | grep -oE '[0-9]+$' | head -1)
-    [ -n "$dport" ] || return 1
-    echo "$dport"
+    # Port SSH Direct (raw TCP listener di ws.py) — baca dari config/.env
+    if [ -f "${DIR}/config/.env" ]; then
+        grep "^NATSSH_SSH_DIRECT_PORT=" "${DIR}/config/.env" 2>/dev/null | cut -d= -f2
+    fi
 }
 
 port_nginx_stream() {
-    # Port Nginx Stream (TCP listener untuk SSH direct) — baca dari stream.conf
-    local sport
-    sport=$(grep -E 'listen [0-9]+' /etc/nginx/stream.conf 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
-    [ -n "$sport" ] || return 1
-    echo "$sport"
+    # Port Nginx Stream (TCP listener untuk SSH direct) — baca dari config/.env
+    if [ -f "${DIR}/config/.env" ]; then
+        grep "^NGINX_STREAM_PORT=" "${DIR}/config/.env" 2>/dev/null | cut -d= -f2
+    fi
 }
 
 conf_port_direct() {
@@ -2564,12 +2594,15 @@ conf_port_direct() {
         pause
         return
     fi
-    if grep -q "Environment=NATSSH_SSH_DIRECT_PORT=" "$unit"; then
-        sed -i "s/Environment=NATSSH_SSH_DIRECT_PORT=[0-9]*/Environment=NATSSH_SSH_DIRECT_PORT=$new_port/" "$unit"
+    if [ -f "${DIR}/config/.env" ]; then
+        if grep -q "^NATSSH_SSH_DIRECT_PORT=" "${DIR}/config/.env"; then
+            sed -i "s/^NATSSH_SSH_DIRECT_PORT=.*/NATSSH_SSH_DIRECT_PORT=$new_port/" "${DIR}/config/.env"
+        else
+            echo "NATSSH_SSH_DIRECT_PORT=$new_port" >> "${DIR}/config/.env"
+        fi
     else
-        sed -i "/^\[Service\]/a Environment=NATSSH_SSH_DIRECT_PORT=$new_port" "$unit"
+        echo "NATSSH_SSH_DIRECT_PORT=$new_port" > "${DIR}/config/.env"
     fi
-    systemctl daemon-reload
     echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
     read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr
     if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
@@ -2604,7 +2637,7 @@ conf_toggle_ssh_direct() {
         pause
         return
     fi
-    if grep -q "NATSSH_SSH_DIRECT_ENABLED=1" "$unit"; then
+    if grep -q "^NATSSH_SSH_DIRECT_ENABLED=1" "${DIR}/config/.env" 2>/dev/null; then
         new_val=0
         pesan="NONAKTIF"
     else
@@ -2620,12 +2653,15 @@ conf_toggle_ssh_direct() {
         pause
         return
     fi
-    if grep -q "NATSSH_SSH_DIRECT_ENABLED=" "$unit"; then
-        sed -i "s/NATSSH_SSH_DIRECT_ENABLED=[01]/NATSSH_SSH_DIRECT_ENABLED=$new_val/" "$unit"
+    if [ -f "${DIR}/config/.env" ]; then
+        if grep -q "^NATSSH_SSH_DIRECT_ENABLED=" "${DIR}/config/.env"; then
+            sed -i "s/^NATSSH_SSH_DIRECT_ENABLED=[01]/NATSSH_SSH_DIRECT_ENABLED=$new_val/" "${DIR}/config/.env"
+        else
+            echo "NATSSH_SSH_DIRECT_ENABLED=$new_val" >> "${DIR}/config/.env"
+        fi
     else
-        sed -i "/^\[Service\]/a Environment=NATSSH_SSH_DIRECT_ENABLED=$new_val" "$unit"
+        echo "NATSSH_SSH_DIRECT_ENABLED=$new_val" > "${DIR}/config/.env"
     fi
-    systemctl daemon-reload
     echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
     systemctl restart natssh-ws
     sleep 1
@@ -2639,12 +2675,13 @@ conf_toggle_ssh_direct() {
 
 conf_nginx_stream_port() {
     conf_file="/etc/nginx/stream.conf"
-    if [ ! -f "$conf_file" ]; then
-        echo -e "${RED}Gagal: $conf_file tidak ditemukan.${NC}"
-        pause
-        return
+    if [ -f "${DIR}/config/.env" ] && grep -q "^NGINX_STREAM_PORT=" "${DIR}/config/.env"; then
+        cur=$(grep "^NGINX_STREAM_PORT=" "${DIR}/config/.env" | cut -d= -f2)
+    elif [ -f "$conf_file" ]; then
+        cur=$(grep -E 'listen [0-9]+' "$conf_file" | head -1 | grep -oE '[0-9]+' | head -1)
+    else
+        cur=""
     fi
-    cur=$(grep -E 'listen [0-9]+' "$conf_file" | head -1 | grep -oE '[0-9]+' | head -1)
     echo -e "Port Nginx Stream saat ini: ${YELLOW}${cur:-tidak diketahui}${NC}"
     echo -e "${YELLOW}Ketik 0 atau kosong untuk batal.${NC}"
     read -p "Port Nginx Stream baru: " new_port
@@ -2671,6 +2708,15 @@ conf_nginx_stream_port() {
         return
     fi
     sed -i "s/listen [0-9]*;/listen $new_port;/" "$conf_file"
+    if [ -f "${DIR}/config/.env" ]; then
+        if grep -q "^NGINX_STREAM_PORT=" "${DIR}/config/.env"; then
+            sed -i "s/^NGINX_STREAM_PORT=.*/NGINX_STREAM_PORT=$new_port/" "${DIR}/config/.env"
+        else
+            echo "NGINX_STREAM_PORT=$new_port" >> "${DIR}/config/.env"
+        fi
+    else
+        echo "NGINX_STREAM_PORT=$new_port" > "${DIR}/config/.env"
+    fi
     systemctl restart nginx
     sleep 1
     systemctl is-active --quiet nginx && \
