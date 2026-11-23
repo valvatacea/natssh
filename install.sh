@@ -145,25 +145,25 @@ while true; do
     fi
 done
 
-# Backup host.conf untuk rollback jika instalasi gagal di tengah jalan
+# Backup .env untuk rollback jika instalasi gagal di tengah jalan
 INSTALL_SUKSES=0
-HOST_CONF_BACKUP=0
-if [ -f "$DIR/config/host.conf" ]; then
-    cp "$DIR/config/host.conf" "$DIR/config/host.conf.bak"
-    HOST_CONF_BACKUP=1
+ENV_BACKUP=0
+if [ -f "$DIR/config/.env" ]; then
+    cp "$DIR/config/.env" "$DIR/config/.env.bak"
+    ENV_BACKUP=1
 fi
 
-_rollback_host_conf() {
-    if [ "$INSTALL_SUKSES" -eq 0 ] && [ "$HOST_CONF_BACKUP" -eq 1 ] && [ -f "$DIR/config/host.conf.bak" ]; then
-        cp "$DIR/config/host.conf.bak" "$DIR/config/host.conf"
-        rm -f "$DIR/config/host.conf.bak"
-        echo -e "${RED}Rollback: config/host.conf dikembalikan ke versi sebelumnya.${NC}"
+_rollback_env() {
+    if [ "$INSTALL_SUKSES" -eq 0 ] && [ "$ENV_BACKUP" -eq 1 ] && [ -f "$DIR/config/.env.bak" ]; then
+        cp "$DIR/config/.env.bak" "$DIR/config/.env"
+        rm -f "$DIR/config/.env.bak"
+        echo -e "${RED}Rollback: config/.env dikembalikan ke versi sebelumnya.${NC}"
     fi
 }
-trap '_rollback_host_conf' EXIT
+trap '_rollback_env' EXIT
 
-echo "$ssl_domain" > "$DIR/config/host.conf"
-echo -e "${GREEN}Domain disimpan ke $DIR/config/host.conf${NC}"
+echo "DOMAIN=$ssl_domain" > "$DIR/config/.env"
+echo -e "${GREEN}Domain disimpan ke $DIR/config/.env${NC}"
 
 # Ekstraksi root domain via Public Suffix List, fallback ke host.conf jika gagal
 echo -e "\n[*] Mengecek Public Suffix List..."
@@ -255,6 +255,18 @@ systemctl daemon-reload
 systemctl enable natssh-ws.service
 systemctl start natssh-ws.service
 echo -e "${GREEN}Service natssh-ws berhasil dibuat dan dijalankan!${NC}"
+
+# Simpan semua konfigurasi natssh ke .env
+echo "NATSSH_WS_PORT=$ws_port" >> "$DIR/config/.env"
+echo "NATSSH_MAX_TOTAL=150" >> "$DIR/config/.env"
+echo "NATSSH_SSH_DIRECT_ENABLED=1" >> "$DIR/config/.env"
+echo "NATSSH_SSH_DIRECT_PORT=$direct_port" >> "$DIR/config/.env"
+echo "NATSSH_PROXY_PROTOCOL=1" >> "$DIR/config/.env"
+echo "NATSSH_TCP_KEEPALIVE=1" >> "$DIR/config/.env"
+echo "MAX_LOGIN=$max_login" >> "$DIR/config/.env"
+echo "MAX_PER_IP=15" >> "$DIR/config/.env"
+echo "IFACE=eth0" >> "$DIR/config/.env"
+echo "MODE=cdn-split" >> "$DIR/config/.env"
 
 udpgw_ports="7100 7200 7300 7400 7500"
 
@@ -537,7 +549,7 @@ echo -e "${GREEN}Service natssh-speed disiapkan (belum diaktifkan). Aktif setela
 echo -e "\n[*] Mengatur Cronjob untuk Autokill..."
 if ! crontab -l 2>/dev/null | grep -q "autokill.sh"; then
     (crontab -l 2>/dev/null; echo "*/1 * * * * MAX_LOGIN=$max_login $DIR/autokill.sh") | crontab -
-    echo 15 > "$DIR/config/suspend_minutes.conf"
+    echo "SUSPEND_MINUTES=15" > "$DIR/config/.env"
     echo -e "${GREEN}Cronjob Autokill berhasil ditambahkan (berjalan setiap 1 menit).${NC}"
 else
     echo -e "${GREEN}Cronjob Autokill sudah ada.${NC}"
@@ -546,7 +558,7 @@ fi
 if ! crontab -l 2>/dev/null | grep -q "unsuspend.sh"; then
     (crontab -l 2>/dev/null; echo "* * * * * $DIR/unsuspend.sh >> $DIR/logs/autokill.log 2>&1") | crontab -
 fi
-[ -f "$DIR/config/suspend_minutes.conf" ] || echo 15 > "$DIR/config/suspend_minutes.conf"
+[ -f "$DIR/config/.env" ] || echo "SUSPEND_MINUTES=15" > "$DIR/config/.env"
 
 if ! crontab -l 2>/dev/null | grep -q "sess_audit"; then
     (crontab -l 2>/dev/null; echo "*/2 * * * * /usr/bin/python3 $DIR/sess_audit.py >/dev/null 2>&1") | crontab -

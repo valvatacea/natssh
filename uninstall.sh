@@ -91,7 +91,7 @@ if [[ "$hapus_file" =~ ^[Yy]$ ]]; then
     if [[ "$hapus_data" =~ ^[Yy]$ ]]; then
         rm -f /etc/issue.net /root/natssh/logs/autokill.log /root/backup_akun_ssh.sh
         rm -rf /root/natssh/banners /root/natssh/logs/ws.log
-        rm -f /root/natssh/config/host.conf /root/natssh/config/port.conf /root/natssh/config/ip.conf /root/natssh/config/hide_ip.conf /root/natssh/config/suspend_minutes.conf /root/natssh/config/cdn_geo.conf /root/natssh/config/cf_ips.cache /root/natssh/config/cfront_ips.cache /root/natssh/config/host_cf.conf
+        rm -f /root/natssh/config/host.conf /root/natssh/config/port.conf /root/natssh/config/ip.conf /root/natssh/config/hide_ip.conf /root/natssh/config/suspend_minutes.conf /root/natssh/config/cdn_geo.conf /root/natssh/config/cf_ips.cache /root/natssh/config/cfront_ips.cache /root/natssh/config/host_cf.conf /root/natssh/config/.env
         rm -rf /root/natssh/limits /root/natssh/logs/conns.json /root/natssh/logs/audit_state.json /root/natssh/logs/audit_sess.log /root/natssh/logs/api.log /root/natssh/logs/autobackup.log /root/natssh/logs/promo.log /root/natssh/config/promo
         echo -e "${GREEN}Data banner/log/backup terhapus.${NC}"
     else

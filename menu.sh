@@ -15,6 +15,13 @@ NC='\u001b[0m'
 # Direktori natssh (portabel jika dipindah)
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Muat konfigurasi terpusat dari config/.env (jika ada)
+if [ -f "${DIR}/config/.env" ]; then
+    set -a
+    . "${DIR}/config/.env"
+    set +a
+fi
+
 port_ws() {
     # port WebSocket running — ss menampilkan nama proses "python3", bukan ws.py,
     # maka cocokkan via PID: hasil kosong = service tak berjalan
@@ -51,7 +58,7 @@ akun_baru() {
             # port.conf  = port Cloudflare yg dipakai klien (default 2086); asal via Origin Rule ke port NAT
             ipaddr=$(cat "${DIR}/config/ip.conf" 2>/dev/null || curl -s -m 3 ifconfig.me 2>/dev/null)
             ipaddr=${ipaddr:-$(hostname -I | awk '{print $1}')}
-            host=$(cat "${DIR}/config/host.conf" 2>/dev/null)
+            host=${DOMAIN}
             wsport=$(port_ws)
             cfport=$(cat "${DIR}/config/port.conf" 2>/dev/null)
             cfport=${cfport:-2086}
@@ -70,7 +77,7 @@ akun_baru() {
                 sisa_hari=$(( $(date -d "$exp" +%s) - $(date +%s) ))
                 sisa_hari=$(( sisa_hari / 86400 ))
                 [ $sisa_hari -lt 0 ] && sisa_hari=0
-                hostcf=$(cat "${DIR}/config/host_cf.conf" 2>/dev/null)
+                hostcf=${DOMAIN_CF}
                 udpgw_ports=$(ss -tln 2>/dev/null | awk '{print $4}' | grep -oE ':7[1-4][0-9][0-9]$' | tr -d ':' | sort -n | paste -sd ', ' -)
                 [ -z "$udpgw_ports" ] && udpgw_ports="7100, 7200, 7300, 7400, 7500"
                 template=$(cat "$card_template")
@@ -87,7 +94,7 @@ akun_baru() {
                 template=${template//\{hari\}/$aktif}
                 template=${template//\{limit\}/${maxlog:-5}}
                 # Hide IP jika hide_ip.conf = 1
-                if [ "$(cat "${DIR}/config/hide_ip.conf" 2>/dev/null)" = "1" ]; then
+                if [ "${HIDE_IP}" = "1" ]; then
                     template=${template//\{ip\}/}
                     template=$(echo "$template" | sed '/^IP[[:space:]]*:[[:space:]]*$/d')
                 else
@@ -98,12 +105,12 @@ akun_baru() {
                 echo -e "$template"
             else
                 [ -z "$host" ] && host="$ipaddr"
-                hostcf=$(cat "${DIR}/config/host_cf.conf" 2>/dev/null)
+                hostcf=${DOMAIN_CF}
                 echo "================ DETAIL AKUN ================"
                 echo "Domain    : $host"
                 [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
                 # Hide IP jika hide_ip.conf = 1
-                if [ "$(cat "${DIR}/config/hide_ip.conf" 2>/dev/null)" != "1" ]; then
+                if [ "${HIDE_IP}" != "1" ]; then
                     echo "IP        : $ipaddr"
                 fi
                 echo "Cloudflare: 80, 443, 8080, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443"
@@ -807,6 +814,7 @@ backup_config() {
     [ -f port.conf ] && list="$list port.conf"
     [ -f hide_ip.conf ] && list="$list hide_ip.conf"
     [ -f suspend_minutes.conf ] && list="$list suspend_minutes.conf"
+    [ -f .env ] && list="$list .env"
     [ -d limits ] && list="$list limits"
     [ -d banners ] && list="$list banners"
     [ -f /etc/issue.net ] && cp /etc/issue.net /root/natssh/issue.net.bak && list="$list issue.net.bak"
@@ -916,7 +924,7 @@ restore_config() {
     local tmpdir="/tmp/natssh_restore_$$"
     mkdir -p "$tmpdir"
     if tar -xzf "$selected" -C "$tmpdir" 2>/dev/null; then
-        for f in ip.conf host.conf port.conf hide_ip.conf suspend_minutes.conf; do
+        for f in ip.conf host.conf port.conf hide_ip.conf suspend_minutes.conf .env; do
             [ -f "$tmpdir/$f" ] && cp "$tmpdir/$f" "/root/natssh/$f"
         done
         [ -d "$tmpdir/limits" ] && cp -r "$tmpdir/limits" /root/natssh/
@@ -1014,17 +1022,31 @@ conf_maxlogin() {
 
 conf_domain_cf_edit() {
     # domain CloudFront (jalur AWS) utk kartu akun; host_cf.conf — opsional
-    local cur=$(cat /root/natssh/config/host_cf.conf 2>/dev/null)
+    local cur=${DOMAIN_CF}
     echo -e "Domain CloudFront saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
     read -p "Domain CloudFront baru (kosong = hapus/sembunyikan, 0 = batal): " h
     [ "$h" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if [ -z "$h" ]; then
-        rm -f /root/natssh/config/host_cf.conf
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^DOMAIN_CF=" "${DIR}/config/.env"; then
+                sed -i "s|^DOMAIN_CF=.*|DOMAIN_CF=" "${DIR}/config/.env"
+            else
+                echo "DOMAIN_CF=" >> "${DIR}/config/.env"
+            fi
+        fi
         echo -e "${GREEN}Domain CloudFront dihapus — baris 'Domain CF' tak tampil di kartu.${NC}"
     elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}(:[0-9]+)?$ ]]; then
         echo -e "${RED}Gagal: format domain salah (contoh: dabcdefgh.cloudfront.net)!${NC}"
     else
-        echo "$h" > /root/natssh/config/host_cf.conf
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^DOMAIN_CF=" "${DIR}/config/.env"; then
+                sed -i "s|^DOMAIN_CF=.*|DOMAIN_CF=$h|" "${DIR}/config/.env"
+            else
+                echo "DOMAIN_CF=$h" >> "${DIR}/config/.env"
+            fi
+        else
+            echo "DOMAIN_CF=$h" > "${DIR}/config/.env"
+        fi
         echo -e "${GREEN}Domain CloudFront tersimpan: $h — muncul di baris 'Domain CF' kartu akun.${NC}"
     fi
 }
@@ -1349,10 +1371,9 @@ terbitkan_ulang_sertifikat() {
 conf_domain() {
     # satu pintu domain: Cloudflare (biasa) + CloudFront — dua-duanya ke kartu akun
     local cur curcf
+    cur=${DOMAIN}
+    curcf=${DOMAIN_CF}
     while true; do
-        cur=$(cat /root/natssh/config/host.conf 2>/dev/null)
-        curcf=$(cat /root/natssh/config/host_cf.conf 2>/dev/null)
-        echo -e "${YELLOW}---- UBAH DOMAIN ----${NC}"
         echo -e "1. Domain (Cloudflare) : ${GREEN}${cur:-OTOMATIS (IP publik)}${NC}"
         echo -e "2. Domain CloudFront   : ${GREEN}${curcf:-BELUM DIATUR}${NC}"
         echo -e "${RED}0. Kembali${NC}"
@@ -1374,12 +1395,26 @@ conf_domain_edit() {
     read -p "Domain/host baru (kosong = otomatis IP, 0 = batal): " h
     [ "$h" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if [ -z "$h" ]; then
-        rm -f /root/natssh/config/host.conf
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^DOMAIN=" "${DIR}/config/.env"; then
+                sed -i "s|^DOMAIN=.*|DOMAIN=" "${DIR}/config/.env"
+            else
+                echo "DOMAIN=" >> "${DIR}/config/.env"
+            fi
+        fi
         echo -e "${GREEN}Host kembali otomatis (IP publik terdeteksi saat buat akun).${NC}"
     elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}(:[0-9]+)?$ ]]; then
         echo -e "${RED}Gagal: format domain/host salah (contoh: vpn.example.com)!${NC}"
     else
-        echo "$h" > /root/natssh/config/host.conf
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^DOMAIN=" "${DIR}/config/.env"; then
+                sed -i "s|^DOMAIN=.*|DOMAIN=$h|" "${DIR}/config/.env"
+            else
+                echo "DOMAIN=$h" >> "${DIR}/config/.env"
+            fi
+        else
+            echo "DOMAIN=$h" > "${DIR}/config/.env"
+        fi
         echo -e "${GREEN}Domain tersimpan: $h — dipakai otomatis di kartu akun berikutnya.${NC}"
         echo ""
         read -p "Terbitkan ulang sertifikat SSL untuk domain ini sekarang? (y/N): " terbit_ssl
@@ -1630,7 +1665,7 @@ conf_speed() {
         echo -e "${YELLOW}--- ATUR LIMIT SPEED per CDN ---${NC}"
         garis
         if tc class show dev eth0 2>/dev/null | grep -q "class htb.*1:10"; then
-            _limits=$(grep -E "^(UP|DOWN)_" /root/natssh/config/speed.conf 2>/dev/null)
+            _limits=$(grep -E "^(UP|DOWN)_" "${DIR}/config/.env" 2>/dev/null)
             if [ -n "$_limits" ]; then
                 echo -e "${GREEN}Limit AKTIF:${NC}"
                 echo "$_limits"
@@ -1657,16 +1692,16 @@ conf_speed() {
                 done
                 # update only CF fields in speed.conf
                 iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
-                if [ ! -f /root/natssh/config/speed.conf ]; then
-                    echo "IFACE=$iface" > /root/natssh/config/speed.conf
-                    echo "MODE=cdn-split" >> /root/natssh/config/speed.conf
+                if [ ! -f "${DIR}/config/.env" ]; then
+                    echo "IFACE=$iface" > "${DIR}/config/.env"
+                    echo "MODE=cdn-split" >> "${DIR}/config/.env"
                 fi
-                sed -i "s/^IFACE=.*/IFACE=$iface/" /root/natssh/config/speed.conf
+                sed -i "s/^IFACE=.*/IFACE=$iface/" "${DIR}/config/.env"
                 # ensure CF fields exist
-                grep -q "^UP_CF=" /root/natssh/config/speed.conf || echo "UP_CF=25mbit" >> /root/natssh/config/speed.conf
-                grep -q "^DOWN_CF=" /root/natssh/config/speed.conf || echo "DOWN_CF=25mbit" >> /root/natssh/config/speed.conf
-                sed -i "s/^UP_CF=.*/UP_CF=$up/" /root/natssh/config/speed.conf
-                sed -i "s/^DOWN_CF=.*/DOWN_CF=$down/" /root/natssh/config/speed.conf
+                grep -q "^UP_CF=" "${DIR}/config/.env" || echo "UP_CF=25mbit" >> "${DIR}/config/.env"
+                grep -q "^DOWN_CF=" "${DIR}/config/.env" || echo "DOWN_CF=25mbit" >> "${DIR}/config/.env"
+                sed -i "s/^UP_CF=.*/UP_CF=$up/" "${DIR}/config/.env"
+                sed -i "s/^DOWN_CF=.*/DOWN_CF=$down/" "${DIR}/config/.env"
                 ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 _ensure_speed_service
@@ -1683,15 +1718,16 @@ conf_speed() {
                     val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
                 done
                 iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
-                if [ ! -f /root/natssh/config/speed.conf ]; then
-                    echo "IFACE=$iface" > /root/natssh/config/speed.conf
-                    echo "MODE=cdn-split" >> /root/natssh/config/speed.conf
+                if [ ! -f "${DIR}/config/.env" ]; then
+                    echo "IFACE=$iface" > "${DIR}/config/.env"
+                    echo "MODE=cdn-split" >> "${DIR}/config/.env"
                 fi
-                sed -i "s/^IFACE=.*/IFACE=$iface/" /root/natssh/config/speed.conf
-                grep -q "^UP_CFRONT=" /root/natssh/config/speed.conf || echo "UP_CFRONT=25mbit" >> /root/natssh/config/speed.conf
-                grep -q "^DOWN_CFRONT=" /root/natssh/config/speed.conf || echo "DOWN_CFRONT=25mbit" >> /root/natssh/config/speed.conf
-                sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up/" /root/natssh/config/speed.conf
-                sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down/" /root/natssh/config/speed.conf
+                sed -i "s/^IFACE=.*/IFACE=$iface/" "${DIR}/config/.env"
+                # ensure CFront fields exist
+                grep -q "^UP_CFRONT=" "${DIR}/config/.env" || echo "UP_CFRONT=25mbit" >> "${DIR}/config/.env"
+                grep -q "^DOWN_CFRONT=" "${DIR}/config/.env" || echo "DOWN_CFRONT=25mbit" >> "${DIR}/config/.env"
+                sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up/" "${DIR}/config/.env"
+                sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down/" "${DIR}/config/.env"
                 ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 _ensure_speed_service
@@ -1714,12 +1750,12 @@ conf_speed() {
                     val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
                 done
                 iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
-                echo "IFACE=$iface" > /root/natssh/config/speed.conf
-                echo "UP_CF=$up_cf" >> /root/natssh/config/speed.conf
-                echo "DOWN_CF=$down_cf" >> /root/natssh/config/speed.conf
-                echo "UP_CFRONT=$up_cfront" >> /root/natssh/config/speed.conf
-                echo "DOWN_CFRONT=$down_cfront" >> /root/natssh/config/speed.conf
-                echo "MODE=cdn-split" >> /root/natssh/config/speed.conf
+                echo "IFACE=$iface" > "${DIR}/config/.env"
+                echo "UP_CF=$up_cf" >> "${DIR}/config/.env"
+                echo "DOWN_CF=$down_cf" >> "${DIR}/config/.env"
+                echo "UP_CFRONT=$up_cfront" >> "${DIR}/config/.env"
+                echo "DOWN_CFRONT=$down_cfront" >> "${DIR}/config/.env"
+                echo "MODE=cdn-split" >> "${DIR}/config/.env"
                 ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 _ensure_speed_service
@@ -1730,11 +1766,18 @@ conf_speed() {
                 tc qdisc del dev eth0 ingress 2>/dev/null
                 ip link set dev ifb0 down 2>/dev/null
                 ip link del ifb0 2>/dev/null
-                rm -f /root/natssh/config/speed.conf
+                if [ -f "${DIR}/config/.env" ]; then
+                    sed -i "/^IFACE=/d" "${DIR}/config/.env"
+                    sed -i "/^MODE=/d" "${DIR}/config/.env"
+                    sed -i "/^UP_CF=/d" "${DIR}/config/.env"
+                    sed -i "/^DOWN_CF=/d" "${DIR}/config/.env"
+                    sed -i "/^UP_CFRONT=/d" "${DIR}/config/.env"
+                    sed -i "/^DOWN_CFRONT=/d" "${DIR}/config/.env"
+                fi
                 systemctl disable --now natssh-speed.service 2>/dev/null
                 echo -e "${GREEN}Limit speed dihapus.${NC}"; pause ;;
             5)
-                iface=$(grep "^IFACE=" /root/natssh/config/speed.conf 2>/dev/null | cut -d= -f2); iface=${iface:-eth0}
+                iface=$(grep "^IFACE=" "${DIR}/config/.env" 2>/dev/null | cut -d= -f2); iface=${iface:-eth0}
                 echo "--- tc classes $iface ---"; tc class show dev $iface
                 echo "--- tc filters $iface ---"; tc filter show dev $iface parent 1:
                 echo "--- ingress ---"; tc filter show dev $iface parent ffff:

@@ -2,7 +2,7 @@
 # Apply NATSSH per-CDN (Cloudflare vs CloudFront) speed limit via tc flower (by IP range).
 # Modified: fetch only if internet available, skip if IPs unchanged.
 
-CONF=/root/natssh/config/speed.conf
+CONF=/root/natssh/config/.env
 [ -f "$CONF" ] || exit 0
 source "$CONF"
 IFACE=${IFACE:-eth0}
