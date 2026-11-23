@@ -41,7 +41,6 @@ echo -e "\n[*] Menghentikan dan menghapus Service nginx..."
 systemctl stop nginx.service 2>/dev/null
 systemctl disable nginx.service 2>/dev/null
 rm -f /etc/nginx/sites-enabled/natssh-ws /etc/nginx/sites-available/natssh-ws
-rm -f /etc/nginx/sites-enabled/natssh-ws-ssl /etc/nginx/sites-available/natssh-ws-ssl
 rm -f /etc/nginx/ssl/natssh.crt /etc/nginx/ssl/natssh.key
 systemctl daemon-reload
 echo -e "${GREEN}Service nginx berhasil dihapus.${NC}"
