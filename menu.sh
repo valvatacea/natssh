@@ -76,7 +76,7 @@ akun_baru() {
                 sisa_hari=$(( sisa_hari / 86400 ))
                 [ $sisa_hari -lt 0 ] && sisa_hari=0
                 hostcf=${DOMAIN_CF}
-                udpgw_ports=$(ss -tln 2>/dev/null | awk '{print $4}' | grep -oE ':7[1-4][0-9][0-9]$' | tr -d ':' | sort -n | paste -sd ', ' -)
+                udpgw_ports=$(ss -tln 2>/dev/null | awk '{print $4}' | grep -oE ':7[1-4][0-9][0-9]$' | tr -d ':' | sort -n | paste -sd, | sed 's/,/, /g')
                 [ -z "$udpgw_ports" ] && udpgw_ports="7100, 7200, 7300, 7400, 7500"
                 template=$(cat "$card_template")
                 template=${template//\{domain\}/$host}
@@ -117,7 +117,7 @@ akun_baru() {
                 nginx_reverse=${nginx_reverse:-20865}
                 nginx_stream=$(grep -E 'listen [0-9]+' /etc/nginx/stream.conf 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
                 nginx_stream=${nginx_stream:-20869}
-                udpgw_ports=$(ss -tln 2>/dev/null | awk '{print $4}' | grep -oE ':7[1-4][0-9][0-9]$' | tr -d ':' | sort -n | paste -sd ', ' -)
+                udpgw_ports=$(ss -tln 2>/dev/null | awk '{print $4}' | grep -oE ':7[1-4][0-9][0-9]$' | tr -d ':' | sort -n | paste -sd, | sed 's/,/, /g')
                 [ -z "$udpgw_ports" ] && udpgw_ports="7100, 7200, 7300, 7400, 7500"
                 echo "Port UDPGW: ${udpgw_ports}"
                 echo "Port Direct : ${nginx_reverse} (reverse), ${nginx_stream} (stream)"
