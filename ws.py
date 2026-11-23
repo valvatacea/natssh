@@ -23,6 +23,9 @@ IDLE_TIMEOUT = int(os.environ.get("NATSSH_IDLE_TIMEOUT", "300"))  # detik tanpa 
 TCP_KEEPALIVE = os.environ.get("NATSSH_TCP_KEEPALIVE", "1") == "1"  # heartbeat TCP
 MAX_CONN_AGE = int(os.environ.get("NATSSH_MAX_CONN_AGE", "3600"))  # maks usia koneksi (detik), 0 = nonaktif
 MAX_LOG_SIZE = 512_000  # 500 KB, selaras autokill.sh
+SSH_DIRECT_PORT = int(os.environ.get("NATSSH_SSH_DIRECT_PORT", "20169"))  # port listener SSH direct (raw TCP)
+SSH_DIRECT_ENABLED = os.environ.get("NATSSH_SSH_DIRECT_ENABLED", "0") == "1"  # nyalakan listener SSH direct
+PROXY_PROTOCOL = os.environ.get("NATSSH_PROXY_PROTOCOL", "0") == "1"  # terima header PROXY dari nginx stream
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "ws.log")
 
@@ -111,6 +114,29 @@ def _header(req: str, name: str) -> str:
                 return v.strip()
     return ""
 
+
+def _parse_proxy_protocol(sock):
+    """Baca header PROXY protocol v1 dari nginx stream; kembalikan (ip, port) klien asli atau None."""
+    if not PROXY_PROTOCOL:
+        return None
+    try:
+        line = b""
+        while True:
+            ch = sock.recv(1)
+            if not ch:
+                return None
+            line += ch
+            if line.endswith(b"\r\n"):
+                break
+            if len(line) > 108:
+                return None
+        text = line.decode("ascii", errors="ignore").strip()
+        parts = text.split(" ")
+        if len(parts) >= 5 and parts[0] == "PROXY" and parts[1] == "TCP4":
+            return parts[2], int(parts[4])
+    except OSError:
+        return None
+    return None
 
 def forward(src, dst, conn=None, field=None):
     """Salur satu arah; tutup dua-duanya saat satu arah berhenti.
@@ -265,6 +291,116 @@ def handle_client(client_socket, ip):
             _release(real_ip, False)
 
 
+def handle_direct_client(client_socket, peer_ip):
+    """Handler untuk SSH direct via listener TCP polos (bukan WebSocket).
+
+    Klien kirim banner SSH-2.0 langsung, tidak ada upgrade HTTP.
+    Jika PROXY_PROTOCOL aktif, baca header PROXY dari nginx stream untuk IP asli.
+    """
+    global _total
+    conn = None
+    cid = 0
+    admitted = False
+    real_ip = peer_ip
+    try:
+        if PROXY_PROTOCOL:
+            pp = _parse_proxy_protocol(client_socket)
+            if pp:
+                real_ip = pp[0]
+        try:
+            buf = client_socket.recv(8192)
+        except OSError:
+            try:
+                client_socket.close()
+            except OSError:
+                pass
+            return
+        if not buf:
+            try:
+                client_socket.close()
+            except OSError:
+                pass
+            return
+        if not _admit(real_ip, False):
+            try:
+                cur = _per_ip.get(real_ip, 0)
+                _log(f"TOLAK-DIRECT {real_ip} (peer={peer_ip}, per-ip={cur}, total={_total})")
+            finally:
+                try:
+                    client_socket.close()
+                except OSError:
+                    pass
+            return
+        admitted = True
+        try:
+            ssh_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            ssh_socket.settimeout(10)
+            ssh_socket.connect(("127.0.0.1", SSH_PORT))
+            ssh_socket.settimeout(None)
+            ssh_socket.sendall(buf)  # kirim banner SSH klien apa adanya
+            client_socket.settimeout(IDLE_TIMEOUT)
+            ssh_socket.settimeout(IDLE_TIMEOUT)
+            if TCP_KEEPALIVE:
+                for sock in (client_socket, ssh_socket):
+                    try:
+                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                        if hasattr(socket, "TCP_KEEPIDLE"):
+                            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 30)
+                        if hasattr(socket, "TCP_KEEPINTVL"):
+                            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
+                        if hasattr(socket, "TCP_KEEPCNT"):
+                            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+                    except OSError:
+                        pass
+            _log(f"DIRECT {real_ip} (peer={peer_ip}, total={_total})")
+            conn = {"start": round(time.time(), 3), "ip": real_ip, "edge": peer_ip,
+                    "ua": "ssh-direct", "city": "", "cc": "", "cdn": "Langsung",
+                    "port_ws": str(SSH_DIRECT_PORT), "up": 0, "down": 0, "alasan": "natural"}
+            with _lock:
+                cid = next(_SEQ)
+                _CONNS[cid] = conn
+            _dump()
+            t_back = threading.Thread(target=forward,
+                                      args=(ssh_socket, client_socket, conn, "down"), daemon=True)
+            t_back.start()
+            forward(client_socket, ssh_socket, conn, "up")
+            t_back.join(timeout=5)
+        except OSError as exc:
+            _log(f"GAGAL-DIRECT {peer_ip}: {exc}")
+            try:
+                client_socket.close()
+            except OSError:
+                pass
+    finally:
+        if conn is not None:
+            with _lock:
+                _LAST.append({**conn, "end": round(time.time(), 3)})
+                _CONNS.pop(cid, None)
+            _dump()
+        if admitted:
+            _release(real_ip, False)
+
+
+def accept_direct():
+    """Loop accept listener SSH direct di port SSH_DIRECT_PORT (127.0.0.1 saja)."""
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("127.0.0.1", SSH_DIRECT_PORT))
+    server.listen(64)
+    _log(f"mulai direct: ssh={SSH_DIRECT_PORT} -> sshd {SSH_PORT}")
+    while True:
+        try:
+            client, addr = server.accept()
+            threading.Thread(target=handle_direct_client,
+                             args=(client, addr[0]), daemon=True).start()
+        except OSError as exc:
+            _log(f"ACCEPT-DIRECT ERROR: {exc}")
+            time.sleep(1)
+        except Exception as exc:
+            _log(f"ACCEPT-DIRECT ERROR: {exc}")
+            time.sleep(1)
+
+
 def _watchdog():
     """Bunuh koneksi yang melebihi MAX_CONN_AGE agar slot tidak menempel selamanya."""
     while True:
@@ -296,6 +432,9 @@ def main():
     _log(f"mulai: ws={WS_PORT} -> ssh lokal {SSH_PORT}, limit {MAX_PER_IP}/ip, {MAX_TOTAL} total")
     t_wd = threading.Thread(target=_watchdog, daemon=True)
     t_wd.start()
+    if SSH_DIRECT_ENABLED:
+        t_direct = threading.Thread(target=accept_direct, daemon=True)
+        t_direct.start()
     while True:
         try:
             client, addr = server.accept()

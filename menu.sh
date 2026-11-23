@@ -1368,7 +1368,7 @@ conf_service() {
         echo "5. Toggle Heartbeat WS"
         echo "6. Ubah Port WebSocket"
         echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-7): " p || exit 0
+        read -p "Pilih (0-6): " p || exit 0
         case $p in
             1)
                 echo -e "${YELLOW}Menjalankan natssh-ws...${NC}"
@@ -1406,6 +1406,33 @@ conf_service() {
             4) conf_keepalive; continue ;;
             5) conf_heartbeat; continue ;;
             6) conf_port ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
+        esac
+    done
+}
+
+conf_service_direct() {
+    while true; do
+        clear
+        garis
+        echo -e "${YELLOW}   KONTROL LAYANAN SSH DIRECT${NC}"
+        garis
+        if grep -q "NATSSH_SSH_DIRECT_ENABLED=1" /etc/systemd/system/natssh-ws.service 2>/dev/null; then
+            echo -e "SSH Direct: ${GREEN}AKTIF${NC}"
+        else
+            echo -e "SSH Direct: ${RED}NONAKTIF${NC}"
+        fi
+        direct_port=$(port_direct 2>/dev/null || echo "-")
+        echo -e "Port SSH Direct: ${YELLOW}${direct_port}${NC}"
+        echo ""
+        echo "1. Toggle SSH Direct"
+        echo "2. Ubah Port SSH Direct"
+        echo -e "${RED}0. Kembali${NC}"
+        read -p "Pilih (0-2): " p || exit 0
+        case $p in
+            1) conf_toggle_ssh_direct ; continue ;;
+            2) conf_port_direct ; continue ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
         esac
@@ -1481,13 +1508,16 @@ conf_nginx_service() {
         echo -e "Status saat ini: ${GREEN}${status}${NC}"
         nginx_port=$(grep "listen" /etc/nginx/sites-available/natssh-ws 2>/dev/null | head -1 | awk '{print $2}' | tr -d ';' || echo "-")
         echo -e "Port Nginx: ${YELLOW}${nginx_port}${NC}"
+        stream_port=$(port_nginx_stream 2>/dev/null || echo "-")
+        echo -e "Port Nginx Stream: ${YELLOW}${stream_port}${NC}"
         echo ""
         echo "1. Start"
         echo "2. Stop"
         echo "3. Restart"
         echo "4. Ubah Port Nginx"
+        echo "5. Ubah Port Nginx Stream"
         echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-4): " p || exit 0
+        read -p "Pilih (0-5): " p || exit 0
         case $p in
             1)
                 echo -e "${YELLOW}Menjalankan nginx...${NC}"
@@ -1523,6 +1553,7 @@ conf_nginx_service() {
                 pause
                 ;;
             4) conf_nginx_port ;;
+            5) conf_nginx_stream_port ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}"; sleep 1 ;;
         esac
@@ -2368,6 +2399,162 @@ conf_nginx_port() {
     pause
 }
 
+port_direct() {
+    # Port SSH Direct (raw TCP listener di ws.py) — baca dari systemd unit
+    local dport
+    dport=$(grep -E '^Environment=NATSSH_SSH_DIRECT_PORT=' /etc/systemd/system/natssh-ws.service 2>/dev/null | grep -oE '[0-9]+$' | head -1)
+    [ -n "$dport" ] || return 1
+    echo "$dport"
+}
+
+port_nginx_stream() {
+    # Port Nginx Stream (TCP listener untuk SSH direct) — baca dari stream.conf
+    local sport
+    sport=$(grep -E 'listen [0-9]+' /etc/nginx/stream.conf 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+    [ -n "$sport" ] || return 1
+    echo "$sport"
+}
+
+conf_port_direct() {
+    unit=/etc/systemd/system/natssh-ws.service
+    if [ ! -f "$unit" ]; then
+        echo -e "${RED}Gagal: $unit tidak ditemukan.${NC}"
+        pause
+        return
+    fi
+    cur_port=$(port_direct 2>/dev/null || echo "-")
+    echo -e "Port SSH Direct saat ini: ${YELLOW}${cur_port}${NC}"
+    echo -e "${YELLOW}Ketik 0 atau kosong untuk batal.${NC}"
+    read -p "Port SSH Direct baru: " new_port
+    if [ -z "$new_port" ] || [ "$new_port" = "0" ]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
+    fi
+    if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
+        echo -e "${RED}Gagal: port harus angka 1-65535!${NC}"
+        pause
+        return
+    elif ss -tln | grep -q ":$new_port "; then
+        echo -e "${RED}Gagal: port $new_port sedang dipakai proses lain!${NC}"
+        pause
+        return
+    fi
+    if grep -q "Environment=NATSSH_SSH_DIRECT_PORT=" "$unit"; then
+        sed -i "s/Environment=NATSSH_SSH_DIRECT_PORT=[0-9]*/Environment=NATSSH_SSH_DIRECT_PORT=$new_port/" "$unit"
+    else
+        sed -i "/^\[Service\]/a Environment=NATSSH_SSH_DIRECT_PORT=$new_port" "$unit"
+    fi
+    systemctl daemon-reload
+    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+    read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr
+    if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
+    fi
+    systemctl restart natssh-ws
+    sleep 1
+    if systemctl is-active --quiet natssh-ws; then
+        echo -e "${GREEN}SUKSES! SSH Direct kini di port $new_port.${NC}"
+        # Update nginx stream proxy_pass ke port direct baru
+        stconf="/etc/nginx/stream.conf"
+        if [ -f "$stconf" ]; then
+            sed -i "s|proxy_pass 127.0.0.1:[0-9]*;|proxy_pass 127.0.0.1:$new_port;|" "$stconf"
+            if nginx -t >/dev/null 2>&1 && systemctl restart nginx; then
+                echo -e "${GREEN}Nginx Stream diupdate forward ke port $new_port.${NC}"
+            else
+                echo -e "${RED}Nginx gagal restart! Cek: journalctl -u nginx -n 20${NC}"
+            fi
+        fi
+    else
+        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+    fi
+    pause
+}
+
+conf_toggle_ssh_direct() {
+    unit=/etc/systemd/system/natssh-ws.service
+    if [ ! -f "$unit" ]; then
+        echo -e "${RED}Gagal: $unit tidak ditemukan.${NC}"
+        pause
+        return
+    fi
+    if grep -q "NATSSH_SSH_DIRECT_ENABLED=1" "$unit"; then
+        new_val=0
+        pesan="NONAKTIF"
+    else
+        new_val=1
+        pesan="AKTIF"
+    fi
+    echo -e "SSH Direct saat ini: $([ "$new_val" = "1" ] && echo -e "${RED}NONAKTIF${NC}" || echo -e "${GREEN}AKTIF${NC}")"
+    echo -e "${YELLOW}Akan diubah menjadi: ${GREEN}${pesan}${NC}"
+    echo -e "${RED}PERINGATAN: Semua koneksi aktif akan terputus!${NC}"
+    read -p "Yakin toggle SSH Direct? Koneksi aktif akan terputus (y/N): " cfr
+    if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
+    fi
+    if grep -q "NATSSH_SSH_DIRECT_ENABLED=" "$unit"; then
+        sed -i "s/NATSSH_SSH_DIRECT_ENABLED=[01]/NATSSH_SSH_DIRECT_ENABLED=$new_val/" "$unit"
+    else
+        sed -i "/^\[Service\]/a Environment=NATSSH_SSH_DIRECT_ENABLED=$new_val" "$unit"
+    fi
+    systemctl daemon-reload
+    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+    systemctl restart natssh-ws
+    sleep 1
+    if systemctl is-active --quiet natssh-ws; then
+        echo -e "${GREEN}SUKSES! SSH Direct kini ${pesan}.${NC}"
+    else
+        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+    fi
+    pause
+}
+
+conf_nginx_stream_port() {
+    conf_file="/etc/nginx/stream.conf"
+    if [ ! -f "$conf_file" ]; then
+        echo -e "${RED}Gagal: $conf_file tidak ditemukan.${NC}"
+        pause
+        return
+    fi
+    cur=$(grep -E 'listen [0-9]+' "$conf_file" | head -1 | grep -oE '[0-9]+' | head -1)
+    echo -e "Port Nginx Stream saat ini: ${YELLOW}${cur:-tidak diketahui}${NC}"
+    echo -e "${YELLOW}Ketik 0 atau kosong untuk batal.${NC}"
+    read -p "Port Nginx Stream baru: " new_port
+    if [ -z "$new_port" ] || [ "$new_port" = "0" ]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
+    fi
+    if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
+        echo -e "${RED}Gagal: port harus angka 1-65535!${NC}"
+        pause
+        return
+    fi
+    if ss -tln | grep -q ":$new_port "; then
+        echo -e "${RED}Gagal: port $new_port sedang dipakai proses lain!${NC}"
+        pause
+        return
+    fi
+    echo -e "${YELLOW}Restart nginx — koneksi aktif terputus 2-3 detik...${NC}"
+    read -p "Yakin restart nginx? Koneksi aktif akan terputus (y/N): " cfr
+    if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
+    fi
+    sed -i "s/listen [0-9]*;/listen $new_port;/" "$conf_file"
+    systemctl restart nginx
+    sleep 1
+    systemctl is-active --quiet nginx && \
+        echo -e "${GREEN}SUKSES! Nginx Stream kini listen di port $new_port.${NC}" || \
+        echo -e "${RED}Service gagal start! Cek: journalctl -u nginx -n 20${NC}"
+    pause
+}
+
 conf_port_submenu() {
     while true; do
         clear
@@ -2395,35 +2582,37 @@ menu_conf() {
         printf "  %-3s %-46s\\n" "1." "Ubah Domain/Host"
         printf "  %-3s %-46s\\n" "2." "Hide IP"
         echo -e "${CYAN}  -- Layanan --${NC}"
-        printf "  %-3s %-46s\\n" "3." "Kontrol Layanan WS"
-        printf "  %-3s %-46s\\n" "4." "Kontrol Layanan UDPGW"
-        printf "  %-3s %-46s\\n" "5." "Kontrol Nginx"
+        printf "  %-3s %-46s\\n" "3." "Kontrol SSH WS"
+        printf "  %-3s %-46s\n" "4." "Kontrol SSH Direct"
+        printf "  %-3s %-46s\\n" "5." "Kontrol UDPGW"
+        printf "  %-3s %-46s\\n" "6." "Kontrol Nginx"
         echo -e "${CYAN}  -- Batas --${NC}"
-        printf "  %-3s %-46s\\n" "6." "Atur Batas Login per Akun (Max Login)"
-        printf "  %-3s %-46s\\n" "7." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
-        printf "  %-3s %-46s\\n" "8." "Ubah Batas Koneksi per IP (MAX_PER_IP)"
-        printf "  %-3s %-46s\\n" "9." "Atur Limit Speed per CDN (CF/CFront)"
+        printf "  %-3s %-46s\\n" "7." "Atur Batas Login per Akun (Max Login)"
+        printf "  %-3s %-46s\\n" "8." "Ubah Maks Koneksi Serentak (MAX_TOTAL)"
+        printf "  %-3s %-46s\\n" "9." "Ubah Batas Koneksi per IP (MAX_PER_IP)"
+        printf "  %-3s %-46s\\n" "10." "Atur Limit Speed per CDN (CF/CFront)"
         echo -e "${CYAN}  -- Lainnya --${NC}"
-        printf "  %-3s %-46s\\n" "10." "Penjadwalan"
-        printf "  %-3s %-46s\\n" "11." "Ubah Banner Pelanggan"
-        printf "  %-3s %-46s\\n" "12." "Ubah Durasi Suspend (menit)"
-        printf "  %-3s %-46s\\n" "13." "Test Ping (Cek Koneksi Internet)"
+        printf "  %-3s %-46s\\n" "11." "Penjadwalan"
+        printf "  %-3s %-46s\\n" "12." "Ubah Banner Pelanggan"
+        printf "  %-3s %-46s\\n" "13." "Ubah Durasi Suspend (menit)"
+        printf "  %-3s %-46s\\n" "14." "Test Ping (Cek Koneksi Internet)"
         echo -e "${RED}  0.  Kembali ke Menu Utama${NC}"
-        read -p "Pilih (0-13): " p || exit 0
+        read -p "Pilih (0-14): " p || exit 0
         case $p in
             1) conf_domain ;;
             2) conf_hide_ip ;;
             3) conf_service ;;
-            4) conf_udpgw_service ;;
-            5) conf_nginx_service ;;
-            6) conf_maxlogin ;;
-            7) conf_maxtotal ;;
-            8) conf_maxperip ;;
-            9) conf_speed ;;
-            10) conf_restart_schedule ;;
-            11) conf_banner ;;
-            12) conf_suspend_minutes ;;
-            13) conf_test_ping ;;
+            4) conf_service_direct ;;
+            5) conf_udpgw_service ;;
+            6) conf_nginx_service ;;
+            7) conf_maxlogin ;;
+            8) conf_maxtotal ;;
+            9) conf_maxperip ;;
+            10) conf_speed ;;
+            11) conf_restart_schedule ;;
+            12) conf_banner ;;
+            13) conf_suspend_minutes ;;
+            14) conf_test_ping ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac

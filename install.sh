@@ -95,9 +95,11 @@ if ! command -v python3 &> /dev/null; then
 else
     echo -e "${GREEN}Python3 sudah terinstal.${NC}"
 fi
+read -p "Masukkan Port SSH WS (kosongkan untuk otomatis): " ws_port
+if [ -z "$ws_port" ]; then
+    ws_port=20865
+fi
 
-read -p "Masukkan Port NAT kosong untuk WebSocket (default: 20865): " ws_port
-ws_port=${ws_port:-20865}
 read -p "Maksimal perangkat per akun / batas autokill (default: 5): " max_login
 max_login=${max_login:-5}
 if ! [[ "$max_login" =~ ^[0-9]+$ ]] || [ "$max_login" -lt 1 ] || [ "$max_login" -gt 20 ]; then
@@ -108,6 +110,19 @@ if ! [[ "$ws_port" =~ ^[0-9]+$ ]] || [ "$ws_port" -lt 1 ] || [ "$ws_port" -gt 65
 fi
 if ss -tln | grep -q ":${ws_port} "; then
     echo -e "${RED}Port ${ws_port} sudah dipakai proses lain!${NC}"; exit 1
+fi
+
+# Port SSH Direct (raw TCP listener di ws.py, untuk SSH non-WebSocket)
+default_direct=$((ws_port + 4))
+read -p "Masukkan Port SSH Direct (kosongkan untuk otomatis): " direct_port
+if [ -z "$direct_port" ]; then
+    direct_port=$default_direct
+fi
+if ! [[ "$direct_port" =~ ^[0-9]+$ ]] || [ "$direct_port" -lt 1 ] || [ "$direct_port" -gt 65535 ]; then
+    echo "Port SSH Direct tidak valid!"; exit 1
+fi
+if ss -tln | grep -q ":${direct_port} "; then
+    echo -e "${RED}Port ${direct_port} sudah dipakai proses lain!${NC}"; exit 1
 fi
 
 DIR=$(pwd)
@@ -225,6 +240,9 @@ User=root
 WorkingDirectory=$DIR
 Environment=NATSSH_WS_PORT=${ws_port}
 Environment=NATSSH_MAX_TOTAL=150
+Environment=NATSSH_SSH_DIRECT_ENABLED=1
+Environment=NATSSH_SSH_DIRECT_PORT=${direct_port}
+Environment=NATSSH_PROXY_PROTOCOL=1
 ExecStart=/usr/bin/python3 $DIR/ws.py
 Restart=always
 RestartSec=3
@@ -287,7 +305,17 @@ if ! command -v nginx &> /dev/null; then
     echo -e "${RED}Gagal menginstal nginx.${NC}"; exit 1
 fi
 
-nginx_port=20865
+read -p "Masukkan Port Nginx Reverse (kosongkan untuk 443 atau 8443): " nginx_port
+if [ -z "$nginx_port" ]; then
+    if ss -tln | grep -q ":443 "; then
+        nginx_port=8443
+    else
+        nginx_port=443
+    fi
+fi
+if ! [[ "$nginx_port" =~ ^[0-9]+$ ]] || [ "$nginx_port" -lt 1 ] || [ "$nginx_port" -gt 65535 ]; then
+    echo "Port tidak valid!"; exit 1
+fi
 if ss -tln | grep -q ":${nginx_port} "; then
     echo -e "${RED}Port ${nginx_port} sudah dipakai proses lain!${NC}"; exit 1
 fi
@@ -455,6 +483,40 @@ fi
 nginx -t && systemctl enable --now nginx
 echo -e "${GREEN}Service nginx berhasil dibuat dan dijalankan di port ${nginx_port} SSL -> 127.0.0.1:${ws_port}!${NC}"
 
+echo -e "\n[*] Menginstal modul Nginx Stream untuk SSH Direct (TCP proxy)..."
+apt-get install -y libnginx-mod-stream >/dev/null 2>&1
+
+read -p "Masukkan Port Nginx Stream (kosongkan untuk 80 atau 8080): " stream_port
+if [ -z "$stream_port" ]; then
+    if ss -tln | grep -q ":80 "; then
+        stream_port=8080
+    else
+        stream_port=80
+    fi
+fi
+if ! [[ "$stream_port" =~ ^[0-9]+$ ]] || [ "$stream_port" -lt 1 ] || [ "$stream_port" -gt 65535 ]; then
+    echo "Port tidak valid!"; exit 1
+fi
+if ss -tln | grep -q ":${stream_port} "; then
+    echo -e "${RED}Port ${stream_port} sudah dipakai proses lain!${NC}"; exit 1
+fi
+
+if ! grep -q 'include /etc/nginx/stream.conf' /etc/nginx/nginx.conf; then
+    sed -i '/^http {/i include /etc/nginx/stream.conf;' /etc/nginx/nginx.conf
+fi
+cat > /etc/nginx/stream.conf <<'EOF'
+stream {
+    server {
+        listen ${stream_port};
+        proxy_pass 127.0.0.1:${direct_port};
+        proxy_protocol on;
+        proxy_timeout 300s;
+    }
+}
+EOF
+nginx -t && systemctl restart nginx
+echo -e "${GREEN}Service Nginx Stream dijalankan di port ${stream_port} -> 127.0.0.1:${direct_port}!${NC}"
+
 echo -e "\n[*] Menyiapkan service NATSSH speed limit (tidak diaktifkan otomatis)..."
 cat > /etc/systemd/system/natssh-speed.service <<'EOF'
 [Unit]
@@ -580,7 +642,9 @@ echo -e "2. Untuk mengecek status WebSocket: ${YELLOW}systemctl status natssh-ws
 echo -e "3. Port WebSocket Anda saat ini: ${YELLOW}${ws_port}${NC}"
 echo -e "4. Batas perangkat per akun (autokill): ${YELLOW}${max_login}${NC}"
 echo -e "5. badvpn-udpgw (localhost only): ${YELLOW}${udpgw_ports}${NC}"
-echo -e "6. Nginx reverse proxy (port publik): ${YELLOW}20865${NC} -> 127.0.0.1:${ws_port}"
+echo -e "6. Nginx reverse proxy (port publik): ${YELLOW}${nginx_port}${NC} -> 127.0.0.1:${ws_port}"
+echo -e "7. SSH Direct (TCP listener): ${YELLOW}${direct_port}${NC}"
+echo -e "8. Nginx Stream (SSH Direct via proxy): ${YELLOW}${stream_port}${NC} -> 127.0.0.1:${direct_port}"
 
 # Tandai instalasi sukses agar trap rollback tidak aktif
 INSTALL_SUKSES=1
