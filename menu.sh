@@ -66,7 +66,7 @@ akun_baru() {
                 nginx_stream=$(grep -E 'listen [0-9]+' /etc/nginx/stream.conf 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
                 nginx_stream=${nginx_stream:-20869}
                 cf_ports="80, 443, 8080, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443"
-                cf_front_ports="80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443 (HTTPS)"
+                cf_front_ports="80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443"
                 sisa_hari=$(( $(date -d "$exp" +%s) - $(date +%s) ))
                 sisa_hari=$(( sisa_hari / 86400 ))
                 [ $sisa_hari -lt 0 ] && sisa_hari=0
