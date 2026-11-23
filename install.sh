@@ -162,10 +162,10 @@ _rollback_env() {
 }
 trap '_rollback_env' EXIT
 
-echo "DOMAIN=$ssl_domain" > "$DIR/config/.env"
+echo "DOMAIN=$ssl_domain" >> "$DIR/config/.env"
 echo -e "${GREEN}Domain disimpan ke $DIR/config/.env${NC}"
 
-# Ekstraksi root domain via Public Suffix List, fallback ke host.conf jika gagal
+# Ekstraksi root domain via Public Suffix List, fallback ke .env jika gagal
 echo -e "\n[*] Mengecek Public Suffix List..."
 PSL_FILE="$DIR/config/public_suffix_list.dat"
 root_domain=""
@@ -176,20 +176,20 @@ else
     if wget -q "https://publicsuffix.org/list/public_suffix_list.dat" -O "$PSL_FILE" 2>/dev/null; then
         echo -e "${GREEN}PSL tersimpan di $PSL_FILE.${NC}"
     else
-        echo -e "${YELLOW}Gagal unduh Public Suffix List, pakai fallback host.conf${NC}"
+        echo -e "${YELLOW}Gagal unduh Public Suffix List, pakai fallback .env${NC}"
     fi
 fi
 
 if [ -s "$PSL_FILE" ]; then
     root_domain=$(extract_root_domain "$ssl_domain" "$PSL_FILE")
     if [ -z "$root_domain" ]; then
-        echo -e "${YELLOW}Public Suffix List tidak dapat menentukan root domain, pakai fallback host.conf${NC}"
+        echo -e "${YELLOW}Public Suffix List tidak dapat menentukan root domain, pakai fallback .env${NC}"
         root_domain="$ssl_domain"
     fi
 fi
 
 if [ -z "$root_domain" ]; then
-    echo -e "${YELLOW}PSL tidak tersedia, pakai fallback host.conf${NC}"
+    echo -e "${YELLOW}PSL tidak tersedia, pakai fallback .env${NC}"
     root_domain="$ssl_domain"
 fi
 echo -e "${GREEN}Root domain untuk sertifikat: ${root_domain}${NC}"
@@ -334,7 +334,7 @@ fi
 
 rm -f /etc/nginx/sites-enabled/default
 
-ssl_domain=${DOMAIN}
+ssl_domain=${ssl_domain}
 if [ -z "$ssl_domain" ]; then
     read -p "Masukkan Domain/Host (contoh: id1.xenonblue.qzz.io): " ssl_domain
     if [ -z "$ssl_domain" ]; then
@@ -561,7 +561,7 @@ fi
 if ! crontab -l 2>/dev/null | grep -q "unsuspend.sh"; then
     (crontab -l 2>/dev/null; echo "* * * * * $DIR/unsuspend.sh >> $DIR/logs/autokill.log 2>&1") | crontab -
 fi
-[ -f "$DIR/config/.env" ] || echo "SUSPEND_MINUTES=15" > "$DIR/config/.env"
+[ -f "$DIR/config/.env" ] || echo "SUSPEND_MINUTES=15" >> "$DIR/config/.env"
 
 if ! crontab -l 2>/dev/null | grep -q "sess_audit"; then
     (crontab -l 2>/dev/null; echo "*/2 * * * * /usr/bin/python3 $DIR/sess_audit.py >/dev/null 2>&1") | crontab -
@@ -663,4 +663,4 @@ echo -e "8. Nginx Stream (SSH Direct via proxy): ${YELLOW}${stream_port}${NC} ->
 
 # Tandai instalasi sukses agar trap rollback tidak aktif
 INSTALL_SUKSES=1
-rm -f "$DIR/config/host.conf.bak"
+rm -f "$DIR/config/.env.bak"
