@@ -70,6 +70,7 @@ akun_baru() {
                 sisa_hari=$(( $(date -d "$exp" +%s) - $(date +%s) ))
                 sisa_hari=$(( sisa_hari / 86400 ))
                 [ $sisa_hari -lt 0 ] && sisa_hari=0
+                hostcf=$(cat "${DIR}/config/host_cf.conf" 2>/dev/null)
                 template=$(cat "$card_template")
                 template=${template//\{domain\}/$host}
                 template=${template//\{domain_cf\}/$hostcf}
@@ -95,6 +96,7 @@ akun_baru() {
                 echo -e "$template"
             else
                 [ -z "$host" ] && host="$ipaddr"
+                hostcf=$(cat "${DIR}/config/host_cf.conf" 2>/dev/null)
                 echo "================ DETAIL AKUN ================"
                 echo "Domain    : $host"
                 [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
