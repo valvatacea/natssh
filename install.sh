@@ -316,6 +316,20 @@ if [ -z "${CF_Token}" ] && [ -z "${CF_Key}" ]; then
 fi
 export CF_Token="${CF_Token}"
 
+# Simpan token ke config/.env agar tidak perlu input ulang di jalankan berikutnya
+if [ -n "${CF_Token}" ]; then
+    if [ -f "$DIR/config/.env" ]; then
+        if grep -q "^CF_Token=" "$DIR/config/.env"; then
+            sed -i "s|^CF_Token=.*|CF_Token=${CF_Token}|" "$DIR/config/.env"
+        else
+            echo "CF_Token=${CF_Token}" >> "$DIR/config/.env"
+        fi
+    else
+        echo "CF_Token=${CF_Token}" > "$DIR/config/.env"
+    fi
+    echo -e "${GREEN}Cloudflare API Token disimpan ke config/.env${NC}"
+fi
+
 if [ -z "$CF_Token" ] && [ -z "${CF_Key}" ]; then
     echo -e "${RED}Cloudflare API Token tidak diisi. Instalasi dibatalkan.${NC}"; exit 1
 fi
