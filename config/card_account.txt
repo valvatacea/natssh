@@ -1,0 +1,12 @@
+================ DETAIL AKUN ================
+Domain    : {domain}
+Domain CF : {domain_cf}
+Cloudflare: {cf_ports} | TLS: {cf_tls_ports}
+CloudFront: {cf_front_ports}
+Port UDPGW: {udpgw_ports}
+Port Direct : {nginx_reverse} (reverse), {nginx_stream} (stream)
+Username  : {username}
+Password  : {password}
+Expired   : {expired} ({hari} hari)
+Limit     : {limit} perangkat
+============================================

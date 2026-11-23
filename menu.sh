@@ -58,29 +58,55 @@ akun_baru() {
             maxlog=$(crontab -l | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
             echo -e "${GREEN}SUKSES! Akun $user berhasil dibuat.${NC}"
             echo ""
-            echo "================ DETAIL AKUN ================"
-            # host = IP kalau domain tak didefinisikan -> cukup tampilkan sekali di baris IP
-            [ -z "$host" ] && host="$ipaddr"
-            if [ "$host" != "$ipaddr" ]; then
-                echo "Domain    : $host"
+            # Render kartu akun dari template jika ada
+            card_template="${DIR}/config/card_account.txt"
+            if [ -f "$card_template" ] && [ -s "$card_template" ]; then
+                nginx_reverse=$(grep -E 'listen [0-9]+ ssl' /etc/nginx/sites-available/natssh-ws 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+                nginx_reverse=${nginx_reverse:-20865}
+                nginx_stream=$(grep -E 'listen [0-9]+' /etc/nginx/stream.conf 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+                nginx_stream=${nginx_stream:-20869}
+                cf_ports="80, 8080, 8880, 2052, 2082, 2086, 2095"
+                cf_tls_ports="443, 2053, 2083, 2087, 2096, 8443"
+                cf_front_ports="80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443 (HTTPS)"
+                sisa_hari=$(( $(date -d "$exp" +%s) - $(date +%s) ))
+                sisa_hari=$(( sisa_hari / 86400 ))
+                [ $sisa_hari -lt 0 ] && sisa_hari=0
+                template=$(cat "$card_template")
+                template=${template//\{domain\}/$host}
+                template=${template//\{domain_cf\}/$hostcf}
+                template=${template//\{cf_ports\}/$cf_ports}
+                template=${template//\{cf_tls_ports\}/$cf_tls_ports}
+                template=${template//\{cf_front_ports\}/$cf_front_ports}
+                template=${template//\{udpgw_ports\}/${udpgw_ports:-7300}}
+                template=${template//\{nginx_reverse\}/$nginx_reverse}
+                template=${template//\{nginx_stream\}/$nginx_stream}
+                template=${template//\{username\}/$user}
+                template=${template//\{password\}/$pass}
+                template=${template//\{expired\}/$exp}
+                template=${template//\{hari\}/$aktif}
+                template=${template//\{limit\}/${maxlog:-5}}
+                echo -e "$template"
+            else
+                echo "================ DETAIL AKUN ================"
+                [ -z "$host" ] && host="$ipaddr"
+                if [ "$host" != "$ipaddr" ]; then
+                    echo "Domain    : $host"
+                fi
+                [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
+                if [ "$(cat "${DIR}/config/hide_ip.conf" 2>/dev/null)" != "1" ]; then
+                    echo "IP        : $ipaddr"
+                fi
+                echo "Port WS   : $cfport (via Cloudflare)"
+                echo "Port UDPGW: ${udpgw_ports:-7300}"
+                echo "Cloudflare: 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
+                echo "CloudFront: 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443 (HTTPS)"
+                echo "Port NAT  : ${wsport:-20865} (cadangan, koneksi langsung tanpa Cloudflare)"
+                echo "Username  : $user"
+                echo "Password  : $pass"
+                echo "Expired   : $exp ($aktif hari)"
+                echo "Limit     : ${maxlog:-5} perangkat"
+                echo "============================================"
             fi
-            local hostcf=$(cat "${DIR}/config/host_cf.conf" 2>/dev/null)
-            [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
-            if [ "$(cat "${DIR}/config/hide_ip.conf" 2>/dev/null)" != "1" ]; then
-                echo "IP        : $ipaddr"
-            fi
-            echo "Port WS   : $cfport (via Cloudflare)"
-            udpgw_ports=$(systemctl list-units 'natssh-udpgw@*.service' --state=active --no-legend 2>/dev/null | awk '{print $1}' | sed 's/natssh-udpgw@//;s/.service//' | paste -sd, -)
-            echo "Port UDPGW: ${udpgw_ports:-7300}"
-            echo "Cloudflare: 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
-            echo "CloudFront: 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443 (HTTPS)"
-            echo "Port NAT  : ${wsport:-20865} (cadangan, koneksi langsung tanpa Cloudflare)"
-            echo "Username  : $user"
-            echo "Password  : $pass"
-            echo "Expired   : $exp ($aktif hari)"
-            echo "Limit     : ${maxlog:-5} perangkat"
-            echo "============================================"
-            echo "(blok di atas siap disalin & dikirim ke pelanggan)"
         fi
     fi
 }
