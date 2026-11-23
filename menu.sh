@@ -2396,7 +2396,7 @@ conf_test_ping() {
 
     # ── 3. TCP Port Check ──
     echo -e "${CYAN}--- TCP PORT CHECK ---${NC}"
-    declare -a ports=(443 80 22 20165 20865 20169)
+    declare -a ports=(443 80)
     for port in "${ports[@]}"; do
         if command -v nc >/dev/null 2>&1; then
             if nc -zv -w 3 1.1.1.1 "$port" >/dev/null 2>&1; then
@@ -2440,7 +2440,7 @@ conf_test_ping() {
     echo -e "${YELLOW}Catatan:${NC}"
     echo -e "  - Gateway 10.20.0.1 mungkin tidak merespons ICMP (blokir), tapi HTTP/TCP tetap bisa."
     echo -e "  - Jangan diagnosa masalah koneksi jika hanya ICMP yang timeout."
-    echo -e "  - Port 20165/20865 = WebSocket natssh; 20169 = SSH Direct."
+    echo -e "  - Port 443/80 = HTTPS/HTTP publik."
     pause
 }
 
