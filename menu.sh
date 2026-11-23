@@ -2441,7 +2441,6 @@ conf_test_ping() {
     echo -e "  - Gateway 10.20.0.1 mungkin tidak merespons ICMP (blokir), tapi HTTP/TCP tetap bisa."
     echo -e "  - Jangan diagnosa masalah koneksi jika hanya ICMP yang timeout."
     echo -e "  - Port 443/80 = HTTPS/HTTP publik."
-    pause
 }
 
 conf_udpgw() {
