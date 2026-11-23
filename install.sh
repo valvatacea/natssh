@@ -334,9 +334,12 @@ fi
 
 rm -f /etc/nginx/sites-enabled/default
 
-ssl_domain=$(cat "$DIR/config/host.conf" 2>/dev/null)
+ssl_domain=${DOMAIN}
 if [ -z "$ssl_domain" ]; then
-    echo -e "${RED}Domain/Host kosong di $DIR/config/host.conf! Instalasi dibatalkan.${NC}"; exit 1
+    read -p "Masukkan Domain/Host (contoh: id1.xenonblue.qzz.io): " ssl_domain
+    if [ -z "$ssl_domain" ]; then
+        echo -e "${RED}Domain/Host kosong! Instalasi dibatalkan.${NC}"; exit 1
+    fi
 fi
 
 echo -e "\n[*] Memeriksa acme.sh..."

@@ -1213,9 +1213,9 @@ muat_env() {
 # Terbitkan ulang sertifikat SSL via acme.sh (Cloudflare DNS challenge)
 terbitkan_ulang_sertifikat() {
     local ssl_domain root_domain
-    ssl_domain=$(cat "${DIR}/config/host.conf" 2>/dev/null)
+    ssl_domain=${DOMAIN}
     if [ -z "$ssl_domain" ]; then
-        echo -e "${RED}Domain/Host kosong di host.conf! Tidak dapat menerbitkan sertifikat.${NC}"
+        echo -e "${RED}Domain/Host kosong di .env! Tidak dapat menerbitkan sertifikat.${NC}"
         return 1
     fi
 
@@ -1229,20 +1229,20 @@ terbitkan_ulang_sertifikat() {
         if wget -q "https://publicsuffix.org/list/public_suffix_list.dat" -O "$PSL_FILE" 2>/dev/null; then
             echo -e "${GREEN}PSL tersimpan di $PSL_FILE.${NC}"
         else
-            echo -e "${YELLOW}Gagal unduh Public Suffix List, pakai fallback host.conf${NC}"
+            echo -e "${YELLOW}Gagal unduh Public Suffix List, pakai fallback .env${NC}"
         fi
     fi
 
     if [ -s "$PSL_FILE" ]; then
         root_domain=$(extract_root_domain "$ssl_domain" "$PSL_FILE")
         if [ -z "$root_domain" ]; then
-            echo -e "${YELLOW}Public Suffix List tidak dapat menentukan root domain, pakai fallback host.conf${NC}"
+            echo -e "${YELLOW}Public Suffix List tidak dapat menentukan root domain, pakai fallback .env${NC}"
             root_domain="$ssl_domain"
         fi
     fi
 
     if [ -z "$root_domain" ]; then
-        echo -e "${YELLOW}PSL tidak tersedia, pakai fallback host.conf${NC}"
+        echo -e "${YELLOW}PSL tidak tersedia, pakai fallback .env${NC}"
         root_domain="$ssl_domain"
     fi
 
@@ -1390,7 +1390,7 @@ conf_domain() {
 
 conf_domain_edit() {
     # host/domain Cloudflare di kartu akun; host.conf dipakai akun_baru (fallback: IP publik)
-    local cur=$(cat /root/natssh/config/host.conf 2>/dev/null)
+    local cur=${DOMAIN}
     echo -e "Host kartu akun saat ini: ${YELLOW}${cur:-OTOMATIS (IP publik)}${NC}"
     read -p "Domain/host baru (kosong = otomatis IP, 0 = batal): " h
     [ "$h" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
@@ -1750,12 +1750,28 @@ conf_speed() {
                     val=${!v}; if [[ "$val" =~ ^[0-9]+$ ]] || [[ "$val" =~ ^[0-9]+\.[0-9]+$ ]] || [[ "$val" =~ ^\.[0-9]+$ ]]; then eval "$v=${val}mbit"; fi
                 done
                 iface=$(ip route | grep default | awk '{print $5}' | head -1); iface=${iface:-eth0}
-                echo "IFACE=$iface" > "${DIR}/config/.env"
-                echo "UP_CF=$up_cf" >> "${DIR}/config/.env"
-                echo "DOWN_CF=$down_cf" >> "${DIR}/config/.env"
-                echo "UP_CFRONT=$up_cfront" >> "${DIR}/config/.env"
-                echo "DOWN_CFRONT=$down_cfront" >> "${DIR}/config/.env"
-                echo "MODE=cdn-split" >> "${DIR}/config/.env"
+                # Update .env dengan semua kecepatan CDN (tanpa menghapus key lain)
+                if [ -f "${DIR}/config/.env" ]; then
+                    sed -i "s/^IFACE=.*/IFACE=$iface/" "${DIR}/config/.env"
+                    grep -q "^IFACE=" "${DIR}/config/.env" || echo "IFACE=$iface" >> "${DIR}/config/.env"
+                    sed -i "s/^UP_CF=.*/UP_CF=$up_cf/" "${DIR}/config/.env"
+                    grep -q "^UP_CF=" "${DIR}/config/.env" || echo "UP_CF=$up_cf" >> "${DIR}/config/.env"
+                    sed -i "s/^DOWN_CF=.*/DOWN_CF=$down_cf/" "${DIR}/config/.env"
+                    grep -q "^DOWN_CF=" "${DIR}/config/.env" || echo "DOWN_CF=$down_cf" >> "${DIR}/config/.env"
+                    sed -i "s/^UP_CFRONT=.*/UP_CFRONT=$up_cfront/" "${DIR}/config/.env"
+                    grep -q "^UP_CFRONT=" "${DIR}/config/.env" || echo "UP_CFRONT=$up_cfront" >> "${DIR}/config/.env"
+                    sed -i "s/^DOWN_CFRONT=.*/DOWN_CFRONT=$down_cfront/" "${DIR}/config/.env"
+                    grep -q "^DOWN_CFRONT=" "${DIR}/config/.env" || echo "DOWN_CFRONT=$down_cfront" >> "${DIR}/config/.env"
+                    sed -i "s/^MODE=.*/MODE=cdn-split/" "${DIR}/config/.env"
+                    grep -q "^MODE=" "${DIR}/config/.env" || echo "MODE=cdn-split" >> "${DIR}/config/.env"
+                else
+                    echo "IFACE=$iface" > "${DIR}/config/.env"
+                    echo "UP_CF=$up_cf" >> "${DIR}/config/.env"
+                    echo "DOWN_CF=$down_cf" >> "${DIR}/config/.env"
+                    echo "UP_CFRONT=$up_cfront" >> "${DIR}/config/.env"
+                    echo "DOWN_CFRONT=$down_cfront" >> "${DIR}/config/.env"
+                    echo "MODE=cdn-split" >> "${DIR}/config/.env"
+                fi
                 ip link show "$iface" >/dev/null 2>&1 || { echo -e "${RED}Interface $iface tidak ditemukan!${NC}"; pause; continue; }
                 bash /root/natssh/apply_speed.sh 2>/dev/null
                 _ensure_speed_service
@@ -2208,7 +2224,7 @@ BEOF
 }
 
 conf_hide_ip() {
-    local cur=$(cat /root/natssh/config/hide_ip.conf 2>/dev/null)
+    local cur=${HIDE_IP}
     cur=${cur:-0}
     echo -e "${YELLOW}---- HIDE IP SAAT BUAT AKUN ----${NC}"
     if [ "$cur" = "1" ]; then
@@ -2219,10 +2235,26 @@ conf_hide_ip() {
     read -p "Toggle? (1=ON, 0=OFF, kosong=batal): " v
     [ -z "$v" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if [ "$v" = "1" ]; then
-        echo "1" > /root/natssh/config/hide_ip.conf
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
+                sed -i "s|^HIDE_IP=.*|HIDE_IP=1|" "${DIR}/config/.env"
+            else
+                echo "HIDE_IP=1" >> "${DIR}/config/.env"
+            fi
+        else
+            echo "HIDE_IP=1" > "${DIR}/config/.env"
+        fi
         echo -e "${GREEN}Hide IP diaktifkan.${NC}"
     elif [ "$v" = "0" ]; then
-        echo "0" > /root/natssh/config/hide_ip.conf
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
+                sed -i "s|^HIDE_IP=.*|HIDE_IP=0|" "${DIR}/config/.env"
+            else
+                echo "HIDE_IP=0" >> "${DIR}/config/.env"
+            fi
+        else
+            echo "HIDE_IP=0" > "${DIR}/config/.env"
+        fi
         echo -e "${GREEN}Hide IP dinonaktifkan.${NC}"
     else
         echo -e "${RED}Pilihan tidak valid!${NC}"
@@ -2230,7 +2262,7 @@ conf_hide_ip() {
 }
 
 conf_suspend_minutes() {
-    local cur=$(cat /root/natssh/config/suspend_minutes.conf 2>/dev/null)
+    local cur=${SUSPEND_MINUTES}
     cur=${cur:-15}
     echo -e "${YELLOW}---- DURASI SUSPEND (autokill) ----${NC}"
     echo -e "Durasi saat ini: ${GREEN}${cur} menit${NC}"
@@ -2239,7 +2271,15 @@ conf_suspend_minutes() {
     if ! [[ "$v" =~ ^[0-9]+$ ]] || [ "$v" -lt 1 ] || [ "$v" -gt 1440 ]; then
         echo -e "${RED}Nilai tidak valid!${NC}"; pause; return
     fi
-    echo "$v" > /root/natssh/config/suspend_minutes.conf
+    if [ -f "${DIR}/config/.env" ]; then
+        if grep -q "^SUSPEND_MINUTES=" "${DIR}/config/.env"; then
+            sed -i "s|^SUSPEND_MINUTES=.*|SUSPEND_MINUTES=$v|" "${DIR}/config/.env"
+        else
+            echo "SUSPEND_MINUTES=$v" >> "${DIR}/config/.env"
+        fi
+    else
+        echo "SUSPEND_MINUTES=$v" > "${DIR}/config/.env"
+    fi
     echo -e "${GREEN}Durasi suspend diubah menjadi ${v} menit.${NC}"
     pause
 }
