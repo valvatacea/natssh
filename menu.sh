@@ -2810,7 +2810,7 @@ menu_conf() {
         echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
         garis
         echo -e "${CYAN}  -- Domain/IP --${NC}"
-        printf "  %-3s %-46s\\n" "1." "Ubah Domain/Host"
+        printf "  %-3s %-46s\\n" "1." "Domain/Host"
         printf "  %-3s %-46s\\n" "2." "Hide IP"
         echo -e "${CYAN}  -- Layanan --${NC}"
         printf "  %-3s %-46s\\n" "3." "Kontrol SSH WS"
