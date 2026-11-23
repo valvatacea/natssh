@@ -1548,7 +1548,7 @@ conf_nginx_service() {
         status=$(systemctl is-active nginx 2>/dev/null)
         echo -e "Status saat ini: ${GREEN}${status}${NC}"
         nginx_port=$(grep "listen" /etc/nginx/sites-available/natssh-ws 2>/dev/null | head -1 | awk '{print $2}' | tr -d ';' || echo "-")
-        echo -e "Port Nginx: ${YELLOW}${nginx_port}${NC}"
+        echo -e "Port Nginx Reverse: ${YELLOW}${nginx_port}${NC}"
         stream_port=$(port_nginx_stream 2>/dev/null || echo "-")
         echo -e "Port Nginx Stream: ${YELLOW}${stream_port}${NC}"
         echo ""
