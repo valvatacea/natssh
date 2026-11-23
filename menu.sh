@@ -1215,21 +1215,21 @@ terbitkan_ulang_sertifikat() {
         return 1
     fi
 
-    echo -e "\n[*] Memeriksa perintah idn2 (untuk domain internasional)..."
-    if ! command -v idn2 >/dev/null 2>&1; then
-        echo -e "${YELLOW}idn2 belum terpasang. Memasang...${NC}"
+    echo -e "\n[*] Memeriksa perintah idn (untuk domain internasional)..."
+    if ! command -v idn >/dev/null 2>&1; then
+        echo -e "${YELLOW}idn belum terpasang. Memasang...${NC}"
         if command -v apt-get >/dev/null 2>&1; then
-            apt-get update -qq && apt-get install -y idn2
+            apt-get update -qq && apt-get install -y idn
         elif command -v apk >/dev/null 2>&1; then
-            apk add idn2
+            apk add idn
         else
-            echo -e "${RED}Gagal memasang idn2 (paket manager tidak didukung).${NC}"
+            echo -e "${RED}Gagal memasang idn (paket manager tidak didukung).${NC}"
         fi
     fi
-    if ! command -v idn2 >/dev/null 2>&1; then
-        echo -e "${RED}idn2 tidak tersedia, sertifikat untuk domain IDN mungkin gagal.${NC}"
+    if ! command -v idn >/dev/null 2>&1; then
+        echo -e "${RED}idn tidak tersedia, sertifikat untuk domain IDN mungkin gagal.${NC}"
     else
-        echo -e "${GREEN}idn2 siap.${NC}"
+        echo -e "${GREEN}idn siap.${NC}"
     fi
 
     echo -e "\n[*] Menerbitkan sertifikat SSL via acme.sh (Cloudflare DNS challenge)..."
