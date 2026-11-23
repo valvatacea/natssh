@@ -1206,11 +1206,31 @@ terbitkan_ulang_sertifikat() {
 
     # Cek kredensial Cloudflare
     if [ -z "${CF_Token}" ] && [ -z "${CF_Key}" ]; then
-        read -p "Masukkan Cloudflare API Token (kosongkan jika sudah di environment): " CF_Token
+        echo -e "${YELLOW}Pilih jenis kredensial Cloudflare:${NC}"
+        echo -e "  1) API Token"
+        echo -e "  2) API Key + Email"
+        read -p "Pilihan (1-2, 0 = batal): " cf_pilih
+        case "$cf_pilih" in
+            1)
+                read -p "Masukkan Cloudflare API Token: " CF_Token
+                export CF_Token="${CF_Token}"
+                ;;
+            2)
+                read -p "Masukkan Cloudflare API Key: " CF_Key
+                read -p "Masukkan Cloudflare Account Email: " CF_Email
+                export CF_Key="${CF_Key}"
+                export CF_Email="${CF_Email}"
+                ;;
+            0|"")
+                echo -e "${RED}Dibatalkan.${NC}"; return 1
+                ;;
+            *)
+                echo -e "${RED}Pilihan tidak valid.${NC}"; return 1
+                ;;
+        esac
     fi
-    export CF_Token="${CF_Token}"
 
-    # Simpan token ke config/.env agar tidak perlu input ulang di jalankan berikutnya
+    # Simpan kredensial ke config/.env
     if [ -n "${CF_Token}" ]; then
         if [ -f "${DIR}/config/.env" ]; then
             if grep -q "^CF_Token=" "${DIR}/config/.env"; then
@@ -1224,8 +1244,32 @@ terbitkan_ulang_sertifikat() {
         echo -e "${GREEN}Cloudflare API Token disimpan ke config/.env${NC}"
     fi
 
+    if [ -n "${CF_Key}" ]; then
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^CF_Key=" "${DIR}/config/.env"; then
+                sed -i "s|^CF_Key=.*|CF_Key=${CF_Key}|" "${DIR}/config/.env"
+            else
+                echo "CF_Key=${CF_Key}" >> "${DIR}/config/.env"
+            fi
+        else
+            echo "CF_Key=${CF_Key}" > "${DIR}/config/.env"
+        fi
+        if [ -n "${CF_Email}" ]; then
+            if [ -f "${DIR}/config/.env" ]; then
+                if grep -q "^CF_Email=" "${DIR}/config/.env"; then
+                    sed -i "s|^CF_Email=.*|CF_Email=${CF_Email}|" "${DIR}/config/.env"
+                else
+                    echo "CF_Email=${CF_Email}" >> "${DIR}/config/.env"
+                fi
+            else
+                echo "CF_Email=${CF_Email}" > "${DIR}/config/.env"
+            fi
+            echo -e "${GREEN}Cloudflare API Key + Email disimpan ke config/.env${NC}"
+        fi
+    fi
+
     if [ -z "$CF_Token" ] && [ -z "${CF_Key}" ]; then
-        echo -e "${RED}Cloudflare API Token tidak diisi. Terbit ulang sertifikat dibatalkan.${NC}"
+        echo -e "${RED}Kredensial Cloudflare tidak diisi. Terbit ulang sertifikat dibatalkan.${NC}"
         return 1
     fi
 
