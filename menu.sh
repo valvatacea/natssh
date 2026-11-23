@@ -85,12 +85,23 @@ akun_baru() {
                 template=${template//\{expired\}/$exp}
                 template=${template//\{hari\}/$aktif}
                 template=${template//\{limit\}/${maxlog:-5}}
+                # Hide IP jika hide_ip.conf = 1
+                if [ "$(cat "${DIR}/config/hide_ip.conf" 2>/dev/null)" = "1" ]; then
+                    template=${template//\{ip\}/}
+                    template=$(echo "$template" | sed '/^IP[[:space:]]*:[[:space:]]*$/d')
+                else
+                    template=${template//\{ip\}/$ipaddr}
+                fi
                 echo -e "$template"
             else
                 [ -z "$host" ] && host="$ipaddr"
                 echo "================ DETAIL AKUN ================"
                 echo "Domain    : $host"
                 [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
+                # Hide IP jika hide_ip.conf = 1
+                if [ "$(cat "${DIR}/config/hide_ip.conf" 2>/dev/null)" != "1" ]; then
+                    echo "IP        : $ipaddr"
+                fi
                 echo "Cloudflare: 80, 8080, 8880, 2052, 2082, 2086, 2095 | TLS: 443, 2053, 2083, 2087, 2096, 8443"
                 echo "CloudFront: 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8443"
                 nginx_reverse=$(grep -E 'listen [0-9]+ ssl' /etc/nginx/sites-available/natssh-ws 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)

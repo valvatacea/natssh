@@ -1,6 +1,7 @@
 ================ DETAIL AKUN ================
 Domain    : {domain}
 Domain CF : {domain_cf}
+IP        : {ip}
 Cloudflare: {cf_ports} | TLS: {cf_tls_ports}
 CloudFront: {cf_front_ports}
 Port UDPGW: {udpgw_ports}
