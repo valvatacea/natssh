@@ -23,12 +23,10 @@ if [ -f "${DIR}/config/.env" ]; then
 fi
 
 port_ws() {
-    # port WebSocket running — ss menampilkan nama proses "python3", bukan ws.py,
-    # maka cocokkan via PID: hasil kosong = service tak berjalan
-    local wpid
-    wpid=$(pgrep -f "ws.py" | head -1)
-    [ -n "$wpid" ] || return 1
-    ss -tlnp 2>/dev/null | grep "pid=$wpid," | awk '{print $4}' | awk -F: '{print $NF}' | head -1
+    # Port WebSocket — baca dari config/.env (NATSSH_WS_PORT)
+    if [ -f "${DIR}/config/.env" ]; then
+        grep "^NATSSH_WS_PORT=" "${DIR}/config/.env" 2>/dev/null | cut -d= -f2
+    fi
 }
 
 garis() { echo -e "${GREEN}======================================${NC}"; }
