@@ -129,6 +129,24 @@ while true; do
         break
     fi
 done
+
+# Backup host.conf untuk rollback jika instalasi gagal di tengah jalan
+INSTALL_SUKSES=0
+HOST_CONF_BACKUP=0
+if [ -f "$DIR/config/host.conf" ]; then
+    cp "$DIR/config/host.conf" "$DIR/config/host.conf.bak"
+    HOST_CONF_BACKUP=1
+fi
+
+_rollback_host_conf() {
+    if [ "$INSTALL_SUKSES" -eq 0 ] && [ "$HOST_CONF_BACKUP" -eq 1 ] && [ -f "$DIR/config/host.conf.bak" ]; then
+        cp "$DIR/config/host.conf.bak" "$DIR/config/host.conf"
+        rm -f "$DIR/config/host.conf.bak"
+        echo -e "${RED}Rollback: config/host.conf dikembalikan ke versi sebelumnya.${NC}"
+    fi
+}
+trap '_rollback_host_conf' EXIT
+
 echo "$ssl_domain" > "$DIR/config/host.conf"
 echo -e "${GREEN}Domain disimpan ke $DIR/config/host.conf${NC}"
 
@@ -563,3 +581,7 @@ echo -e "3. Port WebSocket Anda saat ini: ${YELLOW}${ws_port}${NC}"
 echo -e "4. Batas perangkat per akun (autokill): ${YELLOW}${max_login}${NC}"
 echo -e "5. badvpn-udpgw (localhost only): ${YELLOW}${udpgw_ports}${NC}"
 echo -e "6. Nginx reverse proxy (port publik): ${YELLOW}20865${NC} -> 127.0.0.1:${ws_port}"
+
+# Tandai instalasi sukses agar trap rollback tidak aktif
+INSTALL_SUKSES=1
+rm -f "$DIR/config/host.conf.bak"
