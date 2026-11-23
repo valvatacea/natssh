@@ -188,3 +188,26 @@ async def forward(src, dst, conn=None, field=None):
 - Jangan hapus `ws.py` versi threading sebelum rewrite async stabil dan diuji di production.
 - Simpan backup `ws.py` versi lama di branch ini atau tag git sebelum overwrite.
 - Jika async terlalu kompleks, fallback: pertahankan threading tetapi perbaiki bottleneck yang ada (misal kurangi stack size thread, tuning `MAX_TOTAL`).
+
+---
+
+## 9. Detail Implementasi yang Tidak Boleh Terlewat
+
+Berikut detail kecil dari `ws.py` versi threading yang harus dipertahankan atau diganti dengan setara di versi async:
+
+| No | Detail | Lokasi Lama | Keterangan |
+|----|--------|-------------|------------|
+| 1 | `port_ws` dari header `X-Forwarded-Port` | Baris 213 | Nilai disimpan ke `conn["port_ws"]`, fallback ke `WS_PORT` jika header tidak ada |
+| 2 | Deteksi `via_cdn` dan `edge` IP | Baris 198–210 | Bandingkan `real_ip` vs `ip` untuk `via_cdn`; ekstrak `edge` dari `X-Forwarded-For` terbalik (skip `127.0.0.1`, `localhost`, `::1`) |
+| 3 | Label `cdn` dari header `X-CDN` | Baris 255 | Disimpan ke `conn["cdn"]`, fallback `"Langsung"` |
+| 4 | Header Geo | Baris 215–216 | `CloudFront-Viewer-City` → `conn["city"]`; `CloudFront-Viewer-Country` atau `CF-IPCountry` → `conn["cc"]` |
+| 5 | Kirim `HTTP/1.1 101` tanpa validasi `Sec-WebSocket-Key` | Baris 191–195 | Perilaku non-standar sengaja (terima semua HTTP upgrade tanpa cek WebSocket key), harus dipertahankan untuk kompatibilitas klien lama |
+| 6 | `pending_sess.json` audit trail | Baris 282–298 | Rotasi entri >5 menit, max 200 entri, ditulis setiap koneksi selesai |
+| 7 | `itertools.count(1)` untuk `cid` | Baris 88 | Ganti dengan integer counter yang dilindungi `asyncio.Lock` |
+| 8 | `MAX_LOG_SIZE = 512_000` | Baris 35 | Rotasi log manual saat melebihi 500KB, format log sama |
+
+Catatan tambahan:
+- `handle_client` tetap menerima `client_socket` dan `ip` (peer address), tapi semua operasi socket diubah ke non-blocking via `asyncio` event loop.
+- `handle_direct_client` tetap terpisah dari `handle_client` (tanpa HTTP upgrade, dengan PROXY Protocol opsional).
+- `forward()` tetap berfungsi duplex: satu task untuk arah downstream, `await` untuk arah upstream.
+
