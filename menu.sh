@@ -90,6 +90,8 @@ akun_baru() {
                 else
                     template=${template//\{ip\}/$ipaddr}
                 fi
+                # Hapus baris yang nilainya kosong (contoh: Domain CF : tanpa nilai)
+                template=$(echo "$template" | sed -E '/^[A-Za-z ]+:[[:space:]]*$/d')
                 echo -e "$template"
             else
                 [ -z "$host" ] && host="$ipaddr"
