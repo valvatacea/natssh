@@ -2361,24 +2361,86 @@ conf_reboot_schedule() {
 conf_test_ping() {
     clear
     garis
-    echo -e "${YELLOW}   TEST PING (CEK KONEKSI INTERNET)${NC}"
+    echo -e "${YELLOW}   DIAGNOSA KONEKSI JARINGAN${NC}"
     garis
+
+    # ── 1. ICMP Ping ──
+    echo -e "${CYAN}--- PING (ICMP) ---${NC}"
     for host in 1.1.1.1 8.8.8.8 10.20.0.1; do
         if ping -c 2 -W 3 "$host" >/dev/null 2>&1; then
             echo -e "Ping $host : ${GREEN}OK${NC}"
         else
-            echo -e "Ping $host : ${RED}timeout${NC}  (gateway 10.20.0.1 mungkin blokir ICMP — normal)"
+            echo -e "Ping $host : ${RED}timeout${NC}"
         fi
     done
     echo ""
-    if curl -s -o /dev/null --connect-timeout 5 --max-time 10 https://1.1.1.1 >/dev/null 2>&1; then
-        echo -e "HTTP ke Cloudflare : ${GREEN}OK${NC}"
+
+    # ── 2. DNS Resolution ──
+    echo -e "${CYAN}--- DNS RESOLUTION ---${NC}"
+    if command -v nslookup >/dev/null 2>&1; then
+        if nslookup google.com >/dev/null 2>&1; then
+            echo -e "DNS google.com   : ${GREEN}OK${NC}"
+        else
+            echo -e "DNS google.com   : ${RED}gagal${NC}"
+        fi
+    elif command -v dig >/dev/null 2>&1; then
+        if dig +short google.com >/dev/null 2>&1; then
+            echo -e "DNS google.com   : ${GREEN}OK${NC}"
+        else
+            echo -e "DNS google.com   : ${RED}gagal${NC}"
+        fi
     else
-        echo -e "HTTP ke Cloudflare : ${RED}gagal${NC}"
+        echo -e "DNS              : ${YELLOW}tidak ada nslookup/dig${NC}"
     fi
+    echo ""
+
+    # ── 3. TCP Port Check ──
+    echo -e "${CYAN}--- TCP PORT CHECK ---${NC}"
+    declare -a ports=(443 80 22 20165 20865 20169)
+    for port in "${ports[@]}"; do
+        if command -v nc >/dev/null 2>&1; then
+            if nc -zv -w 3 1.1.1.1 "$port" >/dev/null 2>&1; then
+                echo -e "Port $port (1.1.1.1) : ${GREEN}OK${NC}"
+            else
+                echo -e "Port $port (1.1.1.1) : ${RED}timeout${NC}"
+            fi
+        else
+            echo -e "Port $port        : ${YELLOW}nc tidak terpasang${NC}"
+            break
+        fi
+    done
+    echo ""
+
+    # ── 4. HTTP/HTTPS ──
+    echo -e "${CYAN}--- HTTP/HTTPS ---${NC}"
+    if curl -s -o /dev/null --connect-timeout 5 --max-time 10 https://1.1.1.1 >/dev/null 2>&1; then
+        echo -e "HTTPS 1.1.1.1      : ${GREEN}OK${NC}"
+    else
+        echo -e "HTTPS 1.1.1.1      : ${RED}gagal${NC}"
+    fi
+    if curl -s -o /dev/null --connect-timeout 5 --max-time 10 http://1.1.1.1 >/dev/null 2>&1; then
+        echo -e "HTTP 1.1.1.1       : ${GREEN}OK${NC}"
+    else
+        echo -e "HTTP 1.1.1.1       : ${RED}gagal${NC}"
+    fi
+    echo ""
+
+    # ── 5. Traceroute (optional, singkat) ──
+    echo -e "${CYAN}--- TRACEROUTE (1.1.1.1) ---${NC}"
+    if command -v traceroute >/dev/null 2>&1; then
+        traceroute -m 8 -w 2 -q 1 1.1.1.1 2>/dev/null | head -12 || echo -e "${RED}traceroute gagal${NC}"
+    elif command -v tracepath >/dev/null 2>&1; then
+        tracepath -m 8 1.1.1.1 2>/dev/null | head -12 || echo -e "${RED}tracepath gagal${NC}"
+    else
+        echo -e "${YELLOW}traceroute/tracepath tidak terpasang${NC}"
+    fi
+    echo ""
+
     garis
-    echo -e "${YELLOW}Catatan: 10.20.0.1 (gateway) tidak merespons ICMP (blokir), tapi HTTP tetap bisa berjalan.${NC}"
-    echo -e "${YELLOW}Jangan diagnosa sebagai masalah koneksi jika hanya ICMP yang timeout.${NC}"
+    echo -e "${YELLOW}Catatan:${NC}"
+    echo -e "  - Gateway 10.20.0.1 mungkin tidak merespons ICMP (blokir), tapi HTTP/TCP tetap bisa."
+    echo -e "  - Jangan diagnosa masalah koneksi jika hanya ICMP yang timeout."
+    echo -e "  - Port 20165/20865 = WebSocket natssh; 20169 = SSH Direct."
     pause
 }
 
