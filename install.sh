@@ -247,6 +247,14 @@ echo -e "\n[*] Port WebSocket akan disetel via Environment systemd (ws.py v2): $
 echo -e "\n[*] Mengatur izin eksekusi..."
 chmod +x "$DIR/menu.sh" "$DIR/autokill.sh" "$DIR/unsuspend.sh" "$DIR/autobackup.sh" "$DIR/uninstall.sh" "$DIR/apply_speed.sh" "$DIR/promo_rotate.sh" "$DIR/sess_audit.py" "$DIR/reap.py" "$DIR/audit_kill.py" "$DIR/ws_match.py" "$DIR/generate_cdn_geo.sh"
 
+echo -e "\n[*] Menghasilkan cdn_geo.conf dari cache IP Cloudflare/CloudFront..."
+bash "$DIR/generate_cdn_geo.sh"
+if [ -s "$DIR/config/cdn_geo.conf" ]; then
+    echo -e "${GREEN}cdn_geo.conf berhasil dihasilkan.${NC}"
+else
+    echo -e "${YELLOW}cdn_geo.conf kosong (cache IP belum tersedia).${NC}"
+fi
+
 echo -e "\n[*] Mengatur Service Systemd untuk WebSocket Proxy (ws.py)..."
 cat > /etc/systemd/system/natssh-ws.service <<EOF
 [Unit]
@@ -450,7 +458,7 @@ else
 fi
 
 echo -e "\n[*] Menerbitkan sertifikat SSL via acme.sh (Cloudflare DNS challenge)..."
-"$HOME/.acme.sh/acme.sh" --issue --dns dns_cf -d "*.${root_domain}" -d "${root_domain}" \
+"$HOME/.acme.sh/acme.sh" --issue --force --dns dns_cf -d "*.${root_domain}" -d "${root_domain}" \
     --cert-file /etc/nginx/ssl/natssh.pem \
     --key-file /etc/nginx/ssl/natssh_key.pem \
     --fullchain-file /etc/nginx/ssl/natssh_fullchain.pem \
@@ -486,6 +494,17 @@ server {
 }
 EOF
 ln -sf /etc/nginx/sites-available/natssh-ws /etc/nginx/sites-enabled/natssh-ws
+
+echo -e "\n[*] Membuat konfigurasi label CDN untuk nginx..."
+if [ ! -f "$DIR/config/cdn_geo.conf" ]; then
+    touch "$DIR/config/cdn_geo.conf"
+fi
+cat > /etc/nginx/conf.d/cdn-label.conf <<'EOF'
+geo $cdn_label {
+    default "Langsung";
+    include /root/natssh/config/cdn_geo.conf;
+}
+EOF
 
 echo -e "\n[*] Mengoptimalkan nginx untuk WebSocket (file descriptor & connections)..."
 sed -i 's/^[[:space:]]*worker_connections .*/    worker_connections 4096;/' /etc/nginx/nginx.conf
