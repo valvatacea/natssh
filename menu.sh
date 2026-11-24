@@ -2450,64 +2450,6 @@ conf_test_ping() {
     echo -e "  - Port 443/80 = HTTPS/HTTP publik."
 }
 
-conf_udpgw() {
-    while true; do
-        clear
-        garis
-        echo -e "${YELLOW}   BADVPN-UDPGW (UDP GATEWAY)${NC}"
-        garis
-        active=""
-        for pp in 7100 7200 7300 7400 7500; do
-            st=$(systemctl is-active natssh-udpgw@${pp} 2>/dev/null)
-            [ "$st" = "active" ] && active="$active $pp"
-        done
-        if [ -z "$active" ]; then
-            st_text="inactive"
-            st_color="${RED}"
-        else
-            st_text="active"
-            st_color="${GREEN}"
-        fi
-        echo -e "Status : ${st_color}${st_text}${NC}  Port aktif:${YELLOW}${active:- (none)}${NC}"
-        echo -e "Tunnel contoh: ssh -N -L 7300:127.0.0.1:7300 user@host"
-        garis
-        echo "1. Ubah Port (pilih port untuk aktif/nonaktif)"
-        echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-1): " p || return
-        case $p in
-            1)
-                ports_list="7100 7200 7300 7400 7500"
-                clear
-                garis
-                echo -e "${YELLOW}   KELOLA PORT UDGPW${NC}"
-                garis
-                i=1
-                for pp in $ports_list; do
-                    st=$(systemctl is-active natssh-udpgw@${pp} 2>/dev/null)
-                    [ "$st" = "active" ] && st="active" || st="inactive"
-                    echo "$i) $pp  [$st]"
-                    i=$((i+1))
-                done
-                echo "0) Batal"
-                echo -e "${YELLOW}Catatan: pilih port aktif -> nonaktifkan; nonaktif -> aktifkan.${NC}"
-                garis
-                read -p "Pilih nomor port (0 batal): " n
-                [ "$n" = "0" ] && return
-                case $n in
-                    1) pp=7100 ;; 2) pp=7200 ;; 3) pp=7300 ;; 4) pp=7400 ;; 5) pp=7500 ;; *) echo -e "${RED}Tidak valid${NC}"; pause; return ;;
-                esac
-                if systemctl is-active --quiet natssh-udpgw@${pp}; then
-                    systemctl disable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} nonaktif${NC}" || echo -e "${RED}non-active${NC}"
-                else
-                    systemctl enable --now natssh-udpgw@${pp} >/dev/null 2>&1 && echo -e "${GREEN}${pp} aktif${NC}" || echo -e "${RED}non-active${NC}"
-                fi
-                ;;
-            0) return ;;
-            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
-        esac
-        [ "$p" != "0" ] && pause
-    done
-}
 
 conf_keepalive() {
     clear; garis
@@ -2806,7 +2748,7 @@ conf_port_submenu() {
         echo -e "${RED}  0.  Kembali${NC}"
         read -p "Pilih (0-1): " p || exit 0
         case $p in
-            1) conf_udpgw ;;
+            1) conf_udpgw_service ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
