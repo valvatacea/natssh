@@ -342,7 +342,14 @@ akun_daftar() {
 do_limit() {
     local selfdir=$(dirname "$(readlink -f "$0")")
     local lfile="$selfdir/limits/$1"
-    local global=$(crontab -l 2>/dev/null | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+    # Baca global dari .env (sumber tunggal), fallback crontab, fallback 5
+    if [ -f "${selfdir}/config/.env" ] && grep -q "^MAX_LOGIN=" "${selfdir}/config/.env"; then
+        global=$(grep "^MAX_LOGIN=" "${selfdir}/config/.env" | cut -d= -f2)
+    elif crontab -l 2>/dev/null | grep -q "MAX_LOGIN="; then
+        global=$(crontab -l 2>/dev/null | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+    else
+        global=5
+    fi
     global=${global:-5}
     local khusus="" 
     [ -f "$lfile" ] && khusus=$(cat "$lfile" 2>/dev/null)
@@ -2875,7 +2882,14 @@ akun_daftar() {
 do_limit() {
     local selfdir=$(dirname "$(readlink -f "$0")")
     local lfile="$selfdir/limits/$1"
-    local global=$(crontab -l 2>/dev/null | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+    # Baca global dari .env (sumber tunggal), fallback crontab, fallback 5
+    if [ -f "${selfdir}/config/.env" ] && grep -q "^MAX_LOGIN=" "${selfdir}/config/.env"; then
+        global=$(grep "^MAX_LOGIN=" "${selfdir}/config/.env" | cut -d= -f2)
+    elif crontab -l 2>/dev/null | grep -q "MAX_LOGIN="; then
+        global=$(crontab -l 2>/dev/null | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+    else
+        global=5
+    fi
     global=${global:-5}
     local khusus="" 
     [ -f "$lfile" ] && khusus=$(cat "$lfile" 2>/dev/null)
