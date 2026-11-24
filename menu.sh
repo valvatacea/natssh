@@ -818,7 +818,6 @@ backup_config() {
     mkdir -p "$bakdir"
 
     [ -f "${DIR}/config/.env" ] && list="$list ${DIR}/config/.env"
-    [ -d "${DIR}/limits" ] && list="$list ${DIR}/limits"
     [ -d "${DIR}/banners" ] && list="$list ${DIR}/banners"
     [ -f /etc/issue.net ] && cp /etc/issue.net "$bakdir/issue.net.bak" && list="$list $bakdir/issue.net.bak"
     [ -f /etc/systemd/system/natssh-ws.service ] && cp /etc/systemd/system/natssh-ws.service "$bakdir/natssh-ws.service.bak" && list="$list $bakdir/natssh-ws.service.bak"
@@ -932,7 +931,6 @@ restore_config() {
     mkdir -p "$tmpdir"
     if tar -xzf "$selected" -C "$tmpdir" 2>/dev/null; then
         [ -f "$tmpdir/.env" ] && cp "$tmpdir/.env" "${DIR}/config/.env"
-        [ -d "$tmpdir/limits" ] && cp -r "$tmpdir/limits" "${DIR}/"
         [ -d "$tmpdir/banners" ] && cp -r "$tmpdir/banners" "${DIR}/"
         [ -f "$tmpdir/issue.net.bak" ] && cp "$tmpdir/issue.net.bak" /etc/issue.net
         [ -f "$tmpdir/natssh-ws.service.bak" ] && cp "$tmpdir/natssh-ws.service.bak" /etc/systemd/system/natssh-ws.service
