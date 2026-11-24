@@ -516,8 +516,19 @@ sessi_online() {
 
 autokill_manual() {
     # batas utk eksekusi ini: Enter = pakai global (cron), 0 = batal, angka >= 1 = khusus
-    local global=$(crontab -l 2>/dev/null | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+    local selfdir=$(dirname "$(readlink -f "$0")")
+    # Baca global MAX_LOGIN dari .env (sumber tunggal), fallback crontab, fallback 5
+    if [ -f "${selfdir}/config/.env" ] && grep -q "^MAX_LOGIN=" "${selfdir}/config/.env"; then
+        global=$(grep "^MAX_LOGIN=" "${selfdir}/config/.env" | cut -d= -f2)
+    elif crontab -l 2>/dev/null | grep -q "MAX_LOGIN="; then
+        global=$(crontab -l 2>/dev/null | grep -o "MAX_LOGIN=[0-9]*" | head -1 | cut -d= -f2)
+    else
+        global=5
+    fi
     global=${global:-5}
+    if ! [[ "$global" =~ ^[0-9]+$ ]]; then
+        global=5
+    fi
     read -p "Batas perangkat eksekusi ini (Enter = global ${global}, 0 = batal): " max_login
     if [ "$max_login" == "0" ]; then
         echo -e "${YELLOW}Dibatalkan.${NC}"
@@ -563,6 +574,9 @@ autokill_manual() {
     fi
 
     local dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+    local LOG_FILE="/root/natssh/logs/autokill.log"
+    local LOG_DIR="$(dirname "$LOG_FILE")"
+    mkdir -p "$LOG_DIR"
     for pair in $kick_list; do
         local u=${pair%%:*}
 
@@ -574,7 +588,15 @@ autokill_manual() {
             [ -n "$ep" ] && eps="$eps $ep"
         done
         if [ -n "$eps" ]; then
-            echo "$eps" | python3 "$dir/audit_kill.py" "$u" 2>/dev/null
+            AUDIT="$dir/audit_kill.py"
+            if [ -f "$AUDIT" ]; then
+                echo "$eps" | python3 "$AUDIT" "$u" 2>>"$LOG_FILE"
+                if [ $? -ne 0 ]; then
+                    echo "$(date '+%Y-%m-%d %H:%M:%S') - AUDIT ERROR: audit_kill.py gagal untuk $u" >> "$LOG_FILE"
+                fi
+            else
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - PERINGATAN: audit_kill.py tidak ditemukan di $AUDIT" >> "$LOG_FILE"
+            fi
         fi
 
         # Kill sequence: loginctl terminate-user dulu, lalu pkill -KILL
@@ -592,7 +614,7 @@ autokill_manual() {
             echo -e "${RED}Gagal membersihkan semua sshd $u, masih ada sisa.${NC}"
         else
             echo -e "${GREEN}Sukses menendang $u.${NC}"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang manual: $u (melebihi batas ${max_login})" >> /root/natssh/logs/autokill.log
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang manual: $u (melebihi batas ${max_login})" >> "$LOG_FILE"
         fi
     done
     echo -e "${GREEN}Autokill selesai!${NC}"
