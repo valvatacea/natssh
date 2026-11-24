@@ -2246,8 +2246,6 @@ conf_ip() {
     local ip_conf="${DIR}/config/ip.conf"
     local ip_private=""
     local ip_public=""
-    local cur=${HIDE_IP}
-    cur=${cur:-0}
 
     # Ambil IP private (eth0 atau antarmuka utama)
     if command -v ip >/dev/null 2>&1; then
@@ -2262,52 +2260,46 @@ conf_ip() {
     [ -z "$ip_public" ] && ip_public=$(curl -s -m 5 api.ipify.org 2>/dev/null)
     [ -z "$ip_public" ] && ip_public="tidak diketahui"
 
+    # Tentukan status saat ini dari .env
+    if grep -q "^HIDE_IP=1" "${DIR}/config/.env" 2>/dev/null; then
+        new_val=0
+        pesan="NONAKTIF"
+    else
+        new_val=1
+        pesan="AKTIF"
+    fi
+
     echo -e "${YELLOW}---- KONFIGURASI IP & HIDE IP ----${NC}"
     echo -e "IP Private : ${GREEN}${ip_private:-tidak diketahui}${NC}"
     echo -e "IP Publik  : ${GREEN}${ip_public}${NC}"
-    if [ "$cur" = "1" ]; then
-        echo -e "Hide IP    : ${GREEN}ON (IP disembunyikan di kartu akun)${NC}"
-    else
-        echo -e "Hide IP    : ${YELLOW}OFF (IP ditampilkan di kartu akun)${NC}"
+    echo -e "Hide IP    : ${GREEN}AKTIF${NC}"
+    echo -e "${YELLOW}Akan diubah menjadi: ${GREEN}${pesan}${NC}"
+    echo -e "${RED}PERINGATAN: Semua koneksi aktif akan terputus!${NC}"
+    read -p "Yakin toggle Hide IP? Koneksi aktif akan terputus (y/N): " cfr
+    if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
     fi
-    echo ""
-    read -p "Hide IP? (y/N): " v
-    [ -z "$v" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
-    if [[ "$v" =~ ^[Yy]$ ]]; then
-        if [ "$cur" = "1" ]; then
-            echo -e "${YELLOW}Hide IP sudah aktif.${NC}"
+    if [ -f "${DIR}/config/.env" ]; then
+        if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
+            sed -i "s|^HIDE_IP=[01]|HIDE_IP=$new_val|" "${DIR}/config/.env"
         else
-            if [ -f "${DIR}/config/.env" ]; then
-                if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
-                    sed -i "s|^HIDE_IP=.*|HIDE_IP=1|" "${DIR}/config/.env"
-                else
-                    echo "HIDE_IP=1" >> "${DIR}/config/.env"
-                fi
-            else
-                echo "HIDE_IP=1" > "${DIR}/config/.env"
-            fi
-            muat_env
-            echo -e "${GREEN}Hide IP diaktifkan.${NC}"
-        fi
-    elif [[ "$v" =~ ^[Nn]$ ]]; then
-        if [ "$cur" != "1" ]; then
-            echo -e "${YELLOW}Hide IP sudah nonaktif.${NC}"
-        else
-            if [ -f "${DIR}/config/.env" ]; then
-                if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
-                    sed -i "s|^HIDE_IP=.*|HIDE_IP=0|" "${DIR}/config/.env"
-                else
-                    echo "HIDE_IP=0" >> "${DIR}/config/.env"
-                fi
-            else
-                echo "HIDE_IP=0" > "${DIR}/config/.env"
-            fi
-            muat_env
-            echo -e "${GREEN}Hide IP dinonaktifkan.${NC}"
+            echo "HIDE_IP=$new_val" >> "${DIR}/config/.env"
         fi
     else
-        echo -e "${RED}Pilihan tidak valid!${NC}"
+        echo "HIDE_IP=$new_val" > "${DIR}/config/.env"
     fi
+    muat_env
+    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+    systemctl restart natssh-ws
+    sleep 1
+    if systemctl is-active --quiet natssh-ws; then
+        echo -e "${GREEN}SUKSES! Hide IP kini ${pesan}.${NC}"
+    else
+        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+    fi
+    pause
 }
 
 conf_suspend_minutes() {
