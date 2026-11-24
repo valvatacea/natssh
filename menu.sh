@@ -1586,8 +1586,12 @@ conf_nginx_service() {
         garis
         status=$(systemctl is-active nginx 2>/dev/null)
         echo -e "Status saat ini: ${GREEN}${status}${NC}"
-        nginx_port=$(grep "listen" /etc/nginx/sites-available/natssh-ws 2>/dev/null | head -1 | awk '{print $2}' | tr -d ';' || echo "-")
-        echo -e "Port Nginx Reverse: ${YELLOW}${nginx_port}${NC}"
+        if [ -f "${DIR}/config/.env" ] && grep -q "^NGINX_REVERSE_PORT=" "${DIR}/config/.env"; then
+            nginx_port=$(grep "^NGINX_REVERSE_PORT=" "${DIR}/config/.env" | cut -d= -f2)
+        else
+            nginx_port=$(grep "listen" /etc/nginx/sites-available/natssh-ws 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1 || echo "-")
+        fi
+        echo -e "Port Nginx Reverse: ${YELLOW}${nginx_port:-tidak diketahui}${NC}"
         stream_port=$(port_nginx_stream 2>/dev/null || echo "-")
         echo -e "Port Nginx Stream: ${YELLOW}${stream_port}${NC}"
         echo ""
@@ -2726,6 +2730,7 @@ conf_toggle_ssh_direct() {
     else
         echo "NATSSH_SSH_DIRECT_ENABLED=$new_val" > "${DIR}/config/.env"
     fi
+    muat_env
     echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
     systemctl restart natssh-ws
     sleep 1
