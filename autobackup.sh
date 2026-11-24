@@ -8,23 +8,29 @@ mkdir -p "$BACKUP_DIR"
 
 ts=$(date +%Y%m%d_%H%M%S)
 OUT_CFG="$BACKUP_DIR/config_$ts.tar.gz"
+bakdir="${DIR}/tmp_bak_$$"
+mkdir -p "$bakdir"
+
 LIST=""
-[ -f "$DIR/config/.env" ] && LIST="$LIST config/.env"
-[ -d "$DIR/limits" ] && LIST="$LIST limits"
-[ -d "$DIR/banners" ] && LIST="$LIST banners"
-[ -f /etc/issue.net ] && cp /etc/issue.net "$DIR/issue.net.bak" && LIST="$LIST issue.net.bak"
-[ -f /etc/systemd/system/natssh-ws.service ] && cp /etc/systemd/system/natssh-ws.service "$DIR/natssh-ws.service.bak" && LIST="$LIST natssh-ws.service.bak"
+[ -f "$DIR/config/.env" ] && LIST="$LIST $DIR/config/.env"
+[ -d "$DIR/limits" ] && LIST="$LIST $DIR/limits"
+[ -d "$DIR/banners" ] && LIST="$LIST $DIR/banners"
+[ -f /etc/issue.net ] && cp /etc/issue.net "$bakdir/issue.net.bak" && LIST="$LIST $bakdir/issue.net.bak"
+[ -f /etc/systemd/system/natssh-ws.service ] && cp /etc/systemd/system/natssh-ws.service "$bakdir/natssh-ws.service.bak" && LIST="$LIST $bakdir/natssh-ws.service.bak"
+
 cd "$DIR" && tar -czf "$OUT_CFG" $LIST >/dev/null 2>&1
+
+# Bersihkan file .bak sementara
+rm -rf "$bakdir"
 
 # --- Backup akun (portable) ---
 BACKUP_FILE="$BACKUP_DIR/akun_$ts.sh"
 {
   echo "#!/bin/bash"
   echo "# Auto-backup akun NATSSH - $(date)"
-  echo "set -e"
   awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd | while read user; do
-    hash=$(grep "^${user}:" /etc/shadow | cut -d: -f2)
-    exp_days=$(grep "^${user}:" /etc/shadow | cut -d: -f8)
+    hash=$(grep "^${user}:" /etc/shadow 2>/dev/null | cut -d: -f2)
+    exp_days=$(grep "^${user}:" /etc/shadow 2>/dev/null | cut -d: -f8)
     if [ -n "$exp_days" ]; then
       exp_date=$(date -d "1970-01-01 + $exp_days days" +"%Y-%m-%d" 2>/dev/null)
       if [ $? -eq 0 ]; then
