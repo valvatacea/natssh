@@ -1024,36 +1024,7 @@ conf_maxlogin() {
     fi
 }
 
-conf_domain_cf_edit() {
-    # domain CloudFront (jalur AWS) utk kartu akun; DOMAIN_CF di .env — opsional
-    local cur=${DOMAIN_CF}
-    echo -e "Domain CloudFront saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
-    read -p "Domain CloudFront baru (kosong = hapus/sembunyikan, 0 = batal): " h
-    [ "$h" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
-    if [ -z "$h" ]; then
-        if [ -f "${DIR}/config/.env" ]; then
-            if grep -q "^DOMAIN_CF=" "${DIR}/config/.env"; then
-                sed -i "s|^DOMAIN_CF=.*|DOMAIN_CF=$h|" "${DIR}/config/.env"
-            else
-                echo "DOMAIN_CF=" >> "${DIR}/config/.env"
-            fi
-        fi
-        echo -e "${GREEN}Domain CloudFront dihapus — baris 'Domain CF' tak tampil di kartu.${NC}"
-    elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}(:[0-9]+)?$ ]]; then
-        echo -e "${RED}Gagal: format domain salah (contoh: dabcdefgh.cloudfront.net)!${NC}"
-    else
-        if [ -f "${DIR}/config/.env" ]; then
-            if grep -q "^DOMAIN_CF=" "${DIR}/config/.env"; then
-                sed -i "s|^DOMAIN_CF=.*|DOMAIN_CF=$h|" "${DIR}/config/.env"
-            else
-                echo "DOMAIN_CF=$h" >> "${DIR}/config/.env"
-            fi
-        else
-            echo "DOMAIN_CF=$h" > "${DIR}/config/.env"
-        fi
-        echo -e "${GREEN}Domain CloudFront tersimpan: $h — muncul di baris 'Domain CF' kartu akun.${NC}"
-    fi
-}
+
 
 conf_port() {
     cur_port=$(port_ws)
@@ -1373,63 +1344,7 @@ terbitkan_ulang_sertifikat() {
     return 0
 }
 
-conf_domain() {
-    # satu pintu domain: Cloudflare (biasa) + CloudFront — dua-duanya ke kartu akun
-    local cur curcf
-    cur=${DOMAIN}
-    curcf=${DOMAIN_CF}
-    while true; do
-        echo -e "1. Domain (Cloudflare) : ${GREEN}${cur:-OTOMATIS (IP publik)}${NC}"
-        echo -e "2. Domain CloudFront   : ${GREEN}${curcf:-BELUM DIATUR}${NC}"
-        echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-2): " p || exit 0
-        case $p in
-            1) conf_domain_edit ;;
-            2) conf_domain_cf_edit ;;
-            0) return ;;
-            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
-        esac
-        pause
-    done
-}
 
-conf_domain_edit() {
-    # host/domain Cloudflare di kartu akun; DOMAIN di .env (fallback: IP publik)
-    local cur=${DOMAIN}
-    echo -e "Host kartu akun saat ini: ${YELLOW}${cur:-OTOMATIS (IP publik)}${NC}"
-    read -p "Domain/host baru (kosong = otomatis IP, 0 = batal): " h
-    [ "$h" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
-    if [ -z "$h" ]; then
-        if [ -f "${DIR}/config/.env" ]; then
-            if grep -q "^DOMAIN=" "${DIR}/config/.env"; then
-                sed -i "s|^DOMAIN=.*|DOMAIN=$h|" "${DIR}/config/.env"
-            else
-                echo "DOMAIN=" >> "${DIR}/config/.env"
-            fi
-        fi
-        echo -e "${GREEN}Host kembali otomatis (IP publik terdeteksi saat buat akun).${NC}"
-    elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}(:[0-9]+)?$ ]]; then
-        echo -e "${RED}Gagal: format domain/host salah (contoh: vpn.example.com)!${NC}"
-    else
-        if [ -f "${DIR}/config/.env" ]; then
-            if grep -q "^DOMAIN=" "${DIR}/config/.env"; then
-                sed -i "s|^DOMAIN=.*|DOMAIN=$h|" "${DIR}/config/.env"
-            else
-                echo "DOMAIN=$h" >> "${DIR}/config/.env"
-            fi
-        else
-            echo "DOMAIN=$h" > "${DIR}/config/.env"
-        fi
-        echo -e "${GREEN}Domain tersimpan: $h — dipakai otomatis di kartu akun berikutnya.${NC}"
-        echo ""
-        read -p "Terbitkan ulang sertifikat SSL untuk domain ini sekarang? (y/N): " terbit_ssl
-        if [[ "$terbit_ssl" =~ ^[Yy]$ ]]; then
-            terbitkan_ulang_sertifikat
-        else
-            echo -e "${YELLOW}Sertifikat tidak ditampilkan ulang. Jalankan kembali nanti lewat menu ini.${NC}"
-        fi
-    fi
-}
 
 conf_service() {
     while true; do
@@ -3841,15 +3756,14 @@ conf_domain_cf_edit() {
     local cur=${DOMAIN_CF}
     echo -e "Domain CloudFront saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
     read -p "Domain CloudFront baru (kosong = hapus/sembunyikan, 0 = batal): " h
-    [ "$h" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    [ "$h" = "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if [ -z "$h" ]; then
         if [ -f "${DIR}/config/.env" ]; then
             if grep -q "^DOMAIN_CF=" "${DIR}/config/.env"; then
-                sed -i "s|^DOMAIN_CF=.*|DOMAIN_CF=$h|" "${DIR}/config/.env"
-            else
-                echo "DOMAIN_CF=" >> "${DIR}/config/.env"
+                sed -i "/^DOMAIN_CF=/d" "${DIR}/config/.env"
             fi
         fi
+        muat_env
         echo -e "${GREEN}Domain CloudFront dihapus — baris 'Domain CF' tak tampil di kartu.${NC}"
     elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}(:[0-9]+)?$ ]]; then
         echo -e "${RED}Gagal: format domain salah (contoh: dabcdefgh.cloudfront.net)!${NC}"
@@ -3863,6 +3777,7 @@ conf_domain_cf_edit() {
         else
             echo "DOMAIN_CF=$h" > "${DIR}/config/.env"
         fi
+        muat_env
         echo -e "${GREEN}Domain CloudFront tersimpan: $h — muncul di baris 'Domain CF' kartu akun.${NC}"
     fi
 }
@@ -4187,10 +4102,10 @@ terbitkan_ulang_sertifikat() {
 
 conf_domain() {
     # satu pintu domain: Cloudflare (biasa) + CloudFront — dua-duanya ke kartu akun
-    local cur curcf
-    cur=${DOMAIN}
-    curcf=${DOMAIN_CF}
     while true; do
+        local cur curcf
+        cur=${DOMAIN}
+        curcf=${DOMAIN_CF}
         echo -e "1. Domain (Cloudflare) : ${GREEN}${cur:-OTOMATIS (IP publik)}${NC}"
         echo -e "2. Domain CloudFront   : ${GREEN}${curcf:-BELUM DIATUR}${NC}"
         echo -e "${RED}0. Kembali${NC}"
@@ -4201,7 +4116,7 @@ conf_domain() {
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        pause
+        [ "$p" != "0" ] && pause
     done
 }
 
@@ -4210,15 +4125,14 @@ conf_domain_edit() {
     local cur=${DOMAIN}
     echo -e "Host kartu akun saat ini: ${YELLOW}${cur:-OTOMATIS (IP publik)}${NC}"
     read -p "Domain/host baru (kosong = otomatis IP, 0 = batal): " h
-    [ "$h" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    [ "$h" = "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if [ -z "$h" ]; then
         if [ -f "${DIR}/config/.env" ]; then
             if grep -q "^DOMAIN=" "${DIR}/config/.env"; then
-                sed -i "s|^DOMAIN=.*|DOMAIN=$h|" "${DIR}/config/.env"
-            else
-                echo "DOMAIN=" >> "${DIR}/config/.env"
+                sed -i "/^DOMAIN=/d" "${DIR}/config/.env"
             fi
         fi
+        muat_env
         echo -e "${GREEN}Host kembali otomatis (IP publik terdeteksi saat buat akun).${NC}"
     elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}(:[0-9]+)?$ ]]; then
         echo -e "${RED}Gagal: format domain/host salah (contoh: vpn.example.com)!${NC}"
@@ -4232,6 +4146,7 @@ conf_domain_edit() {
         else
             echo "DOMAIN=$h" > "${DIR}/config/.env"
         fi
+        muat_env
         echo -e "${GREEN}Domain tersimpan: $h — dipakai otomatis di kartu akun berikutnya.${NC}"
         echo ""
         read -p "Terbitkan ulang sertifikat SSL untuk domain ini sekarang? (y/N): " terbit_ssl
