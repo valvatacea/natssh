@@ -25,6 +25,12 @@ for f in "$SUSPEND_DIR"/*; do
     user=$(basename "$f")
     exp=$(cat "$f" 2>/dev/null)
     if [[ "$exp" =~ ^[0-9]+$ ]] && [ "$now" -ge "$exp" ]; then
+        # Cek apakah user masih ada di sistem sebelum usermod -U
+        if ! id "$user" &>/dev/null; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - Hapus marker suspensi untuk user tidak ada: $user" >> "$LOG_FILE"
+            rm -f "$f"
+            continue
+        fi
         if usermod -U "$user" 2>/dev/null; then
             rm -f "$f"
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Unsuspend otomatis: $user" >> "$LOG_FILE"
