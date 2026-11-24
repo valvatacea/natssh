@@ -2027,7 +2027,7 @@ conf_maxtotal() {
         cur=150
     fi
     local peak=$(grep -o "total=[0-9]*" "$(dirname "${BASH_SOURCE[0]}")/ws.log" 2>/dev/null | cut -d= -f2 | sort -n | tail -1)
-    echo -e "Batas koneksi serentak (MAX_TOTAL) : ${YELLOW}${cur}${NC} slot"
+    echo -e "Batas koneksi serentak (NATSSH_MAX_TOTAL) : ${YELLOW}${cur}${NC} slot"
     echo -e "Puncak pemakaian sejauh ini        : ${GREEN}${peak:-0}${NC} slot${NC}"
     read -p "Nilai baru (10-200, 0 = batal): " n
     [ "$n" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
@@ -2044,6 +2044,7 @@ conf_maxtotal() {
     else
         echo "NATSSH_MAX_TOTAL=$n" > "${DIR}/config/.env"
     fi
+    muat_env
     echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
     read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr2
     if [[ ! "$cfr2" =~ ^[Yy]$ ]]; then
@@ -2052,7 +2053,7 @@ conf_maxtotal() {
     fi
     systemctl restart natssh-ws
     sleep 1
-    systemctl is-active --quiet natssh-ws &&         echo -e "${GREEN}SUKSES! MAX_TOTAL kini $n slot.${NC}" || \
+    systemctl is-active --quiet natssh-ws &&         echo -e "${GREEN}SUKSES! NATSSH_MAX_TOTAL kini $n slot.${NC}" || \
         echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
 }
 
