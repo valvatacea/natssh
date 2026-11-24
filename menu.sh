@@ -3826,9 +3826,9 @@ terbitkan_ulang_sertifikat() {
 
     echo -e "\n[*] Menerbitkan sertifikat SSL via acme.sh (Cloudflare DNS challenge)..."
     "$HOME/.acme.sh/acme.sh" --issue --dns dns_cf -d "*.${root_domain}" -d "${root_domain}" \
-        --cert-file /etc/nginx/ssl/natssh.crt \
-        --key-file /etc/nginx/ssl/natssh.key \
-        --fullchain-file /etc/nginx/ssl/natssh_fullchain.crt \
+        --cert-file /etc/nginx/ssl/natssh.pem \
+        --key-file /etc/nginx/ssl/natssh_key.pem \
+        --fullchain-file /etc/nginx/ssl/natssh_fullchain.pem \
         --reloadcmd "systemctl reload nginx" || {
         echo -e "${RED}Gagal menerbitkan sertifikat SSL. Sertifikat lama tetap dipakai.${NC}"
         return 1
