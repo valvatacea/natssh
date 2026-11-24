@@ -1014,6 +1014,7 @@ conf_maxlogin() {
         else
             echo "MAX_LOGIN=$max_login" > "${selfdir}/config/.env"
         fi
+        muat_env
         # Bersihkan injeksi MAX_LOGIN= dari crontab autokill; autokill.sh baca dari .env
         if crontab -l 2>/dev/null | grep -q "autokill.sh"; then
             (crontab -l 2>/dev/null | sed 's/MAX_LOGIN=[0-9]* //') | crontab -
