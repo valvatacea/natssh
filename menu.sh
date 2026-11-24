@@ -1082,6 +1082,7 @@ conf_port() {
         else
             echo "NATSSH_WS_PORT=$new_port" > "${DIR}/config/.env"
         fi
+        muat_env
         echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
         read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr
         if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
@@ -2491,6 +2492,7 @@ conf_heartbeat() {
             else
                 echo "NATSSH_TCP_KEEPALIVE=1" > "${DIR}/config/.env"
             fi
+            muat_env
             systemctl daemon-reload
             systemctl restart natssh-ws.service
             echo -e "${GREEN}Heartbeat WS AKTIF.${NC}" ;;
@@ -2504,6 +2506,7 @@ conf_heartbeat() {
             else
                 echo "NATSSH_TCP_KEEPALIVE=0" > "${DIR}/config/.env"
             fi
+            muat_env
             systemctl daemon-reload
             systemctl restart natssh-ws.service
             echo -e "${YELLOW}Heartbeat WS NONAKTIF.${NC}" ;;
