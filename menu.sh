@@ -2242,41 +2242,69 @@ BEOF
     done
 }
 
-conf_hide_ip() {
+conf_ip() {
+    local ip_conf="${DIR}/config/ip.conf"
+    local ip_private=""
+    local ip_public=""
     local cur=${HIDE_IP}
     cur=${cur:-0}
-    echo -e "${YELLOW}---- HIDE IP SAAT BUAT AKUN ----${NC}"
-    if [ "$cur" = "1" ]; then
-        echo -e "Status: ${GREEN}ON (IP disembunyikan)${NC}"
-    else
-        echo -e "Status: ${YELLOW}OFF (IP ditampilkan)${NC}"
+
+    # Ambil IP private (eth0 atau antarmuka utama)
+    if command -v ip >/dev/null 2>&1; then
+        ip_private=$(ip -4 addr show eth0 2>/dev/null | grep -oP 'inet \K[\d.]+' | head -1)
+        if [ -z "$ip_private" ]; then
+            ip_private=$(ip -4 addr show 2>/dev/null | grep -oP 'inet \K[\d.]+' | head -1)
+        fi
     fi
-    read -p "Toggle? (1=ON, 0=OFF, kosong=batal): " v
+
+    # Ambil IP public (coba ifconfig.me, fallback ipify)
+    ip_public=$(curl -s -m 5 ifconfig.me 2>/dev/null)
+    [ -z "$ip_public" ] && ip_public=$(curl -s -m 5 api.ipify.org 2>/dev/null)
+    [ -z "$ip_public" ] && ip_public="tidak diketahui"
+
+    echo -e "${YELLOW}---- KONFIGURASI IP & HIDE IP ----${NC}"
+    echo -e "IP Private : ${GREEN}${ip_private:-tidak diketahui}${NC}"
+    echo -e "IP Publik  : ${GREEN}${ip_public}${NC}"
+    if [ "$cur" = "1" ]; then
+        echo -e "Hide IP    : ${GREEN}ON (IP disembunyikan di kartu akun)${NC}"
+    else
+        echo -e "Hide IP    : ${YELLOW}OFF (IP ditampilkan di kartu akun)${NC}"
+    fi
+    echo ""
+    read -p "Toggle Hide IP? (y/N): " v
     [ -z "$v" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
-    if [ "$v" = "1" ]; then
-        if [ -f "${DIR}/config/.env" ]; then
-            if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
-                sed -i "s|^HIDE_IP=.*|HIDE_IP=1|" "${DIR}/config/.env"
-            else
-                echo "HIDE_IP=1" >> "${DIR}/config/.env"
-            fi
+    if [[ "$v" =~ ^[Yy]$ ]]; then
+        if [ "$cur" = "1" ]; then
+            echo -e "${YELLOW}Hide IP sudah aktif.${NC}"
         else
-            echo "HIDE_IP=1" > "${DIR}/config/.env"
-        fi
-        muat_env
-        echo -e "${GREEN}Hide IP diaktifkan.${NC}"
-    elif [ "$v" = "0" ]; then
-        if [ -f "${DIR}/config/.env" ]; then
-            if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
-                sed -i "s|^HIDE_IP=.*|HIDE_IP=0|" "${DIR}/config/.env"
+            if [ -f "${DIR}/config/.env" ]; then
+                if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
+                    sed -i "s|^HIDE_IP=.*|HIDE_IP=1|" "${DIR}/config/.env"
+                else
+                    echo "HIDE_IP=1" >> "${DIR}/config/.env"
+                fi
             else
-                echo "HIDE_IP=0" >> "${DIR}/config/.env"
+                echo "HIDE_IP=1" > "${DIR}/config/.env"
             fi
-        else
-            echo "HIDE_IP=0" > "${DIR}/config/.env"
+            muat_env
+            echo -e "${GREEN}Hide IP diaktifkan.${NC}"
         fi
-        muat_env
-        echo -e "${GREEN}Hide IP dinonaktifkan.${NC}"
+    elif [[ "$v" =~ ^[Nn]$ ]]; then
+        if [ "$cur" != "1" ]; then
+            echo -e "${YELLOW}Hide IP sudah nonaktif.${NC}"
+        else
+            if [ -f "${DIR}/config/.env" ]; then
+                if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
+                    sed -i "s|^HIDE_IP=.*|HIDE_IP=0|" "${DIR}/config/.env"
+                else
+                    echo "HIDE_IP=0" >> "${DIR}/config/.env"
+                fi
+            else
+                echo "HIDE_IP=0" > "${DIR}/config/.env"
+            fi
+            muat_env
+            echo -e "${GREEN}Hide IP dinonaktifkan.${NC}"
+        fi
     else
         echo -e "${RED}Pilihan tidak valid!${NC}"
     fi
@@ -2770,7 +2798,7 @@ menu_conf() {
         read -p "Pilih (0-14): " p || exit 0
         case $p in
             1) conf_domain ;;
-            2) conf_hide_ip ;;
+            2) conf_ip ;;
             3) conf_service ;;
             4) conf_service_direct ;;
             5) conf_udpgw_service ;;
