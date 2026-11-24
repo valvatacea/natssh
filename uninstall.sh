@@ -37,24 +37,29 @@ rm -f /etc/systemd/system/natssh-udpgw@.service
 systemctl daemon-reload
 echo -e "${GREEN}Service natssh-udpgw berhasil dihapus.${NC}"
 
+echo -e "\\n[*] Menghapus binary badvpn-udpgw..."
+rm -f /usr/local/bin/badvpn-udpgw
+rm -rf /tmp/badvpn-build
+echo -e "${GREEN}Binary badvpn-udpgw berhasil dihapus.${NC}"
+
 echo -e "\n[*] Menghentikan dan menghapus Service nginx..."
 systemctl stop nginx.service 2>/dev/null
 systemctl disable nginx.service 2>/dev/null
 rm -f /etc/nginx/sites-enabled/natssh-ws /etc/nginx/sites-available/natssh-ws
-rm -f /etc/nginx/ssl/natssh.crt /etc/nginx/ssl/natssh.key
+rm -f /etc/nginx/ssl/natssh.pem /etc/nginx/ssl/natssh_key.pem /etc/nginx/ssl/natssh_fullchain.pem
 systemctl daemon-reload
 echo -e "${GREEN}Service nginx berhasil dihapus.${NC}"
 
+echo -e "\\n[*] Membersihkan konfigurasi Nginx Stream (SSH Direct)..."
+rm -f /etc/nginx/stream.conf
+sed -i '/include \/etc\/nginx\/stream\.conf;/d' /etc/nginx/nginx.conf
+nginx -t 2>/dev/null && systemctl reload nginx 2>/dev/null || true
+echo -e "${GREEN}Konfigurasi Nginx Stream dibersihkan.${NC}"
+
 echo -e "\n[*] Membersihkan crontab..."
-(crontab -l 2>/dev/null | grep -v "unsuspend.sh") | crontab - 2>/dev/null
-(crontab -l 2>/dev/null | grep -v "autobackup.sh") | crontab - 2>/dev/null
-(crontab -l 2>/dev/null | grep -v "apply_speed.sh") | crontab - 2>/dev/null
-(crontab -l 2>/dev/null | grep -v "generate_cdn_geo.sh") | crontab - 2>/dev/null
-(crontab -l 2>/dev/null | grep -v "systemctl.*restart.*natssh-ws") | crontab - 2>/dev/null
-(crontab -l 2>/dev/null | grep -v "systemctl.*restart.*natssh-udpgw") | crontab - 2>/dev/null
-(crontab -l 2>/dev/null | grep -v "systemctl.*restart.*nginx") | crontab - 2>/dev/null
-(crontab -l 2>/dev/null | grep -v "sess_audit") | crontab - 2>/dev/null
-(crontab -l 2>/dev/null | grep -v "autokill.sh") | crontab - 2>/dev/null
+crontab_l=$(crontab -l 2>/dev/null)
+crontab_new=$(echo "$crontab_l" | grep -v "unsuspend.sh" | grep -v "autobackup.sh" | grep -v "apply_speed.sh" | grep -v "generate_cdn_geo.sh" | grep -v "systemctl.*restart.*natssh-ws" | grep -v "systemctl.*restart.*natssh-udpgw" | grep -v "systemctl.*restart.*nginx" | grep -v "sess_audit" | grep -v "autokill.sh" | grep -v "acme.sh --cron")
+echo "$crontab_new" | crontab - 2>/dev/null || true
 
 echo -e "\n[*] Merestore sshd_config dari backup (rollback)..."
 if [ -f /etc/ssh/sshd_config.natssh_backup ]; then
@@ -76,6 +81,7 @@ else
     sed -i "/^[#[:space:]]*MaxStartups/d" /etc/ssh/sshd_config
     sed -i "/^[#[:space:]]*UseDNS/d" /etc/ssh/sshd_config
     sed -i "/^[#[:space:]]*Compression/d" /etc/ssh/sshd_config
+sed -i "/^[#[:space:]]*AllowTcpForwarding/d" /etc/ssh/sshd_config
     systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 fi
 
@@ -89,7 +95,7 @@ if [[ "$hapus_file" =~ ^[Yy]$ ]]; then
     read -p "Hapus juga data (issue.net, ws.log, autokill.log, backup, slot banner, conf)? (y/N): " hapus_data
     if [[ "$hapus_data" =~ ^[Yy]$ ]]; then
         rm -f /etc/issue.net /root/natssh/logs/autokill.log /root/backup_akun_ssh.sh
-        rm -rf /root/natssh/banners /root/natssh/logs/ws.log
+        rm -rf /root/natssh/banners /root/natssh/logs/ws.log /etc/nginx/ssl /root/.acme.sh
         rm -f /root/natssh/config/host.conf /root/natssh/config/port.conf /root/natssh/config/ip.conf /root/natssh/config/hide_ip.conf /root/natssh/config/suspend_minutes.conf /root/natssh/config/cdn_geo.conf /root/natssh/config/cf_ips.cache /root/natssh/config/cfront_ips.cache /root/natssh/config/host_cf.conf /root/natssh/config/.env
         rm -rf /root/natssh/limits /root/natssh/logs/conns.json /root/natssh/logs/audit_state.json /root/natssh/logs/audit_sess.log /root/natssh/logs/api.log /root/natssh/logs/autobackup.log /root/natssh/logs/promo.log /root/natssh/config/promo
         echo -e "${GREEN}Data banner/log/backup terhapus.${NC}"
