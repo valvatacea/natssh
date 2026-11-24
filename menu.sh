@@ -2818,6 +2818,7 @@ menu_conf() {
         printf "  %-3s %-46s\n" "4." "Kontrol SSH Direct"
         printf "  %-3s %-46s\\n" "5." "Kontrol UDPGW"
         printf "  %-3s %-46s\\n" "6." "Kontrol Nginx"
+        echo -e "${CYAN}  -- Batas --${NC}"
         printf "  %-3s %-46s\\n" "7." "Login per Akun"
         printf "  %-3s %-46s\\n" "8." "Koneksi Serentak"
         printf "  %-3s %-46s\\n" "9." "Koneksi per IP"
