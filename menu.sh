@@ -746,7 +746,7 @@ menu_monitor() {
 # Direktori backup terpusat
 BACKUP_DIR="/root/natssh_backup"
 
-backup_ekspor() {
+backup_akun() {
     mkdir -p "$BACKUP_DIR"
     local ts=$(date +%Y%m%d_%H%M%S)
     local backup_file="$BACKUP_DIR/akun_$ts.sh"
@@ -1045,7 +1045,7 @@ menu_backup() {
         echo -e "${RED}0. Kembali ke Menu Utama${NC}"
         read -p "Pilih (0-5): " p || exit 0
         case $p in
-            1) backup_ekspor ;;
+            1) backup_akun ;;
             2) backup_config ;;
             3) restore_akun ;;
             4) restore_config ;;
