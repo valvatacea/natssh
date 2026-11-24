@@ -599,11 +599,35 @@ autokill_manual() {
 }
 
 autokill_riwayat() {
-    echo -e "${YELLOW}--- 20 RIWAYAT AUTOKILL TERAKHIR ---${NC}"
-    if [ -f "/root/natssh/logs/autokill.log" ]; then
-        tail -n 20 /root/natssh/logs/autokill.log
-    else
-        echo -e "${RED}Belum ada riwayat autokill saat ini.${NC}"
+    echo -e "${YELLOW}--- RIWAYAT AUTOKILL TERAKHIR ---${NC}"
+    echo ""
+    
+    local log_autokill="/root/natssh/logs/autokill.log"
+    local log_suspend="/root/natssh/logs/suspended_history.log"
+    local found=0
+
+    if [ -f "$log_autokill" ] && [ -s "$log_autokill" ]; then
+        echo -e "${CYAN}--- Autokill Log ---${NC}"
+        tail -n 20 "$log_autokill"
+        echo ""
+        found=1
+    elif [ -f "$log_autokill" ]; then
+        echo -e "${YELLOW}Autokill log kosong.${NC}"
+        echo ""
+    fi
+
+    if [ -f "$log_suspend" ] && [ -s "$log_suspend" ]; then
+        echo -e "${CYAN}--- Riwayat Suspend (otomatis) ---${NC}"
+        tail -n 20 "$log_suspend"
+        echo ""
+        found=1
+    elif [ -f "$log_suspend" ]; then
+        echo -e "${YELLOW}Riwayat suspend kosong.${NC}"
+        echo ""
+    fi
+
+    if [ "$found" -eq 0 ]; then
+        echo -e "${RED}Belum ada riwayat autokill atau suspend.${NC}"
     fi
 }
 
