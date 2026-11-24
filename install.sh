@@ -9,6 +9,17 @@ YELLOW='\u001b[0;33m'
 CYAN='\u001b[0;36m'
 NC='\u001b[0m'
 
+# ── Helper: tulis/perbarui key=value ke config/.env tanpa duplikasi ──
+env_set() {
+    local key="$1" val="$2" env_file="${DIR}/config/.env"
+    mkdir -p "$(dirname "$env_file")"
+    if grep -q "^${key}=" "$env_file" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${val}|" "$env_file"
+    else
+        echo "${key}=${val}" >> "$env_file"
+    fi
+}
+
 # Ekstraksi root domain menggunakan Public Suffix List (unduh dari publicsuffix.org)
 extract_root_domain() {
     local domain="$1"
@@ -26,7 +37,7 @@ extract_root_domain() {
         line_count=$((line_count + 1))
         # Progress tiap 2000 baris
         if [ $((line_count % 2000)) -eq 0 ]; then
-            echo -e "${YELLOW}   ... memproses baris ke-$line_count${NC}"
+            echo -e "${YELLOW}   ... memproses baris ke-$line_count${NC}" >&2
         fi
 
         # Trim whitespace (bash only, tidak pakai sed)
@@ -59,7 +70,7 @@ extract_root_domain() {
         fi
     done < "$psl_file"
 
-    echo -e "${GREEN}   Selesai memproses $line_count baris PSL${NC}"
+    echo -e "${GREEN}   Selesai memproses $line_count baris PSL${NC}" >&2
 
     if [ -n "$best_suffix" ]; then
         # Ekstrak root domain: hilangkan label di depan sampai tersisa best_len label
@@ -84,7 +95,16 @@ if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Tolong jalankan skrip ini sebagai root (sudo -i).${NC}"
   exit 1
 fi
-ulimit -n 65535
+
+# ── Idempotensi: jangan install ulang tanpa konfirmasi ──
+if [ -f "$DIR/config/.env" ] || [ -f /etc/systemd/system/natssh-ws.service ]; then
+    echo -e "${YELLOW}Peringatan: natssh sudah terinstal di $DIR${NC}"
+    read -p "Lanjutkan install ulang? Semua konfigurasi akan ditimpa. (y/N): " reinstall_confirm
+    if [[ ! "$reinstall_confirm" =~ ^[Yy]$ ]]; then
+        echo -e "${RED}Instalasi dibatalkan.${NC}"
+        exit 0
+    fi
+fi
 
 ulimit -n 65535
 
@@ -162,7 +182,7 @@ _rollback_env() {
 }
 trap '_rollback_env' EXIT
 
-echo "DOMAIN=$ssl_domain" >> "$DIR/config/.env"
+env_set "DOMAIN" "$ssl_domain"
 echo -e "${GREEN}Domain disimpan ke $DIR/config/.env${NC}"
 
 # Ekstraksi root domain via Public Suffix List, fallback ke .env jika gagal
@@ -219,7 +239,7 @@ wget -qO "$DIR/audit_kill.py" https://raw.githubusercontent.com/valvatacea/natss
 wget -qO "$DIR/ws_match.py" https://raw.githubusercontent.com/valvatacea/natssh/main/ws_match.py
 wget -qO "$DIR/generate_cdn_geo.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/generate_cdn_geo.sh
 
-for f in menu.sh ws.py autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh apply_cf_marks.sh promo_rotate.sh sess_audit.py reap.py audit_kill.py ws_match.py generate_cdn_geo.sh; do
+for f in menu.sh ws.py autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply_speed.sh promo_rotate.sh sess_audit.py reap.py audit_kill.py ws_match.py generate_cdn_geo.sh; do
     [ -s "$DIR/$f" ] || { echo "Gagal mengunduh $f (repo privat/offline?)"; exit 1; }
 done
 echo -e "\n[*] Port WebSocket akan disetel via Environment systemd (ws.py v2): ${ws_port}"
@@ -251,19 +271,19 @@ systemctl start natssh-ws.service
 echo -e "${GREEN}Service natssh-ws berhasil dibuat dan dijalankan!${NC}"
 
 # Simpan semua konfigurasi natssh ke .env
-echo "NATSSH_WS_PORT=$ws_port" >> "$DIR/config/.env"
-echo "NATSSH_MAX_TOTAL=150" >> "$DIR/config/.env"
-echo "NATSSH_SSH_DIRECT_ENABLED=1" >> "$DIR/config/.env"
-echo "NATSSH_SSH_DIRECT_PORT=$direct_port" >> "$DIR/config/.env"
-echo "NATSSH_PROXY_PROTOCOL=1" >> "$DIR/config/.env"
-echo "NATSSH_TCP_HEARTBEAT=1" >> "$DIR/config/.env"
-echo "NATSSH_IDLE_TIMEOUT=300" >> "$DIR/config/.env"
-echo "NATSSH_MAX_CONN_AGE=3600" >> "$DIR/config/.env"
-echo "NATSSH_SSH_PORT=22" >> "$DIR/config/.env"
-echo "MAX_LOGIN=$max_login" >> "$DIR/config/.env"
-echo "NATSSH_MAX_PER_IP=15" >> "$DIR/config/.env"
-echo "IFACE=eth0" >> "$DIR/config/.env"
-echo "MODE=cdn-split" >> "$DIR/config/.env"
+env_set "NATSSH_WS_PORT" "$ws_port"
+env_set "NATSSH_MAX_TOTAL" "150"
+env_set "NATSSH_SSH_DIRECT_ENABLED" "1"
+env_set "NATSSH_SSH_DIRECT_PORT" "$direct_port"
+env_set "NATSSH_PROXY_PROTOCOL" "1"
+env_set "NATSSH_TCP_HEARTBEAT" "1"
+env_set "NATSSH_IDLE_TIMEOUT" "300"
+env_set "NATSSH_MAX_CONN_AGE" "3600"
+env_set "NATSSH_SSH_PORT" "22"
+env_set "MAX_LOGIN" "$max_login"
+env_set "NATSSH_MAX_PER_IP" "15"
+env_set "IFACE" "eth0"
+env_set "MODE" "cdn-split"
 
 udpgw_ports="7100 7200 7300 7400 7500"
 
@@ -396,40 +416,16 @@ fi
 
 # Simpan kredensial ke config/.env
 if [ -n "${CF_Token}" ]; then
-    if [ -f "$DIR/config/.env" ]; then
-        if grep -q "^CF_Token=" "$DIR/config/.env"; then
-            sed -i "s|^CF_Token=.*|CF_Token=${CF_Token}|" "$DIR/config/.env"
-        else
-            echo "CF_Token=${CF_Token}" >> "$DIR/config/.env"
-        fi
-    else
-        echo "CF_Token=${CF_Token}" > "$DIR/config/.env"
-    fi
+    env_set "CF_Token" "${CF_Token}"
     echo -e "${GREEN}Cloudflare API Token disimpan ke config/.env${NC}"
 fi
 
 if [ -n "${CF_Key}" ]; then
-    if [ -f "$DIR/config/.env" ]; then
-        if grep -q "^CF_Key=" "$DIR/config/.env"; then
-            sed -i "s|^CF_Key=.*|CF_Key=${CF_Key}|" "$DIR/config/.env"
-        else
-            echo "CF_Key=${CF_Key}" >> "$DIR/config/.env"
-        fi
-    else
-        echo "CF_Key=${CF_Key}" > "$DIR/config/.env"
-    fi
+    env_set "CF_Key" "${CF_Key}"
     if [ -n "${CF_Email}" ]; then
-        if [ -f "$DIR/config/.env" ]; then
-            if grep -q "^CF_Email=" "$DIR/config/.env"; then
-                sed -i "s|^CF_Email=.*|CF_Email=${CF_Email}|" "$DIR/config/.env"
-            else
-                echo "CF_Email=${CF_Email}" >> "$DIR/config/.env"
-            fi
-        else
-            echo "CF_Email=${CF_Email}" > "$DIR/config/.env"
-        fi
-        echo -e "${GREEN}Cloudflare API Key + Email disimpan ke config/.env${NC}"
+        env_set "CF_Email" "${CF_Email}"
     fi
+    echo -e "${GREEN}Cloudflare API Key + Email disimpan ke config/.env${NC}"
 fi
 
 if [ -z "$CF_Token" ] && [ -z "${CF_Key}" ]; then
@@ -552,8 +548,8 @@ echo -e "${GREEN}Service natssh-speed disiapkan (belum diaktifkan). Aktif setela
 
 echo -e "\n[*] Mengatur Cronjob untuk Autokill..."
 if ! crontab -l 2>/dev/null | grep -q "autokill.sh"; then
-    (crontab -l 2>/dev/null; echo "*/1 * * * * MAX_LOGIN=$max_login $DIR/autokill.sh") | crontab -
-    echo "SUSPEND_MINUTES=15" >> "$DIR/config/.env"
+    (crontab -l 2>/dev/null; echo "*/1 * * * * $DIR/autokill.sh") | crontab -
+    env_set "SUSPEND_MINUTES" "15"
     echo -e "${GREEN}Cronjob Autokill berhasil ditambahkan (berjalan setiap 1 menit).${NC}"
 else
     echo -e "${GREEN}Cronjob Autokill sudah ada.${NC}"
@@ -562,7 +558,7 @@ fi
 if ! crontab -l 2>/dev/null | grep -q "unsuspend.sh"; then
     (crontab -l 2>/dev/null; echo "* * * * * $DIR/unsuspend.sh >> $DIR/logs/autokill.log 2>&1") | crontab -
 fi
-[ -f "$DIR/config/.env" ] || echo "SUSPEND_MINUTES=15" >> "$DIR/config/.env"
+[ -f "$DIR/config/.env" ] || env_set "SUSPEND_MINUTES" "15"
 
 if ! crontab -l 2>/dev/null | grep -q "sess_audit"; then
     (crontab -l 2>/dev/null; echo "*/2 * * * * /usr/bin/python3 $DIR/sess_audit.py >/dev/null 2>&1") | crontab -
