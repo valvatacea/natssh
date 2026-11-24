@@ -3,10 +3,21 @@
 # Semua timestamp log unsuspend pakai WIB (GMT+7)
 export TZ=Asia/Jakarta
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export LC_ALL=C
+
 SUSPEND_DIR="/root/natssh/suspended"
 LOG_FILE="/root/natssh/logs/autokill.log"
 LOG_DIR="$(dirname "$LOG_FILE")"
 mkdir -p "$LOG_DIR"
+
+# Flock: mencegah overlap jika cron jalankan sambil yang lain masih berjalan
+LOCK_FILE="$LOG_DIR/unsuspend.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Unsuspend sudah berjalan, lewati." >> "$LOG_FILE"
+    exit 0
+fi
+
 [ -d "$SUSPEND_DIR" ] || exit 0
 now=$(date +%s)
 for f in "$SUSPEND_DIR"/*; do
