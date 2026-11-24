@@ -777,7 +777,11 @@ backup_ekspor() {
     for user in $natssh_users; do
         if [ -f "/root/natssh/limits/$user" ]; then
             lim=$(cat "/root/natssh/limits/$user" 2>/dev/null)
-            echo "echo "$lim" > /root/natssh/limits/$user" >> "$backup_file"
+            echo "if [ ! -f "/root/natssh/limits/$user" ]; then" >> "$backup_file"
+            echo "    echo "$lim" > /root/natssh/limits/$user" >> "$backup_file"
+            echo "else" >> "$backup_file"
+            echo "    echo "Limits $user sudah ada, dilewati."" >> "$backup_file"
+            echo "fi" >> "$backup_file"
         fi
     done
 
@@ -791,14 +795,28 @@ backup_ekspor() {
         if [ -n "$exp_days" ]; then
             exp_date=$(date -d "1970-01-01 + $exp_days days" +"%Y-%m-%d" 2>/dev/null)
             if [ $? -eq 0 ]; then
-                echo "useradd -e "$exp_date" -m -s /bin/false "$user"" >> "$backup_file"
+                echo "if ! id "$user" >/dev/null 2>&1; then" >> "$backup_file"
+                echo "    useradd -e "$exp_date" -m -s /bin/false "$user"" >> "$backup_file"
+                echo "    usermod -p '$hash' "$user"" >> "$backup_file"
+                echo "else" >> "$backup_file"
+                echo "    echo "User $user sudah ada, dilewati."" >> "$backup_file"
+                echo "fi" >> "$backup_file"
             else
-                echo "useradd -m -s /bin/false "$user"" >> "$backup_file"
+                echo "if ! id "$user" >/dev/null 2>&1; then" >> "$backup_file"
+                echo "    useradd -m -s /bin/false "$user"" >> "$backup_file"
+                echo "    usermod -p '$hash' "$user"" >> "$backup_file"
+                echo "else" >> "$backup_file"
+                echo "    echo "User $user sudah ada, dilewati."" >> "$backup_file"
+                echo "fi" >> "$backup_file"
             fi
         else
-            echo "useradd -m -s /bin/false "$user"" >> "$backup_file"
+            echo "if ! id "$user" >/dev/null 2>&1; then" >> "$backup_file"
+            echo "    useradd -m -s /bin/false "$user"" >> "$backup_file"
+            echo "    usermod -p '$hash' "$user"" >> "$backup_file"
+            echo "else" >> "$backup_file"
+            echo "    echo "User $user sudah ada, dilewati."" >> "$backup_file"
+            echo "fi" >> "$backup_file"
         fi
-        echo "usermod -p '$hash' "$user"" >> "$backup_file"
         count=$((count + 1))
     done
 

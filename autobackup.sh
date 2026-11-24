@@ -34,20 +34,42 @@ BACKUP_FILE="$BACKUP_DIR/akun_$ts.sh"
     if [ -n "$exp_days" ]; then
       exp_date=$(date -d "1970-01-01 + $exp_days days" +"%Y-%m-%d" 2>/dev/null)
       if [ $? -eq 0 ]; then
-        echo "useradd -e \"$exp_date\" -m -s /bin/false \"$user\""
+        echo "if ! id \"$user\" >/dev/null 2>&1; then"
+        echo "    useradd -e \"$exp_date\" -m -s /bin/false \"$user\""
+        echo "    usermod -p '$hash' \"$user\""
+        echo "else"
+        echo "    echo \"User $user sudah ada, dilewati.\""
+        echo "fi"
       else
-        echo "useradd -m -s /bin/false \"$user\""
+        echo "if ! id \"$user\" >/dev/null 2>&1; then"
+        echo "    useradd -m -s /bin/false \"$user\""
+        echo "    usermod -p '$hash' \"$user\""
+        echo "else"
+        echo "    echo \"User $user sudah ada, dilewati.\""
+        echo "fi"
       fi
     else
-      echo "useradd -m -s /bin/false \"$user\""
+      echo "if ! id \"$user\" >/dev/null 2>&1; then"
+      echo "    useradd -m -s /bin/false \"$user\""
+      echo "    usermod -p '$hash' \"$user\""
+      echo "else"
+      echo "    echo \"User $user sudah ada, dilewati.\""
+      echo "fi"
     fi
-    echo "usermod -p '$hash' \"$user\""
   done
   echo ""
   echo "# --- Batas perangkat per akun ---"
   echo "mkdir -p /root/natssh/limits"
   for f in /root/natssh/limits/*; do
-    [ -f "$f" ] && echo "echo \"$(cat "$f" 2>/dev/null)\" > /root/natssh/limits/$(basename "$f")"
+    if [ -f "$f" ]; then
+      lim=$(cat "$f" 2>/dev/null)
+      name=$(basename "$f")
+      echo "if [ ! -f \"/root/natssh/limits/$name\" ]; then"
+      echo "    echo \"$lim\" > /root/natssh/limits/$name"
+      echo "else"
+      echo "    echo \"Limits $name sudah ada, dilewati.\""
+      echo "fi"
+    fi
   done
 } > "$BACKUP_FILE"
 chmod 700 "$BACKUP_FILE"
