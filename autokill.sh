@@ -11,11 +11,19 @@ if [ -f "$(dirname "$(readlink -f "$0")")/config/.env" ]; then
 fi
 
 MAX_LOGIN="${MAX_LOGIN:-5}" # batas perangkat global; env MAX_LOGIN disuntik cron; khusus per akun di limits/<user>
+if ! [[ "$MAX_LOGIN" =~ ^[0-9]+$ ]]; then
+    MAX_LOGIN=5
+fi
 
 LOG_FILE="/root/natssh/logs/autokill.log"
+LOG_DIR="$(dirname "$LOG_FILE")"
+mkdir -p "$LOG_DIR"
 MAX_LOG_SIZE=512000 # 500KB
 SUSPEND_DIR="/root/natssh/suspended"
 SUSPEND_MINUTES="${SUSPEND_MINUTES:-15}"
+if ! [[ "$SUSPEND_MINUTES" =~ ^[0-9]+$ ]]; then
+    SUSPEND_MINUTES=15
+fi
 SUSPEND_SEC=$(( SUSPEND_MINUTES * 60 ))
 mkdir -p "$SUSPEND_DIR"
 
@@ -30,7 +38,15 @@ if [ -f "$LOG_FILE" ]; then
 fi
 
 # ── REAPER: bunuh sesi sshd hantu (soket bridge mati, proses hidup) ──
-"$(dirname "$(readlink -f "$0")")/reap.py" 2>/dev/null
+REAPER="$(dirname "$(readlink -f "$0")")/reap.py"
+if [ -f "$REAPER" ]; then
+    python3 "$REAPER" 2>>"$LOG_FILE"
+    if [ $? -ne 0 ]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - REAPER ERROR: reap.py gagal dieksekusi" >> "$LOG_FILE"
+    fi
+else
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - PERINGATAN: reap.py tidak ditemukan di $REAPER" >> "$LOG_FILE"
+fi
 
 # 1 sesi SSH tunnel = 1 proses user-owned ("sshd: user"); pasangan "[priv]" milik ROOT
 # (terbuang oleh grep -v root) -> perangkat = count langsung, JANGAN dibagi 2
@@ -66,7 +82,15 @@ ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | un
                 e=$(date -d "$st" +%s 2>/dev/null)
                 [ -n "$e" ] && eps="$eps $e"
             done
-            printf '%s\n' $eps | python3 "$(dirname "$(readlink -f "$0")")/audit_kill.py" "$user" 2>/dev/null
+            AUDIT="$(dirname "$(readlink -f "$0")")/audit_kill.py"
+            if [ -f "$AUDIT" ]; then
+                printf '%s\n' $eps | python3 "$AUDIT" "$user" 2>>"$LOG_FILE"
+                if [ $? -ne 0 ]; then
+                    echo "$(date '+%Y-%m-%d %H:%M:%S') - AUDIT ERROR: audit_kill.py gagal untuk $user" >> "$LOG_FILE"
+                fi
+            else
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - PERINGATAN: audit_kill.py tidak ditemukan di $AUDIT" >> "$LOG_FILE"
+            fi
             pkill -u "$user" sshd
             usermod -L "$user" 2>/dev/null
             echo $(( $(date +%s) + SUSPEND_SEC )) > "$SUSPEND_DIR/$user"
