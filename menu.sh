@@ -2766,13 +2766,37 @@ menu_conf() {
     while true; do
         clear
         garis
+        echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
+        garis
         echo -e "${CYAN}  -- Domain/IP --${NC}"
-        printf "  %-3s %-46s\\\\n\" \"1.\" \"Domain/Host\"\n        printf "  %-3s %-46s\\\\n\" \"2.\" \"IP Address\"\n        printf "  %-3s %-46s\\\\n\" \"3.\" \"Toggle Hide IP\"\n        echo -e "${CYAN}  -- Layanan --${NC}"
-        printf "  %-3s %-46s\\\\n\" \"4.\" \"Kontrol SSH WS\"\n        printf "  %-3s %-46s\\n\" \"5.\" \"Kontrol SSH Direct\"\n        printf "  %-3s %-46s\\\\n\" \"6.\" \"Kontrol UDPGW\"\n        printf "  %-3s %-46s\\\\n\" \"7.\" \"Kontrol Nginx\"\n        echo -e "${CYAN}  -- Batas --${NC}"
-        printf "  %-3s %-46s\\\\n\" \"8.\" \"Login per Akun\"\n        printf "  %-3s %-46s\\\\n\" \"9.\" \"Koneksi Serentak\"\n        printf "  %-3s %-46s\\\\n\" \"10.\" \"Koneksi per IP\"\n        printf "  %-3s %-46s\\\\n\" \"11.\" \"Limit Speed\"\n        echo -e "${CYAN}  -- Lainnya --${NC}"
-        printf "  %-3s %-46s\\\\n\" \"12.\" \"Penjadwalan\"\n        printf "  %-3s %-46s\\\\n\" \"13.\" \"Banner Pelanggan\"\n        printf "  %-3s %-46s\\\\n\" \"14.\" \"Durasi Suspend\"\n        printf "  %-3s %-46s\\\\n\" \"15.\" \"Test Ping\"\n        read -p "Pilih (0-15): " p || exit 0
+        printf "  %-3s %-46s\n" "1." "Domain/Host"
+        printf "  %-3s %-46s\n" "2." "IP Address"
+        printf "  %-3s %-46s\n" "3." "Toggle Hide IP"
+        echo -e "${CYAN}  -- Layanan --${NC}"
+        printf "  %-3s %-46s\n" "4." "Kontrol SSH WS"
+        printf "  %-3s %-46s\n" "5." "Kontrol SSH Direct"
+        printf "  %-3s %-46s\n" "6." "Kontrol UDPGW"
+        printf "  %-3s %-46s\n" "7." "Kontrol Nginx"
+        echo -e "${CYAN}  -- Batas --${NC}"
+        printf "  %-3s %-46s\n" "8." "Login per Akun"
+        printf "  %-3s %-46s\n" "9." "Koneksi Serentak"
+        printf "  %-3s %-46s\n" "10." "Koneksi per IP"
+        printf "  %-3s %-46s\n" "11." "Limit Speed"
+        echo -e "${CYAN}  -- Lainnya --${NC}"
+        printf "  %-3s %-46s\n" "12." "Penjadwalan"
+        printf "  %-3s %-46s\n" "13." "Banner Pelanggan"
+        printf "  %-3s %-46s\n" "14." "Durasi Suspend"
+        printf "  %-3s %-46s\n" "15." "Test Ping"
+        read -p "Pilih (0-15): " p || exit 0
         case $p in
-            1) conf_domain ;;\n            2) conf_ip ;;\n            3) conf_ip_toggle ;;\n            4) conf_service ;;\n            5) conf_service_direct ;;\n            6) conf_udpgw_service ;;\n            7) conf_nginx_service ;;\n            8) conf_maxlogin ;;
+            1) conf_domain ;;
+            2) conf_ip ;;
+            3) conf_ip_toggle ;;
+            4) conf_service ;;
+            5) conf_service_direct ;;
+            6) conf_udpgw_service ;;
+            7) conf_nginx_service ;;
+            8) conf_maxlogin ;;
             9) conf_maxperip ;;
             10) conf_speed ;;
             11) conf_restart_schedule ;;
@@ -2785,6 +2809,7 @@ menu_conf() {
         [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "3" ] && [ "$p" != "4" ] && [ "$p" != "5" ] && [ "$p" != "6" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && pause
     done
 }
+
 
 promo_menu() {
     while true; do
