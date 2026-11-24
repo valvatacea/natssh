@@ -2272,7 +2272,11 @@ conf_ip() {
     echo -e "${YELLOW}---- KONFIGURASI IP & HIDE IP ----${NC}"
     echo -e "IP Private : ${GREEN}${ip_private:-tidak diketahui}${NC}"
     echo -e "IP Publik  : ${GREEN}${ip_public}${NC}"
-    echo -e "Hide IP    : ${GREEN}AKTIF${NC}"
+    if [ "$new_val" = "1" ]; then
+        echo -e "Hide IP    : ${RED}NONAKTIF${NC}"
+    else
+        echo -e "Hide IP    : ${GREEN}AKTIF${NC}"
+    fi
     echo -e "${YELLOW}Akan diubah menjadi: ${GREEN}${pesan}${NC}"
     echo -e "${RED}PERINGATAN: Semua koneksi aktif akan terputus!${NC}"
     read -p "Yakin toggle Hide IP? Koneksi aktif akan terputus (y/N): " cfr
