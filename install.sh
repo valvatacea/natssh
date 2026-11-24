@@ -467,7 +467,7 @@ server {
     listen ${nginx_port} ssl;
     server_name _;
 
-    ssl_certificate /etc/nginx/ssl/natssh.pem;
+    ssl_certificate /etc/nginx/ssl/natssh_fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/natssh_key.pem;
 
     location / {
