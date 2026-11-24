@@ -572,6 +572,13 @@ if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-ws"; then
     (crontab -l 2>/dev/null; echo "0 4 * * * /usr/bin/systemctl restart natssh-ws >/dev/null 2>&1") | crontab -
 fi
 
+if ! crontab -l 2>/dev/null | grep -q "acme.sh --cron"; then
+    (crontab -l 2>/dev/null; echo "0 2 * * * /root/.acme.sh/acme.sh --cron --home /root/.acme.sh >> /var/log/acme-renew.log 2>&1") | crontab -
+    echo -e "${GREEN}Cronjob acme.sh auto-renew berhasil ditambahkan (berjalan setiap jam 02:00).${NC}"
+else
+    echo -e "${GREEN}Cronjob acme.sh auto-renew sudah ada.${NC}"
+fi
+
 if ! crontab -l 2>/dev/null | grep -q "systemctl.*restart.*natssh-udpgw"; then
     (crontab -l 2>/dev/null; echo "0 4,15 * * * /usr/bin/systemctl restart 'natssh-udpgw@*' >/dev/null 2>&1") | crontab -
 fi
