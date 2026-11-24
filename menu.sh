@@ -940,6 +940,20 @@ restore_config() {
 
         muat_env
         systemctl daemon-reload 2>/dev/null
+
+        # Terapkan port nginx dari .env ke konfigurasi nginx yang aktif
+        if [ -f "${DIR}/config/.env" ] && [ -f /etc/nginx/sites-enabled/natssh-ws ]; then
+            nginx_reverse=$(grep "^NGINX_REVERSE_PORT=" "${DIR}/config/.env" 2>/dev/null | cut -d= -f2)
+            if [ -n "$nginx_reverse" ]; then
+                sed -i "s/^    listen [0-9]* ssl;/    listen ${nginx_reverse} ssl;/" /etc/nginx/sites-enabled/natssh-ws
+            fi
+            if nginx -t >/dev/null 2>&1; then
+                systemctl reload nginx
+            else
+                echo -e "${RED}Konfigurasi nginx gagal diuji. Periksa /etc/nginx/sites-enabled/natssh-ws${NC}"
+            fi
+        fi
+
         echo -e "${GREEN}SUKSES! Konfigurasi direstore.${NC}"
         echo ""
         read -p "Restart natssh-ws sekarang agar perubahan berlaku? (y/N): " restart_ns || true
