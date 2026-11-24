@@ -2,6 +2,27 @@
 # Semua timestamp log autokill pakai WIB (GMT+7)
 export TZ=Asia/Jakarta
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export LC_ALL=C
+
+LOG_FILE="/root/natssh/logs/autokill.log"
+LOG_DIR="$(dirname "$LOG_FILE")"
+mkdir -p "$LOG_DIR"
+
+# Flock: mencegah overlap jika cron jalankan sambil yang lain masih berjalan
+LOCK_FILE="$LOG_DIR/autokill.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Autokill sudah berjalan, lewati." >> "$LOG_FILE"
+    exit 0
+fi
+MAX_LOG_SIZE=512000 # 500KB
+SUSPEND_DIR="/root/natssh/suspended"
+SUSPEND_MINUTES="${SUSPEND_MINUTES:-15}"
+if ! [[ "$SUSPEND_MINUTES" =~ ^[0-9]+$ ]]; then
+    SUSPEND_MINUTES=15
+fi
+SUSPEND_SEC=$(( SUSPEND_MINUTES * 60 ))
+mkdir -p "$SUSPEND_DIR"
 
 # Muat konfigurasi terpusat dari config/.env (jika ada)
 if [ -f "$(dirname "$(readlink -f "$0")")/config/.env" ]; then
@@ -15,25 +36,13 @@ if ! [[ "$MAX_LOGIN" =~ ^[0-9]+$ ]]; then
     MAX_LOGIN=5
 fi
 
-LOG_FILE="/root/natssh/logs/autokill.log"
-LOG_DIR="$(dirname "$LOG_FILE")"
-mkdir -p "$LOG_DIR"
-MAX_LOG_SIZE=512000 # 500KB
-SUSPEND_DIR="/root/natssh/suspended"
-SUSPEND_MINUTES="${SUSPEND_MINUTES:-15}"
-if ! [[ "$SUSPEND_MINUTES" =~ ^[0-9]+$ ]]; then
-    SUSPEND_MINUTES=15
-fi
-SUSPEND_SEC=$(( SUSPEND_MINUTES * 60 ))
-mkdir -p "$SUSPEND_DIR"
-
 # Memastikan ukuran log tidak membengkak
 if [ -f "$LOG_FILE" ]; then
     FILE_SIZE=$(stat -c%s "$LOG_FILE")
     if [ "$FILE_SIZE" -gt "$MAX_LOG_SIZE" ]; then
-        # Kosongkan file log jika sudah terlalu besar
-        > "$LOG_FILE"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - Log dibersihkan secara otomatis (mencapai batas ukuran)." >> "$LOG_FILE"
+        # Rotasi: simpan 200 baris terakhir, bukan kosongkan total
+        tail -n 200 "$LOG_FILE" > "$LOG_FILE.tmp" && mv "$LOG_FILE.tmp" "$LOG_FILE"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Log dirotasi (menyimpan 200 baris terakhir) karena mencapai batas ukuran." >> "$LOG_FILE"
     fi
 fi
 
@@ -51,7 +60,7 @@ fi
 # 1 sesi SSH tunnel = 1 proses user-owned ("sshd: user"); pasangan "[priv]" milik ROOT
 # (terbuang oleh grep -v root) -> perangkat = count langsung, JANGAN dibagi 2
 LIMITS_DIR="$(dirname "$(readlink -f "$0")")/limits"
-ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | uniq -c | while read count user; do
+ps -eo user:128=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | uniq -c | while read count user; do
     if id "$user" &>/dev/null; then
         # Jangan reset suspend yang masih berlaku
         if [ -f "$SUSPEND_DIR/$user" ]; then
@@ -74,6 +83,11 @@ ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | un
             fi
         fi
         if [ "$shell" == "/bin/false" ] && [ "$devices" -gt "$limit" ]; then
+            # Hitung ulang sebelum tendang (hindari race condition: user mungkin sudah logout)
+            devices_now=$(pgrep -u "$user" sshd 2>/dev/null | wc -l)
+            if [ "$devices_now" -le "$limit" ]; then
+                continue
+            fi
             # audit dulu sebelum tendang (tandai killed agar tidak duplikat)
             eps=""
             for pid in $(pgrep -u "$user" sshd); do
@@ -95,7 +109,7 @@ ps -eo user:32=,comm= | awk '$2 ~ /sshd/ && $1 != "root" {print $1}' | sort | un
             usermod -L "$user" 2>/dev/null
             echo $(( $(date +%s) + SUSPEND_SEC )) > "$SUSPEND_DIR/$user"
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang & suspend ${SUSPEND_MINUTES}m: $user ($devices perangkat, batas $limit)" >> "$LOG_FILE"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - SUSPEND: $user ($devices perangkat, batas $limit, expired $(date -d @$(( $(date +%s) + SUSPEND_SEC )) '+%Y-%m-%d %H:%M:%S'))" >> /root/natssh/logs/suspended_history.log
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - SUSPEND: $user ($devices perangkat, batas $limit, expired $(date -d @$(( $(date +%s) + SUSPEND_SEC )) '+%Y-%m-%d %H:%M:%S'))" >> "$LOG_DIR/suspended_history.log"
         fi
     fi
 done
