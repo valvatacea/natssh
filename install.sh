@@ -105,6 +105,7 @@ if [ -f "$DIR/config/.env" ] || [ -f /etc/systemd/system/natssh-ws.service ]; th
         exit 0
     fi
 fi
+## Fase 1: Setup & Validasi Awal (selesai)
 
 ulimit -n 65535
 
@@ -223,6 +224,7 @@ if [ "$root_domain" = "$ssl_domain" ]; then
         echo -e "${RED}Instalasi dibatalkan.${NC}"; exit 1
     fi
 fi
+## Fase 2: Ekstraksi Domain & Public Suffix List (selesai)
 
 echo -e "\n[*] Mengunduh file dari repositori..."
 wget -qO "$DIR/menu.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/menu.sh
@@ -243,6 +245,7 @@ for f in menu.sh ws.py autokill.sh unsuspend.sh autobackup.sh uninstall.sh apply
     [ -s "$DIR/$f" ] || { echo "Gagal mengunduh $f (repo privat/offline?)"; exit 1; }
 done
 echo -e "\n[*] Port WebSocket akan disetel via Environment systemd (ws.py v2): ${ws_port}"
+## Fase 3: Persiapan File & Port (selesai)
 
 echo -e "\n[*] Mengatur izin eksekusi..."
 chmod +x "$DIR/menu.sh" "$DIR/autokill.sh" "$DIR/unsuspend.sh" "$DIR/autobackup.sh" "$DIR/uninstall.sh" "$DIR/apply_speed.sh" "$DIR/promo_rotate.sh" "$DIR/sess_audit.py" "$DIR/reap.py" "$DIR/audit_kill.py" "$DIR/ws_match.py" "$DIR/generate_cdn_geo.sh"
@@ -254,6 +257,7 @@ if [ -s "$DIR/config/cdn_geo.conf" ]; then
 else
     echo -e "${YELLOW}cdn_geo.conf kosong (cache IP belum tersedia).${NC}"
 fi
+## Fase 4: Generate cdn_geo.conf (selesai)
 
 echo -e "\n[*] Mengatur Service Systemd untuk WebSocket Proxy (ws.py)..."
 cat > /etc/systemd/system/natssh-ws.service <<EOF
@@ -277,6 +281,7 @@ systemctl daemon-reload
 systemctl enable natssh-ws.service
 systemctl start natssh-ws.service
 echo -e "${GREEN}Service natssh-ws berhasil dibuat dan dijalankan!${NC}"
+## Fase 5: Service Systemd & .env Configuration (selesai)
 
 # Simpan semua konfigurasi natssh ke .env
 env_set "NATSSH_WS_PORT" "$ws_port"
@@ -292,6 +297,7 @@ env_set "MAX_LOGIN" "$max_login"
 env_set "NATSSH_MAX_PER_IP" "15"
 env_set "IFACE" "eth0"
 env_set "MODE" "cdn-split"
+## Fase 6: badvpn-udpgw & Nginx Install (selesai)
 
 udpgw_ports="7100 7200 7300 7400 7500"
 
@@ -312,6 +318,7 @@ cd - >/dev/null
 if ! command -v badvpn-udpgw >/dev/null 2>&1; then
     echo -e "${RED}Gagal build/install badvpn-udpgw.${NC}"; exit 1
 fi
+## Fase 7: badvpn-udpgw Selesai (selesai)
 
 echo -e "\n[*] Mengatur template Service Systemd untuk badvpn-udpgw..."
 cat > /etc/systemd/system/natssh-udpgw@.service <<EOF
@@ -335,6 +342,7 @@ for pp in $udpgw_ports; do
     systemctl enable --now natssh-udpgw@${pp} >/dev/null 2>&1
 done
 echo -e "${GREEN}Service natssh-udpgw aktif di: ${udpgw_ports} (localhost only).${NC}"
+## Fase 8: Nginx Install (selesai)
 
 echo -e "\n[*] Menginstal nginx (reverse proxy WebSocket)..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y nginx >/dev/null 2>&1
@@ -385,6 +393,7 @@ if [ -z "$acme_version" ]; then
     echo -e "${RED}Gagal menjalankan acme.sh. Periksa koneksi internet dan instalasi acme.sh.${NC}"; exit 1
 fi
 echo -e "${GREEN}acme.sh siap: $acme_version${NC}"
+## Fase 9: SSL & Konfigurasi Nginx (selesai)
 
 echo -e "\n[*] Muat variabel dari config/.env (jika ada)..."
 if [ -f "$DIR/config/.env" ]; then
@@ -439,6 +448,7 @@ fi
 if [ -z "$CF_Token" ] && [ -z "${CF_Key}" ]; then
     echo -e "${RED}Kredensial Cloudflare tidak diisi. Instalasi dibatalkan.${NC}"; exit 1
 fi
+## Fase 10: Kredensial Cloudflare & Persiapan SSL (selesai)
 
 echo -e "\n[*] Memeriksa perintah idn (untuk domain internasional)..."
 if ! command -v idn >/dev/null 2>&1; then
