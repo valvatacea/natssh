@@ -2825,8 +2825,7 @@ menu_conf() {
         echo -e "${CYAN}  -- Lainnya --${NC}"
         printf "  %-3s %-46s\\n" "11." "Penjadwalan"
         printf "  %-3s %-46s\\n" "12." "Banner Pelanggan"
-        printf "  %-3s %-46s\\n" "13." "Durasi Suspend (menit)"
-        printf "  %-3s %-46s\\n" "14." "Test Ping (Cek Koneksi Internet)"
+        printf "  %-3s %-46s\\n" "13." "Durasi Suspend"
         printf "  %-3s %-46s\\n" "14." "Test Ping"
         read -p "Pilih (0-14): " p || exit 0
         case $p in
