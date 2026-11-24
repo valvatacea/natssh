@@ -2040,7 +2040,7 @@ conf_suspend_minutes() {
     read -p "Durasi baru (1-1440 menit, kosong=batal): " v
     [ -z "$v" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if ! [[ "$v" =~ ^[0-9]+$ ]] || [ "$v" -lt 1 ] || [ "$v" -gt 1440 ]; then
-        echo -e "${RED}Nilai tidak valid!${NC}"; pause; return
+        echo -e "${RED}Nilai tidak valid!${NC}"; return
     fi
     if [ -f "${DIR}/config/.env" ]; then
         if grep -q "^SUSPEND_MINUTES=" "${DIR}/config/.env"; then
@@ -2053,7 +2053,6 @@ conf_suspend_minutes() {
     fi
     muat_env
     echo -e "${GREEN}Durasi suspend diubah menjadi ${v} menit.${NC}"
-    pause
 }
 
 conf_reboot_schedule() {
