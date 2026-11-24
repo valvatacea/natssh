@@ -630,7 +630,7 @@ autokill_riwayat() {
 
     if [ -f "$log_autokill" ] && [ -s "$log_autokill" ]; then
         echo -e "${CYAN}--- Autokill Log ---${NC}"
-        tail -n 20 "$log_autokill"
+        tail -n 50 "$log_autokill"
         echo ""
         found=1
     elif [ -f "$log_autokill" ]; then
@@ -640,7 +640,7 @@ autokill_riwayat() {
 
     if [ -f "$log_suspend" ] && [ -s "$log_suspend" ]; then
         echo -e "${CYAN}--- Riwayat Suspend (otomatis) ---${NC}"
-        tail -n 20 "$log_suspend"
+        tail -n 50 "$log_suspend"
         echo ""
         found=1
     elif [ -f "$log_suspend" ]; then
