@@ -2269,6 +2269,14 @@ conf_ip() {
         echo -e "Hide IP    : ${YELLOW}OFF (IP ditampilkan di kartu akun)${NC}"
     fi
     echo ""
+    echo "1. Toggle Hide IP"
+    echo "0. Kembali"
+    read -p "Pilih (0-1): " p
+    case $p in
+        1) conf_ip_toggle ;;
+        0) return ;;
+        *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
+    esac
 }
 
 conf_ip_toggle() {
@@ -2290,14 +2298,7 @@ conf_ip_toggle() {
         echo "HIDE_IP=$new_val" > "${DIR}/config/.env"
     fi
     muat_env
-    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
-    systemctl restart natssh-ws
-    sleep 1
-    if systemctl is-active --quiet natssh-ws; then
-        echo -e "${GREEN}SUKSES! Hide IP kini ${pesan}.${NC}"
-    else
-        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
-    fi
+    echo -e "${GREEN}SUKSES! Hide IP kini ${pesan}.${NC}"
     pause
 }
 
