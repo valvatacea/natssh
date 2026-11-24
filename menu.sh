@@ -2246,8 +2246,6 @@ conf_ip() {
     local ip_conf="${DIR}/config/ip.conf"
     local ip_private=""
     local ip_public=""
-    local cur=${HIDE_IP}
-    cur=${cur:-0}
 
     # Ambil IP private (eth0 atau antarmuka utama)
     if command -v ip >/dev/null 2>&1; then
@@ -2265,38 +2263,42 @@ conf_ip() {
     echo -e "${YELLOW}---- KONFIGURASI IP & HIDE IP ----${NC}"
     echo -e "IP Private : ${GREEN}${ip_private:-tidak diketahui}${NC}"
     echo -e "IP Publik  : ${GREEN}${ip_public}${NC}"
-    if [ "$cur" = "1" ]; then
+    if grep -q "^HIDE_IP=1" "${DIR}/config/.env" 2>/dev/null; then
         echo -e "Hide IP    : ${GREEN}ON (IP disembunyikan di kartu akun)${NC}"
     else
         echo -e "Hide IP    : ${YELLOW}OFF (IP ditampilkan di kartu akun)${NC}"
     fi
     echo ""
+}
 
-    if [ "$cur" = "1" ]; then
-        if [ -f "${DIR}/config/.env" ]; then
-            if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
-                sed -i "s|^HIDE_IP=.*|HIDE_IP=0|" "${DIR}/config/.env"
-            else
-                echo "HIDE_IP=0" >> "${DIR}/config/.env"
-            fi
-        else
-            echo "HIDE_IP=0" > "${DIR}/config/.env"
-        fi
-        muat_env
-        echo -e "${GREEN}Hide IP dinonaktifkan.${NC}"
+conf_ip_toggle() {
+    if grep -q "^HIDE_IP=1" "${DIR}/config/.env" 2>/dev/null; then
+        new_val=0
+        pesan="NONAKTIF"
     else
-        if [ -f "${DIR}/config/.env" ]; then
-            if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
-                sed -i "s|^HIDE_IP=.*|HIDE_IP=1|" "${DIR}/config/.env"
-            else
-                echo "HIDE_IP=1" >> "${DIR}/config/.env"
-            fi
-        else
-            echo "HIDE_IP=1" > "${DIR}/config/.env"
-        fi
-        muat_env
-        echo -e "${GREEN}Hide IP diaktifkan.${NC}"
+        new_val=1
+        pesan="AKTIF"
     fi
+
+    if [ -f "${DIR}/config/.env" ]; then
+        if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
+            sed -i "s|^HIDE_IP=[01]|HIDE_IP=$new_val|" "${DIR}/config/.env"
+        else
+            echo "HIDE_IP=$new_val" >> "${DIR}/config/.env"
+        fi
+    else
+        echo "HIDE_IP=$new_val" > "${DIR}/config/.env"
+    fi
+    muat_env
+    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+    systemctl restart natssh-ws
+    sleep 1
+    if systemctl is-active --quiet natssh-ws; then
+        echo -e "${GREEN}SUKSES! Hide IP kini ${pesan}.${NC}"
+    else
+        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+    fi
+    pause
 }
 
 conf_suspend_minutes() {
@@ -2764,36 +2766,13 @@ menu_conf() {
     while true; do
         clear
         garis
-        echo -e "${YELLOW}   KONFIGURASI SISTEM${NC}"
-        garis
         echo -e "${CYAN}  -- Domain/IP --${NC}"
-        printf "  %-3s %-46s\\n" "1." "Domain/Host"
-        printf "  %-3s %-46s\\n" "2." "IP Address"
-        echo -e "${CYAN}  -- Layanan --${NC}"
-        printf "  %-3s %-46s\\n" "3." "Kontrol SSH WS"
-        printf "  %-3s %-46s\n" "4." "Kontrol SSH Direct"
-        printf "  %-3s %-46s\\n" "5." "Kontrol UDPGW"
-        printf "  %-3s %-46s\\n" "6." "Kontrol Nginx"
-        echo -e "${CYAN}  -- Batas --${NC}"
-        printf "  %-3s %-46s\\n" "7." "Login per Akun"
-        printf "  %-3s %-46s\\n" "8." "Koneksi Serentak"
-        printf "  %-3s %-46s\\n" "9." "Koneksi per IP"
-        printf "  %-3s %-46s\\n" "10." "Limit Speed"
-        echo -e "${CYAN}  -- Lainnya --${NC}"
-        printf "  %-3s %-46s\\n" "11." "Penjadwalan"
-        printf "  %-3s %-46s\\n" "12." "Banner Pelanggan"
-        printf "  %-3s %-46s\\n" "13." "Durasi Suspend"
-        printf "  %-3s %-46s\\n" "14." "Test Ping"
-        read -p "Pilih (0-14): " p || exit 0
+        printf "  %-3s %-46s\\\\n\" \"1.\" \"Domain/Host\"\n        printf "  %-3s %-46s\\\\n\" \"2.\" \"IP Address\"\n        printf "  %-3s %-46s\\\\n\" \"3.\" \"Toggle Hide IP\"\n        echo -e "${CYAN}  -- Layanan --${NC}"
+        printf "  %-3s %-46s\\\\n\" \"4.\" \"Kontrol SSH WS\"\n        printf "  %-3s %-46s\\n\" \"5.\" \"Kontrol SSH Direct\"\n        printf "  %-3s %-46s\\\\n\" \"6.\" \"Kontrol UDPGW\"\n        printf "  %-3s %-46s\\\\n\" \"7.\" \"Kontrol Nginx\"\n        echo -e "${CYAN}  -- Batas --${NC}"
+        printf "  %-3s %-46s\\\\n\" \"8.\" \"Login per Akun\"\n        printf "  %-3s %-46s\\\\n\" \"9.\" \"Koneksi Serentak\"\n        printf "  %-3s %-46s\\\\n\" \"10.\" \"Koneksi per IP\"\n        printf "  %-3s %-46s\\\\n\" \"11.\" \"Limit Speed\"\n        echo -e "${CYAN}  -- Lainnya --${NC}"
+        printf "  %-3s %-46s\\\\n\" \"12.\" \"Penjadwalan\"\n        printf "  %-3s %-46s\\\\n\" \"13.\" \"Banner Pelanggan\"\n        printf "  %-3s %-46s\\\\n\" \"14.\" \"Durasi Suspend\"\n        printf "  %-3s %-46s\\\\n\" \"15.\" \"Test Ping\"\n        read -p "Pilih (0-15): " p || exit 0
         case $p in
-            1) conf_domain ;;
-            2) conf_ip ;;
-            3) conf_service ;;
-            4) conf_service_direct ;;
-            5) conf_udpgw_service ;;
-            6) conf_nginx_service ;;
-            7) conf_maxlogin ;;
-            8) conf_maxtotal ;;
+            1) conf_domain ;;\n            2) conf_ip ;;\n            3) conf_ip_toggle ;;\n            4) conf_service ;;\n            5) conf_service_direct ;;\n            6) conf_udpgw_service ;;\n            7) conf_nginx_service ;;\n            8) conf_maxlogin ;;
             9) conf_maxperip ;;
             10) conf_speed ;;
             11) conf_restart_schedule ;;
