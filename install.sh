@@ -469,6 +469,7 @@ server {
 
     ssl_certificate /etc/nginx/ssl/natssh_fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/natssh_key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
 
     location / {
         proxy_pass http://127.0.0.1:${ws_port};
