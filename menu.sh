@@ -588,7 +588,11 @@ autokill_manual() {
     local dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
     local LOG_FILE="/root/natssh/logs/autokill.log"
     local LOG_DIR="$(dirname "$LOG_FILE")"
+    local SUSPEND_DIR="/root/natssh/suspended"
+    local SUSPEND_MINUTES="${SUSPEND_MINUTES:-15}"
+    local SUSPEND_SEC=$(( SUSPEND_MINUTES * 60 ))
     mkdir -p "$LOG_DIR"
+    mkdir -p "$SUSPEND_DIR"
     for pair in $kick_list; do
         local u=${pair%%:*}
 
@@ -626,7 +630,10 @@ autokill_manual() {
             echo -e "${RED}Gagal membersihkan semua sshd $u, masih ada sisa.${NC}"
         else
             echo -e "${GREEN}Sukses menendang $u.${NC}"
+            usermod -L "$u" 2>/dev/null
+            echo $(( $(date +%s) + SUSPEND_SEC )) > "$SUSPEND_DIR/$u"
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Ditendang manual: $u (melebihi batas ${max_login})" >> "$LOG_FILE"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - SUSPEND: $u ($d perangkat, batas $max_login, expired $(date -d @$(( $(date +%s) + SUSPEND_SEC )) '+%Y-%m-%d %H:%M:%S'))" >> "$LOG_DIR/suspended_history.log"
         fi
     done
     echo -e "${GREEN}Autokill selesai!${NC}"
