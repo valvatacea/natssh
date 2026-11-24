@@ -2063,7 +2063,7 @@ conf_maxperip() {
     else
         cur=10
     fi
-    echo -e "Batas koneksi per IP (MAX_PER_IP)  : ${YELLOW}${cur}${NC} koneksi"
+    echo -e "Batas koneksi per IP (NATSSH_MAX_PER_IP)  : ${YELLOW}${cur}${NC} koneksi"
     echo -e "Catatan: jika pakai nginx reverse proxy, IP asli klien dibaca lewat header X-Forwarded-For."
     read -p "Nilai baru (1-100, 0 = batal): " n
     [ "$n" == "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
@@ -2089,7 +2089,7 @@ conf_maxperip() {
     fi
     systemctl restart natssh-ws
     sleep 1
-    systemctl is-active --quiet natssh-ws &&         echo -e "${GREEN}SUKSES! MAX_PER_IP kini $n koneksi/IP.${NC}" || \
+    systemctl is-active --quiet natssh-ws &&         echo -e "${GREEN}SUKSES! NATSSH_MAX_PER_IP kini $n koneksi/IP.${NC}" || \
         echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
 }
 
