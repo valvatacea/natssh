@@ -44,11 +44,26 @@ def kill_hantu(pid, user, sebab):
     try:
         os.kill(pid, 0)
         subprocess.run(["kill", "-KILL", str(pid)], capture_output=True)
+        time.sleep(0.3)
     except OSError:
-        pass
-    with open(LOG, "a") as f:
-        f.write(time.strftime("%Y-%m-%d %H:%M:%S") +
-                f" - REAP: sesi hantu dibunuh, user={user} pid={pid} ({sebab})\n")
+        # sudah mati setelah SIGTERM
+        with open(LOG, "a") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S") +
+                    f" - REAP: sesi hantu dibunuh, user={user} pid={pid} ({sebab})\n")
+        return True
+    try:
+        os.kill(pid, 0)
+        # masih hidup setelah SIGKILL
+        with open(LOG, "a") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S") +
+                    f" - REAP: GAGAL bunuh, user={user} pid={pid} ({sebab})\n")
+        return False
+    except OSError:
+        # mati setelah SIGKILL
+        with open(LOG, "a") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S") +
+                    f" - REAP: sesi hantu dibunuh, user={user} pid={pid} ({sebab})\n")
+        return True
 
 
 def ss(filter_arg):
@@ -107,7 +122,8 @@ def main():
                     continue  # bukan akun jualan
             except KeyError:
                 continue
-            kill_hantu(pid, user_out, "soket bridge mati")
+            if kill_hantu(pid, user_out, "soket bridge mati"):
+                reaped += 1
 
         # 3) proses sshd jualan TANPA pasangan TCP sama sekali (socket sudah lenyap) = hantu total
         for p in pwd.getpwall():
@@ -124,7 +140,11 @@ def main():
                 # Cek apakah masih ada koneksi aktif pada port 22 untuk PID ini
                 if has_active_connection(pid):
                     continue
-                kill_hantu(pid, p.pw_name, "tanpa TCP (socket lenyap)")
+                if kill_hantu(pid, p.pw_name, "tanpa TCP (socket lenyap)"):
+                    reaped += 1
+        with open(LOG, "a") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S") +
+                    f" - REAP: selesai, {reaped} sesi dibunuh\n")
         return 0
     finally:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)
