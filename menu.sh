@@ -945,7 +945,7 @@ conf_autobackup() {
     echo "1. Aktifkan (harian 02:00)"
     echo "2. Aktifkan (tiap 6 jam)"
     echo "3. Nonaktifkan"
-    echo "0. Kembali"
+    echo -e "${RED}0. Kembali${NC}"
     read -p "Pilih: " a
     case $a in
         1)
@@ -1688,7 +1688,7 @@ conf_speed() {
         echo "3. Set semua (CF + CFront) sekaligus"
         echo "4. Hapus limit speed"
         echo "5. Status detail (tc)"
-        echo "0. Kembali"
+        echo -e "${RED}0. Kembali${NC}"
         read -p "Pilih (0-5): " c || return
         case $c in
             1)
@@ -2270,7 +2270,7 @@ conf_ip() {
         fi
         echo ""
         echo "1. Toggle Hide IP"
-        echo "0. Kembali"
+        echo -e "${RED}0. Kembali${NC}"
         read -p "Pilih (0-1): " p
         case $p in
             1) conf_ip_toggle ;;
@@ -2477,7 +2477,7 @@ conf_keepalive() {
     clear; garis
     echo -e "${YELLOW}   TOGGLE KEEPALIVE SSH${NC}"; garis
     if grep -qE "^[[:space:]]*ClientAliveInterval" /etc/ssh/sshd_config; then echo -e "Status: ${GREEN}AKTIF${NC}"; else echo -e "Status: ${RED}NONAKTIF${NC}"; fi
-    echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo "0. Kembali"
+    echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo -e "${RED}0. Kembali${NC}"
     read -p "Pilih (0-2): " k || return
     case $k in
         1)
@@ -2500,7 +2500,7 @@ conf_heartbeat() {
     clear; garis
     echo -e "${YELLOW}   TOGGLE HEARTBEAT WS (TCP keepalive)${NC}"; garis
     if [ "${NATSSH_TCP_HEARTBEAT}" = "0" ]; then echo -e "Status: ${RED}NONAKTIF${NC}"; else echo -e "Status: ${GREEN}AKTIF (default)${NC}"; fi
-    echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo "0. Kembali"
+    echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo -e "${RED}0. Kembali${NC}"
     read -p "Pilih (0-2): " k || return
     case $k in
         1)
@@ -3757,7 +3757,7 @@ conf_autobackup() {
     echo "1. Aktifkan (harian 02:00)"
     echo "2. Aktifkan (tiap 6 jam)"
     echo "3. Nonaktifkan"
-    echo "0. Kembali"
+    echo -e "${RED}0. Kembali${NC}"
     read -p "Pilih: " a
     case $a in
         1)
@@ -4500,7 +4500,7 @@ conf_speed() {
         echo "3. Set semua (CF + CFront) sekaligus"
         echo "4. Hapus limit speed"
         echo "5. Status detail (tc)"
-        echo "0. Kembali"
+        echo -e "${RED}0. Kembali${NC}"
         read -p "Pilih (0-5): " c || return
         case $c in
             1)
@@ -5082,7 +5082,7 @@ conf_ip() {
         fi
         echo ""
         echo "1. Toggle Hide IP"
-        echo "0. Kembali"
+        echo -e "${RED}0. Kembali${NC}"
         read -p "Pilih (0-1): " p
         case $p in
             1) conf_ip_toggle ;;
@@ -5289,7 +5289,7 @@ conf_keepalive() {
     clear; garis
     echo -e "${YELLOW}   TOGGLE KEEPALIVE SSH${NC}"; garis
     if grep -qE "^[[:space:]]*ClientAliveInterval" /etc/ssh/sshd_config; then echo -e "Status: ${GREEN}AKTIF${NC}"; else echo -e "Status: ${RED}NONAKTIF${NC}"; fi
-    echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo "0. Kembali"
+    echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo -e "${RED}0. Kembali${NC}"
     read -p "Pilih (0-2): " k || return
     case $k in
         1)
@@ -5312,7 +5312,7 @@ conf_heartbeat() {
     clear; garis
     echo -e "${YELLOW}   TOGGLE HEARTBEAT WS (TCP keepalive)${NC}"; garis
     if [ "${NATSSH_TCP_HEARTBEAT}" = "0" ]; then echo -e "Status: ${RED}NONAKTIF${NC}"; else echo -e "Status: ${GREEN}AKTIF (default)${NC}"; fi
-    echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo "0. Kembali"
+    echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo -e "${RED}0. Kembali${NC}"
     read -p "Pilih (0-2): " k || return
     case $k in
         1)
