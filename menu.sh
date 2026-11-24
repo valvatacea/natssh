@@ -2271,42 +2271,31 @@ conf_ip() {
         echo -e "Hide IP    : ${YELLOW}OFF (IP ditampilkan di kartu akun)${NC}"
     fi
     echo ""
-    read -p "Toggle Hide IP? (y/N): " v
-    [ -z "$v" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
-    if [[ "$v" =~ ^[Yy]$ ]]; then
-        if [ "$cur" = "1" ]; then
-            echo -e "${YELLOW}Hide IP sudah aktif.${NC}"
-        else
-            if [ -f "${DIR}/config/.env" ]; then
-                if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
-                    sed -i "s|^HIDE_IP=.*|HIDE_IP=1|" "${DIR}/config/.env"
-                else
-                    echo "HIDE_IP=1" >> "${DIR}/config/.env"
-                fi
+
+    if [ "$cur" = "1" ]; then
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
+                sed -i "s|^HIDE_IP=.*|HIDE_IP=0|" "${DIR}/config/.env"
             else
-                echo "HIDE_IP=1" > "${DIR}/config/.env"
+                echo "HIDE_IP=0" >> "${DIR}/config/.env"
             fi
-            muat_env
-            echo -e "${GREEN}Hide IP diaktifkan.${NC}"
-        fi
-    elif [[ "$v" =~ ^[Nn]$ ]]; then
-        if [ "$cur" != "1" ]; then
-            echo -e "${YELLOW}Hide IP sudah nonaktif.${NC}"
         else
-            if [ -f "${DIR}/config/.env" ]; then
-                if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
-                    sed -i "s|^HIDE_IP=.*|HIDE_IP=0|" "${DIR}/config/.env"
-                else
-                    echo "HIDE_IP=0" >> "${DIR}/config/.env"
-                fi
-            else
-                echo "HIDE_IP=0" > "${DIR}/config/.env"
-            fi
-            muat_env
-            echo -e "${GREEN}Hide IP dinonaktifkan.${NC}"
+            echo "HIDE_IP=0" > "${DIR}/config/.env"
         fi
+        muat_env
+        echo -e "${GREEN}Hide IP dinonaktifkan.${NC}"
     else
-        echo -e "${RED}Pilihan tidak valid!${NC}"
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^HIDE_IP=" "${DIR}/config/.env"; then
+                sed -i "s|^HIDE_IP=.*|HIDE_IP=1|" "${DIR}/config/.env"
+            else
+                echo "HIDE_IP=1" >> "${DIR}/config/.env"
+            fi
+        else
+            echo "HIDE_IP=1" > "${DIR}/config/.env"
+        fi
+        muat_env
+        echo -e "${GREEN}Hide IP diaktifkan.${NC}"
     fi
 }
 
