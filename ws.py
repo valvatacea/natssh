@@ -30,7 +30,7 @@ SSH_PORT = int(os.environ.get("NATSSH_SSH_PORT", "22"))   # sshd lokal
 MAX_PER_IP = int(os.environ.get("NATSSH_MAX_PER_IP", "10"))
 MAX_TOTAL = int(os.environ.get("NATSSH_MAX_TOTAL", "30"))
 IDLE_TIMEOUT = int(os.environ.get("NATSSH_IDLE_TIMEOUT", "300"))  # detik tanpa data -> putuskan
-TCP_KEEPALIVE = os.environ.get("NATSSH_TCP_KEEPALIVE", "1") == "1"  # heartbeat TCP
+TCP_KEEPALIVE = os.environ.get("NATSSH_TCP_HEARTBEAT", "1") == "1"  # heartbeat TCP
 MAX_CONN_AGE = int(os.environ.get("NATSSH_MAX_CONN_AGE", "3600"))  # maks usia koneksi (detik), 0 = nonaktif
 MAX_LOG_SIZE = 512_000  # 500 KB, selaras autokill.sh
 SSH_DIRECT_PORT = int(os.environ.get("NATSSH_SSH_DIRECT_PORT", "20169"))  # port listener SSH direct (raw TCP)

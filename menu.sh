@@ -2478,19 +2478,19 @@ conf_keepalive() {
 conf_heartbeat() {
     clear; garis
     echo -e "${YELLOW}   TOGGLE HEARTBEAT WS (TCP keepalive)${NC}"; garis
-    if [ "${NATSSH_TCP_KEEPALIVE}" = "0" ]; then echo -e "Status: ${RED}NONAKTIF${NC}"; else echo -e "Status: ${GREEN}AKTIF (default)${NC}"; fi
+    if [ "${NATSSH_TCP_HEARTBEAT}" = "0" ]; then echo -e "Status: ${RED}NONAKTIF${NC}"; else echo -e "Status: ${GREEN}AKTIF (default)${NC}"; fi
     echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo "0. Kembali"
     read -p "Pilih (0-2): " k || return
     case $k in
         1)
             if [ -f "${DIR}/config/.env" ]; then
-                if grep -q "^NATSSH_TCP_KEEPALIVE=" "${DIR}/config/.env"; then
-                    sed -i 's/^NATSSH_TCP_KEEPALIVE=.*/NATSSH_TCP_KEEPALIVE=1/' "${DIR}/config/.env"
+                if grep -q "^NATSSH_TCP_HEARTBEAT=" "${DIR}/config/.env"; then
+                    sed -i 's/^NATSSH_TCP_HEARTBEAT=.*/NATSSH_TCP_HEARTBEAT=1/' "${DIR}/config/.env"
                 else
-                    echo "NATSSH_TCP_KEEPALIVE=1" >> "${DIR}/config/.env"
+                    echo "NATSSH_TCP_HEARTBEAT=1" >> "${DIR}/config/.env"
                 fi
             else
-                echo "NATSSH_TCP_KEEPALIVE=1" > "${DIR}/config/.env"
+                echo "NATSSH_TCP_HEARTBEAT=1" > "${DIR}/config/.env"
             fi
             muat_env
             systemctl daemon-reload
@@ -2498,13 +2498,13 @@ conf_heartbeat() {
             echo -e "${GREEN}Heartbeat WS AKTIF.${NC}" ;;
         2)
             if [ -f "${DIR}/config/.env" ]; then
-                if grep -q "^NATSSH_TCP_KEEPALIVE=" "${DIR}/config/.env"; then
-                    sed -i 's/^NATSSH_TCP_KEEPALIVE=.*/NATSSH_TCP_KEEPALIVE=0/' "${DIR}/config/.env"
+                if grep -q "^NATSSH_TCP_HEARTBEAT=" "${DIR}/config/.env"; then
+                    sed -i 's/^NATSSH_TCP_HEARTBEAT=.*/NATSSH_TCP_HEARTBEAT=0/' "${DIR}/config/.env"
                 else
-                    echo "NATSSH_TCP_KEEPALIVE=0" >> "${DIR}/config/.env"
+                    echo "NATSSH_TCP_HEARTBEAT=0" >> "${DIR}/config/.env"
                 fi
             else
-                echo "NATSSH_TCP_KEEPALIVE=0" > "${DIR}/config/.env"
+                echo "NATSSH_TCP_HEARTBEAT=0" > "${DIR}/config/.env"
             fi
             muat_env
             systemctl daemon-reload
