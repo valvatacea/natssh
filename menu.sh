@@ -822,6 +822,11 @@ backup_config() {
     [ -f /etc/issue.net ] && cp /etc/issue.net "$bakdir/issue.net.bak" && list="$list $bakdir/issue.net.bak"
     [ -f /etc/systemd/system/natssh-ws.service ] && cp /etc/systemd/system/natssh-ws.service "$bakdir/natssh-ws.service.bak" && list="$list $bakdir/natssh-ws.service.bak"
 
+    # Sertifikat SSL untuk nginx
+    for sslfile in /etc/nginx/ssl/natssh.pem /etc/nginx/ssl/natssh_key.pem /etc/nginx/ssl/natssh_fullchain.pem; do
+        [ -f "$sslfile" ] && cp "$sslfile" "$bakdir/$(basename "$sslfile")" && list="$list $bakdir/$(basename "$sslfile")"
+    done
+
     if [ -z "$list" ]; then
         rm -rf "$bakdir"
         echo -e "${YELLOW}Tidak ada file konfigurasi untuk dibackup.${NC}"
@@ -934,6 +939,12 @@ restore_config() {
         [ -d "$tmpdir/banners" ] && cp -r "$tmpdir/banners" "${DIR}/"
         [ -f "$tmpdir/issue.net.bak" ] && cp "$tmpdir/issue.net.bak" /etc/issue.net
         [ -f "$tmpdir/natssh-ws.service.bak" ] && cp "$tmpdir/natssh-ws.service.bak" /etc/systemd/system/natssh-ws.service
+
+        # Kembalikan sertifikat SSL untuk nginx
+        for sslfile in natssh.pem natssh_key.pem natssh_fullchain.pem; do
+            [ -f "$tmpdir/$sslfile" ] && cp "$tmpdir/$sslfile" /etc/nginx/ssl/
+        done
+
         rm -rf "$tmpdir"
 
         muat_env
