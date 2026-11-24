@@ -399,8 +399,20 @@ do_suspend() {
 }
 
 do_unsuspend() {
-    usermod -U "$1"
-    echo -e "${GREEN}SUKSES! Akun $1 dibuka kuncinya — bisa login kembali.${NC}"
+    local user="$1"
+    if ! id "$user" &>/dev/null; then
+        echo -e "${RED}Gagal: akun $user tidak ada.${NC}"
+        return 1
+    fi
+    mkdir -p "${DIR}/logs"
+    if usermod -U "$user" 2>/dev/null; then
+        echo -e "${GREEN}SUKSES! Akun $user dibuka kuncinya — bisa login kembali.${NC}"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Unsuspend manual: $user" >> "${DIR}/logs/autokill.log"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - UNSUSPEND: $user" >> "${DIR}/logs/suspended_history.log"
+    else
+        echo -e "${RED}Gagal: tidak dapat membuka kunci akun $user.${NC}"
+        return 1
+    fi
 }
 
 akun_autoclean() {

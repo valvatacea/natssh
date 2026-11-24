@@ -121,7 +121,7 @@ for r in riwayat:
 suspend_events: dict[str, list] = {}
 try:
     for ln in open(suspend_file):
-        m = re.match(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) - (SUSPEND|UNSPEND): (\S+)", ln)
+        m = re.match(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) - (SUSPEND|UNSUSPEND): (\S+)", ln)
         if m:
             suspend_events.setdefault(m.group(3), []).append((m.group(1), m.group(2)))
 except OSError:

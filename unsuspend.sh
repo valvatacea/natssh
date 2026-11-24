@@ -5,6 +5,8 @@ export TZ=Asia/Jakarta
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 SUSPEND_DIR="/root/natssh/suspended"
 LOG_FILE="/root/natssh/logs/autokill.log"
+LOG_DIR="$(dirname "$LOG_FILE")"
+mkdir -p "$LOG_DIR"
 [ -d "$SUSPEND_DIR" ] || exit 0
 now=$(date +%s)
 for f in "$SUSPEND_DIR"/*; do
@@ -12,9 +14,12 @@ for f in "$SUSPEND_DIR"/*; do
     user=$(basename "$f")
     exp=$(cat "$f" 2>/dev/null)
     if [[ "$exp" =~ ^[0-9]+$ ]] && [ "$now" -ge "$exp" ]; then
-        usermod -U "$user" 2>/dev/null
-        rm -f "$f"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - Unsuspend otomatis: $user" >> "$LOG_FILE"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - UNSUSPEND: $user" >> /root/natssh/logs/suspended_history.log
+        if usermod -U "$user" 2>/dev/null; then
+            rm -f "$f"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - Unsuspend otomatis: $user" >> "$LOG_FILE"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - UNSUSPEND: $user" >> "$LOG_DIR/suspended_history.log"
+        else
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - GAGAL unsuspend: $user (usermod gagal)" >> "$LOG_FILE"
+        fi
     fi
 done
