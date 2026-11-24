@@ -2614,6 +2614,7 @@ conf_port_direct() {
     else
         echo "NATSSH_SSH_DIRECT_PORT=$new_port" > "${DIR}/config/.env"
     fi
+    muat_env
     echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
     read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr
     if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
