@@ -2615,6 +2615,7 @@ conf_nginx_port() {
     else
         echo "NGINX_REVERSE_PORT=$new_port" > "${DIR}/config/.env"
     fi
+    muat_env
     systemctl restart nginx
     sleep 1
     systemctl is-active --quiet nginx && \
@@ -2786,6 +2787,7 @@ conf_nginx_stream_port() {
     else
         echo "NGINX_STREAM_PORT=$new_port" > "${DIR}/config/.env"
     fi
+    muat_env
     systemctl restart nginx
     sleep 1
     systemctl is-active --quiet nginx && \
