@@ -2271,7 +2271,7 @@ conf_ip() {
         echo -e "Hide IP    : ${YELLOW}OFF (IP ditampilkan di kartu akun)${NC}"
     fi
     echo ""
-    read -p "Toggle Hide IP? (y/N): " v
+    read -p "Hide IP? (y/N): " v
     [ -z "$v" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if [[ "$v" =~ ^[Yy]$ ]]; then
         if [ "$cur" = "1" ]; then
