@@ -2526,11 +2526,12 @@ menu_conf() {
             6) conf_nginx_service ;;
             7) conf_maxlogin ;;
             8) conf_maxperip ;;
-            9) conf_speed ;;
-            10) conf_restart_schedule ;;
-            11) conf_banner ;;
-            12) conf_suspend_minutes ;;
-            13) conf_test_ping ;;
+            9) conf_maxperip ;;
+            10) conf_speed ;;
+            11) conf_restart_schedule ;;
+            12) conf_banner ;;
+            13) conf_suspend_minutes ;;
+            14) conf_test_ping ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
