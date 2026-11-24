@@ -2821,7 +2821,6 @@ menu_conf() {
         printf "  %-3s %-46s\\n" "7." "Login per Akun (MAX_LOGIN)"
         printf "  %-3s %-46s\\n" "8." "Koneksi Serentak (MAX_TOTAL)"
         printf "  %-3s %-46s\\n" "9." "Koneksi per IP (MAX_PER_IP)"
-        printf "  %-3s %-46s\\n" "9." "Batas Koneksi per IP (MAX_PER_IP)"
         printf "  %-3s %-46s\\n" "10." "Limit Speed per CDN (CF/CFront)"
         echo -e "${CYAN}  -- Lainnya --${NC}"
         printf "  %-3s %-46s\\n" "11." "Penjadwalan"
