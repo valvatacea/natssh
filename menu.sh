@@ -2266,7 +2266,7 @@ conf_ip() {
         if grep -q "^HIDE_IP=1" "${DIR}/config/.env" 2>/dev/null; then
             echo -e "Hide IP    : ${GREEN}ON (IP disembunyikan di kartu akun)${NC}"
         else
-            echo -e "Hide IP    : ${YELLOW}OFF (IP ditampilkan di kartu akun)${NC}"
+            echo -e "Hide IP    : ${RED}OFF (IP ditampilkan di kartu akun)${NC}"
         fi
         echo ""
         echo "1. Toggle Hide IP"
@@ -5078,7 +5078,7 @@ conf_ip() {
         if grep -q "^HIDE_IP=1" "${DIR}/config/.env" 2>/dev/null; then
             echo -e "Hide IP    : ${GREEN}ON (IP disembunyikan di kartu akun)${NC}"
         else
-            echo -e "Hide IP    : ${YELLOW}OFF (IP ditampilkan di kartu akun)${NC}"
+            echo -e "Hide IP    : ${RED}OFF (IP ditampilkan di kartu akun)${NC}"
         fi
         echo ""
         echo "1. Toggle Hide IP"
