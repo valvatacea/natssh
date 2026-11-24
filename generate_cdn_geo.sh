@@ -4,7 +4,7 @@
 # Digunakan oleh nginx directive geo untuk mengisi header X-CDN.
 # Skip jika kedua cache kosong atau tidak ada.
 
-DIR=/root/natssh/config
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config"
 CF_CACHE="$DIR/cf_ips.cache"
 CFRONT_CACHE="$DIR/cfront_ips.cache"
 CDN_GEO="$DIR/cdn_geo.conf"
