@@ -2742,22 +2742,6 @@ conf_nginx_stream_port() {
     pause
 }
 
-conf_port_submenu() {
-    while true; do
-        clear
-        garis
-        echo -e "${YELLOW}   UBAH PORT LAYANAN${NC}"
-        garis
-        printf "  %-3s %-46s\n" "1." "badvpn-udpgw (UDP Gateway)"
-        echo -e "${RED}  0.  Kembali${NC}"
-        read -p "Pilih (0-1): " p || exit 0
-        case $p in
-            1) conf_udpgw_service ;;
-            0) return ;;
-            *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
-        esac
-    done
-}
 
 menu_conf() {
     while true; do
