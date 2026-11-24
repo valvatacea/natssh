@@ -43,6 +43,12 @@ BACKUP_FILE="$BACKUP_DIR/akun_$ts.sh"
     fi
     echo "usermod -p '$hash' \"$user\""
   done
+  echo ""
+  echo "# --- Batas perangkat per akun ---"
+  echo "mkdir -p /root/natssh/limits"
+  for f in /root/natssh/limits/*; do
+    [ -f "$f" ] && echo "echo \"$(cat "$f" 2>/dev/null)\" > /root/natssh/limits/$(basename "$f")"
+  done
 } > "$BACKUP_FILE"
 chmod 700 "$BACKUP_FILE"
 

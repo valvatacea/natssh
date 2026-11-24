@@ -771,6 +771,16 @@ backup_ekspor() {
         echo -e "${YELLOW}Tidak ada akun di /root/natssh/limits/.${NC}"
     fi
 
+    echo "" >> "$backup_file"
+    echo "# --- Batas perangkat per akun ---" >> "$backup_file"
+    echo "mkdir -p /root/natssh/limits" >> "$backup_file"
+    for user in $natssh_users; do
+        if [ -f "/root/natssh/limits/$user" ]; then
+            lim=$(cat "/root/natssh/limits/$user" 2>/dev/null)
+            echo "echo "$lim" > /root/natssh/limits/$user" >> "$backup_file"
+        fi
+    done
+
     local count=0
     for user in $natssh_users; do
         # Skip jika user tidak ada di /etc/passwd
@@ -793,7 +803,7 @@ backup_ekspor() {
     done
 
     chmod 700 "$backup_file"
-    echo -e "${GREEN}SUKSES! Data $count akun dan kata sandi berhasil diekstrak.${NC}"
+    echo -e "${GREEN}SUKSES! Data $count akun, kata sandi, dan batas perangkat berhasil diekstrak.${NC}"
     echo -e "File cadangan tersimpan di: ${CYAN}$backup_file${NC} (mode 700)"
     echo -e "Cara Pakai: pindahkan ke VPS baru lalu jalankan ${CYAN}$backup_file${NC}"
     echo -e "${YELLOW}Catatan: Akun yang sudah ada di VPS tujuan tidak akan ditimpa.${NC}"
