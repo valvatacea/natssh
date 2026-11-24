@@ -2475,18 +2475,18 @@ menu_conf() {
             3) conf_service ;;
             4) conf_service_direct ;;
             5) conf_udpgw_service ;;
-            7) conf_nginx_service ;;
-            8) conf_maxlogin ;;
-            9) conf_maxperip ;;
-            10) conf_speed ;;
-            11) conf_restart_schedule ;;
-            12) conf_banner ;;
-            13) conf_suspend_minutes ;;
-            14) conf_test_ping ;;
+            6) conf_nginx_service ;;
+            7) conf_maxlogin ;;
+            8) conf_maxperip ;;
+            9) conf_speed ;;
+            10) conf_restart_schedule ;;
+            11) conf_banner ;;
+            12) conf_suspend_minutes ;;
+            13) conf_test_ping ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
-        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "2" ] && [ "$p" != "3" ] && [ "$p" != "4" ] && [ "$p" != "5" ] && [ "$p" != "6" ] && [ "$p" != "7" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && [ "$p" != "13" ] && pause
+        [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "2" ] && [ "$p" != "3" ] && [ "$p" != "4" ] && [ "$p" != "5" ] && [ "$p" != "6" ] && [ "$p" != "7" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && pause
     done
 }
 
