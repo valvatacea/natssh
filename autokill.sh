@@ -21,7 +21,6 @@ SUSPEND_MINUTES="${SUSPEND_MINUTES:-15}"
 if ! [[ "$SUSPEND_MINUTES" =~ ^[0-9]+$ ]]; then
     SUSPEND_MINUTES=15
 fi
-SUSPEND_SEC=$(( SUSPEND_MINUTES * 60 ))
 mkdir -p "$SUSPEND_DIR"
 
 # Muat konfigurasi terpusat dari config/.env (jika ada)
@@ -30,6 +29,8 @@ if [ -f "$(dirname "$(readlink -f "$0")")/config/.env" ]; then
     . "$(dirname "$(readlink -f "$0")")/config/.env"
     set +a
 fi
+
+SUSPEND_SEC=$(( SUSPEND_MINUTES * 60 ))
 
 MAX_LOGIN="${MAX_LOGIN:-5}" # batas perangkat global; env MAX_LOGIN disuntik cron; khusus per akun di limits/<user>
 if ! [[ "$MAX_LOGIN" =~ ^[0-9]+$ ]]; then
