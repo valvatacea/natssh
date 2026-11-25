@@ -553,7 +553,7 @@ fi
 if ! grep -q 'include /etc/nginx/stream.conf' /etc/nginx/nginx.conf; then
     sed -i '/^http {/i include /etc/nginx/stream.conf;' /etc/nginx/nginx.conf
 fi
-cat > /etc/nginx/stream.conf <<'EOF'
+cat > /etc/nginx/stream.conf <<EOF
 stream {
     server {
         listen ${stream_port};
@@ -567,7 +567,7 @@ nginx -t && systemctl restart nginx
 echo -e "${GREEN}Service Nginx Stream dijalankan di port ${stream_port} -> 127.0.0.1:${direct_port}!${NC}"
 
 echo -e "\n[*] Menyiapkan service NATSSH speed limit (tidak diaktifkan otomatis)..."
-cat > /etc/systemd/system/natssh-speed.service <<'EOF'
+cat > /etc/systemd/system/natssh-speed.service <<EOF
 [Unit]
 Description=NATSSH SSH speed limit (tc)
 After=network.target
