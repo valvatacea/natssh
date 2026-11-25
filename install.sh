@@ -132,7 +132,7 @@ if ! [[ "$ws_port" =~ ^[0-9]+$ ]] || [ "$ws_port" -lt 1 ] || [ "$ws_port" -gt 65
     echo "Port tidak valid!"; exit 1
 fi
 if ss -tln | grep -q ":${ws_port} "; then
-    echo -e "${RED}Port ${ws_port} sudah dipakai proses lain!${NC}"; exit 1
+    echo -e "${YELLOW}Port ${ws_port} sudah dipakai. Mencoba reuse (idempotent).${NC}"
 fi
 
 # Port SSH Direct (raw TCP listener di ws.py, untuk SSH non-WebSocket)
@@ -145,7 +145,7 @@ if ! [[ "$direct_port" =~ ^[0-9]+$ ]] || [ "$direct_port" -lt 1 ] || [ "$direct_
     echo "Port SSH Direct tidak valid!"; exit 1
 fi
 if ss -tln | grep -q ":${direct_port} "; then
-    echo -e "${RED}Port ${direct_port} sudah dipakai proses lain!${NC}"; exit 1
+    echo -e "${YELLOW}Port ${direct_port} sudah dipakai. Mencoba reuse (idempotent).${NC}"
 fi
 
 echo -e "\n[*] Direktori instalasi: $DIR"
@@ -370,7 +370,7 @@ if ! [[ "$nginx_port" =~ ^[0-9]+$ ]] || [ "$nginx_port" -lt 1 ] || [ "$nginx_por
     echo "Port tidak valid!"; exit 1
 fi
 if ss -tln | grep -q ":${nginx_port} "; then
-    echo -e "${RED}Port ${nginx_port} sudah dipakai proses lain!${NC}"; exit 1
+    echo -e "${YELLOW}Port ${nginx_port} sudah dipakai. Mencoba reuse (idempotent).${NC}"
 fi
 
 rm -f /etc/nginx/sites-enabled/default
@@ -529,7 +529,7 @@ sed -i 's/^[[:space:]]*worker_connections .*/    worker_connections 4096;/' /etc
 if ! grep -q 'worker_rlimit_nofile' /etc/nginx/nginx.conf; then
     sed -i '/^pid \/run\/nginx\.pid;$/a worker_rlimit_nofile 65535;' /etc/nginx/nginx.conf
 fi
-nginx -t && systemctl enable --now nginx
+nginx -t && (systemctl restart nginx 2>/dev/null || systemctl enable --now nginx)
 echo -e "${GREEN}Service nginx berhasil dibuat dan dijalankan di port ${nginx_port} SSL -> 127.0.0.1:${ws_port}!${NC}"
 
 echo -e "\n[*] Menginstal modul Nginx Stream untuk SSH Direct (TCP proxy)..."
@@ -547,7 +547,7 @@ if ! [[ "$stream_port" =~ ^[0-9]+$ ]] || [ "$stream_port" -lt 1 ] || [ "$stream_
     echo "Port tidak valid!"; exit 1
 fi
 if ss -tln | grep -q ":${stream_port} "; then
-    echo -e "${RED}Port ${stream_port} sudah dipakai proses lain!${NC}"; exit 1
+    echo -e "${YELLOW}Port ${stream_port} sudah dipakai. Mencoba reuse (idempotent).${NC}"
 fi
 
 if ! grep -q 'include /etc/nginx/stream.conf' /etc/nginx/nginx.conf; then
