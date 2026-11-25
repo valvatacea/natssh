@@ -1194,38 +1194,72 @@ conf_port() {
             echo "NATSSH_WS_PORT=$new_port" > "${DIR}/config/.env"
         fi
         muat_env
+        ngconf=/etc/nginx/sites-available/natssh-ws
+        # Update nginx proxy_pass SEBELUM restart service agar jeda mismatch minimal
+        if [ -f "$ngconf" ]; then
+            sed -i "s|proxy_pass http://127.0.0.1:[0-9]*;|proxy_pass http://127.0.0.1:$new_port;|" "$ngconf"
+            if ! nginx -t >/dev/null 2>&1; then
+                echo -e "${RED}Config nginx invalid! Kembalikan ke port lama.${NC}"
+                sed -i "s|proxy_pass http://127.0.0.1:[0-9]*;|proxy_pass http://127.0.0.1:$cur_port;|" "$ngconf"
+                # kembalikan .env
+                sed -i "s/^NATSSH_WS_PORT=.*/NATSSH_WS_PORT=$cur_port/" "${DIR}/config/.env"
+                muat_env
+                pause
+                return
+            fi
+        fi
         echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
         read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr
         if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
-            echo -e "${YELLOW}Dibatalkan.${NC}"
+            echo -e "${YELLOW}Dibatalkan. Kembalikan port ke $cur_port.${NC}"
+            # revert .env dan nginx
+            sed -i "s/^NATSSH_WS_PORT=.*/NATSSH_WS_PORT=$cur_port/" "${DIR}/config/.env"
+            if [ -f "$ngconf" ]; then
+                sed -i "s|proxy_pass http://127.0.0.1:[0-9]*;|proxy_pass http://127.0.0.1:$cur_port;|" "$ngconf"
+                nginx -t >/dev/null 2>&1 && systemctl reload nginx
+            fi
+            muat_env
             pause
-            continue
+            return
         fi
         systemctl daemon-reload
         systemctl restart natssh-ws
-        sleep 1
+        # tunggu service up (max 10 detik)
+        for _i in $(seq 1 10); do
+            systemctl is-active --quiet natssh-ws && break
+            sleep 1
+        done
         if systemctl is-active --quiet natssh-ws; then
             echo -e "${GREEN}SUKSES! WebSocket kini di port $new_port.${NC}"
-            # Update nginx proxy_forward ke port ws baru
-            ngconf=/etc/nginx/sites-available/natssh-ws
             if [ -f "$ngconf" ]; then
-                sed -i "s|proxy_pass http://127.0.0.1:[0-9]*;|proxy_pass http://127.0.0.1:$new_port;|" "$ngconf"
-                if nginx -t >/dev/null 2>&1 && systemctl restart nginx; then
-                    echo -e "${GREEN}Nginx diupdate forward ke port $new_port.${NC}"
+                if systemctl reload nginx; then
+                    echo -e "${GREEN}Nginx di-reload (proxy $new_port).${NC}"
                 else
-                    echo -e "${RED}Nginx gagal restart! Cek: journalctl -u nginx -n 20${NC}"
+                    echo -e "${RED}Nginx gagal reload! Cek: journalctl -u nginx -n 20${NC}"
                 fi
-            else
-                echo -e "${YELLOW}Config nginx tidak ditemukan di $ngconf, lewati.${NC}"
             fi
         else
             echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+            echo -e "${YELLOW}Kembalikan port ke $cur_port...${NC}"
+            sed -i "s/^NATSSH_WS_PORT=.*/NATSSH_WS_PORT=$cur_port/" "${DIR}/config/.env"
+            if [ -f "$ngconf" ]; then
+                sed -i "s|proxy_pass http://127.0.0.1:[0-9]*;|proxy_pass http://127.0.0.1:$cur_port;|" "$ngconf"
+                nginx -t >/dev/null 2>&1 && systemctl reload nginx
+            fi
+            muat_env
+            systemctl daemon-reload
+            systemctl restart natssh-ws
         fi
     fi
 }
 
 # Ekstraksi root domain menggunakan Public Suffix List (unduh dari publicsuffix.org)
 conf_service() {
+    if [ ! -f /etc/systemd/system/natssh-ws.service ]; then
+        echo -e "${RED}Service natssh-ws belum terpasang. Jalankan install.sh dulu.${NC}"
+        pause
+        return
+    fi
     while true; do
         clear
         garis
@@ -1315,6 +1349,11 @@ conf_service_direct() {
 }
 
 conf_udpgw_service() {
+    if ! systemctl list-unit-files 2>/dev/null | grep -q "natssh-udpgw@"; then
+        echo -e "${RED}Service natssh-udpgw belum terpasang. Jalankan install.sh dulu.${NC}"
+        pause
+        return
+    fi
     while true; do
         clear
         garis
@@ -1374,6 +1413,11 @@ conf_udpgw_service() {
 }
 
 conf_nginx_service() {
+    if ! command -v nginx >/dev/null 2>&1; then
+        echo -e "${RED}nginx belum terpasang. Pasang dulu: apt-get install -y nginx libnginx-mod-stream${NC}"
+        pause
+        return
+    fi
     while true; do
         clear
         garis
@@ -1835,6 +1879,18 @@ conf_maxtotal() {
         echo -e "${RED}Gagal: harus angka 10-200!${NC}"
         return
     fi
+    if [ "$n" = "$cur" ]; then
+        echo -e "${YELLOW}Nilai sama ($n). Tidak perlu restart.${NC}"
+        pause
+        return
+    fi
+    read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr2
+    if [[ ! "$cfr2" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
+    fi
+    _bak_cur="$cur"
     if [ -f "${DIR}/config/.env" ]; then
         if grep -q "^NATSSH_MAX_TOTAL=" "${DIR}/config/.env"; then
             sed -i "s/^NATSSH_MAX_TOTAL=.*/NATSSH_MAX_TOTAL=$n/" "${DIR}/config/.env"
@@ -1845,16 +1901,28 @@ conf_maxtotal() {
         echo "NATSSH_MAX_TOTAL=$n" > "${DIR}/config/.env"
     fi
     muat_env
-    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
-    read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr2
-    if [[ ! "$cfr2" =~ ^[Yy]$ ]]; then
-        echo -e "${YELLOW}Dibatalkan.${NC}"
-        return
-    fi
+    systemctl daemon-reload 2>/dev/null
     systemctl restart natssh-ws
-    sleep 1
-    systemctl is-active --quiet natssh-ws &&         echo -e "${GREEN}SUKSES! NATSSH_MAX_TOTAL kini $n slot.${NC}" || \
-        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+    for _i in $(seq 1 10); do
+        systemctl is-active --quiet natssh-ws && break
+        sleep 1
+    done
+    if systemctl is-active --quiet natssh-ws; then
+        echo -e "${GREEN}SUKSES! NATSSH_MAX_TOTAL kini $n slot.${NC}"
+    else
+        echo -e "${RED}Service gagal start! Kembalikan nilai lama.${NC}"
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^NATSSH_MAX_TOTAL=" "${DIR}/config/.env"; then
+                sed -i "s/^NATSSH_MAX_TOTAL=.*/NATSSH_MAX_TOTAL=$_bak_cur/" "${DIR}/config/.env"
+            else
+                echo "NATSSH_MAX_TOTAL=$_bak_cur" >> "${DIR}/config/.env"
+            fi
+        fi
+        muat_env
+        systemctl daemon-reload 2>/dev/null
+        systemctl restart natssh-ws
+    fi
+    pause
 }
 
 conf_maxperip() {
@@ -1872,6 +1940,18 @@ conf_maxperip() {
         echo -e "${RED}Gagal: harus angka 1-100!${NC}"
         return
     fi
+    if [ "$n" = "$cur" ]; then
+        echo -e "${YELLOW}Nilai sama ($n). Tidak perlu restart.${NC}"
+        pause
+        return
+    fi
+    read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr3
+    if [[ ! "$cfr3" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
+    fi
+    _bak_cur="$cur"
     if [ -f "${DIR}/config/.env" ]; then
         if grep -q "^NATSSH_MAX_PER_IP=" "${DIR}/config/.env"; then
             sed -i "s/^NATSSH_MAX_PER_IP=.*/NATSSH_MAX_PER_IP=$n/" "${DIR}/config/.env"
@@ -1882,16 +1962,28 @@ conf_maxperip() {
         echo "NATSSH_MAX_PER_IP=$n" > "${DIR}/config/.env"
     fi
     muat_env
-    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
-    read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr3
-    if [[ ! "$cfr3" =~ ^[Yy]$ ]]; then
-        echo -e "${YELLOW}Dibatalkan.${NC}"
-        return
-    fi
+    systemctl daemon-reload 2>/dev/null
     systemctl restart natssh-ws
-    sleep 1
-    systemctl is-active --quiet natssh-ws &&         echo -e "${GREEN}SUKSES! NATSSH_MAX_PER_IP kini $n koneksi/IP.${NC}" || \
-        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+    for _i in $(seq 1 10); do
+        systemctl is-active --quiet natssh-ws && break
+        sleep 1
+    done
+    if systemctl is-active --quiet natssh-ws; then
+        echo -e "${GREEN}SUKSES! NATSSH_MAX_PER_IP kini $n koneksi/IP.${NC}"
+    else
+        echo -e "${RED}Service gagal start! Kembalikan nilai lama.${NC}"
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^NATSSH_MAX_PER_IP=" "${DIR}/config/.env"; then
+                sed -i "s/^NATSSH_MAX_PER_IP=.*/NATSSH_MAX_PER_IP=$_bak_cur/" "${DIR}/config/.env"
+            else
+                echo "NATSSH_MAX_PER_IP=$_bak_cur" >> "${DIR}/config/.env"
+            fi
+        fi
+        muat_env
+        systemctl daemon-reload 2>/dev/null
+        systemctl restart natssh-ws
+    fi
+    pause
 }
 
 conf_banner() {
@@ -2098,14 +2190,28 @@ conf_ip_toggle() {
 }
 
 conf_suspend_minutes() {
-    local cur=${SUSPEND_MINUTES}
-    cur=${cur:-15}
+    cur="15"
+    if [ -f "${DIR}/config/.env" ] && grep -q "^SUSPEND_MINUTES=" "${DIR}/config/.env"; then
+        cur=$(grep "^SUSPEND_MINUTES=" "${DIR}/config/.env" | cut -d= -f2)
+        cur=${cur:-15}
+    fi
     echo -e "${YELLOW}---- DURASI SUSPEND (autokill) ----${NC}"
     echo -e "Durasi saat ini: ${GREEN}${cur} menit${NC}"
     read -p "Durasi baru (1-1440 menit, kosong=batal): " v
     [ -z "$v" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if ! [[ "$v" =~ ^[0-9]+$ ]] || [ "$v" -lt 1 ] || [ "$v" -gt 1440 ]; then
         echo -e "${RED}Nilai tidak valid!${NC}"; return
+    fi
+    if [ "$v" = "$cur" ]; then
+        echo -e "${YELLOW}Nilai sama ($v menit). Tidak diubah.${NC}"
+        pause
+        return
+    fi
+    read -p "Yakin ubah durasi suspend ke $v menit? (y/N): " cfr
+    if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Dibatalkan.${NC}"
+        pause
+        return
     fi
     if [ -f "${DIR}/config/.env" ]; then
         if grep -q "^SUSPEND_MINUTES=" "${DIR}/config/.env"; then
@@ -2118,6 +2224,7 @@ conf_suspend_minutes() {
     fi
     muat_env
     echo -e "${GREEN}Durasi suspend diubah menjadi ${v} menit.${NC}"
+    pause
 }
 
 conf_reboot_schedule() {
@@ -2274,15 +2381,49 @@ conf_keepalive() {
     read -p "Pilih (0-2): " k || return
     case $k in
         1)
+            if grep -qE "^[[:space:]]*ClientAliveInterval" /etc/ssh/sshd_config; then
+                echo -e "${YELLOW}Keepalive SSH sudah AKTIF. Tidak perlu restart.${NC}"
+                pause; return
+            fi
+            read -p "Yakin aktifkan keepalive & restart sshd? (y/N): " _ka
+            if [[ ! "$_ka" =~ ^[Yy]$ ]]; then echo -e "${YELLOW}Dibatalkan.${NC}"; pause; return; fi
+            _bak="/tmp/sshd_config.bak.$$"
+            cp -a /etc/ssh/sshd_config "$_bak" 2>/dev/null
             grep -qE "^[#[:space:]]*ClientAliveInterval" /etc/ssh/sshd_config && sed -i 's/^[#[:space:]]*ClientAliveInterval.*/ClientAliveInterval 30/' /etc/ssh/sshd_config || echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config
             grep -qE "^[#[:space:]]*ClientAliveCountMax" /etc/ssh/sshd_config && sed -i 's/^[#[:space:]]*ClientAliveCountMax.*/ClientAliveCountMax 3/' /etc/ssh/sshd_config || echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config
             systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-            echo -e "${GREEN}Keepalive SSH AKTIF.${NC}" ;;
+            sleep 1
+            if systemctl is-active --quiet sshd 2>/dev/null || systemctl is-active --quiet ssh 2>/dev/null; then
+                echo -e "${GREEN}Keepalive SSH AKTIF.${NC}"
+            else
+                echo -e "${RED}Gagal restart sshd! Kembalikan config lama.${NC}"
+                [ -f "$_bak" ] && cp -a "$_bak" /etc/ssh/sshd_config
+                systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+            fi
+            rm -f "$_bak"
+            ;;
         2)
+            if ! grep -qE "^[[:space:]]*ClientAliveInterval" /etc/ssh/sshd_config; then
+                echo -e "${YELLOW}Keepalive SSH sudah NONAKTIF. Tidak perlu restart.${NC}"
+                pause; return
+            fi
+            read -p "Yakin nonaktifkan keepalive & restart sshd? (y/N): " _ka
+            if [[ ! "$_ka" =~ ^[Yy]$ ]]; then echo -e "${YELLOW}Dibatalkan.${NC}"; pause; return; fi
+            _bak="/tmp/sshd_config.bak.$$"
+            cp -a /etc/ssh/sshd_config "$_bak" 2>/dev/null
             sed -i "/^[#[:space:]]*ClientAliveInterval/d" /etc/ssh/sshd_config
             sed -i "/^[#[:space:]]*ClientAliveCountMax/d" /etc/ssh/sshd_config
             systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-            echo -e "${YELLOW}Keepalive SSH NONAKTIF.${NC}" ;;
+            sleep 1
+            if systemctl is-active --quiet sshd 2>/dev/null || systemctl is-active --quiet ssh 2>/dev/null; then
+                echo -e "${YELLOW}Keepalive SSH NONAKTIF.${NC}"
+            else
+                echo -e "${RED}Gagal restart sshd! Kembalikan config lama.${NC}"
+                [ -f "$_bak" ] && cp -a "$_bak" /etc/ssh/sshd_config
+                systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+            fi
+            rm -f "$_bak"
+            ;;
         0) return ;;
         *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
     esac
@@ -2292,11 +2433,23 @@ conf_keepalive() {
 conf_heartbeat() {
     clear; garis
     echo -e "${YELLOW}   TOGGLE HEARTBEAT WS (TCP keepalive)${NC}"; garis
-    if [ "${NATSSH_TCP_HEARTBEAT}" = "0" ]; then echo -e "Status: ${RED}NONAKTIF${NC}"; else echo -e "Status: ${GREEN}AKTIF (default)${NC}"; fi
+    _hb_cur="1"
+    if [ -f "${DIR}/config/.env" ]; then
+        _v=$(grep "^NATSSH_TCP_HEARTBEAT=" "${DIR}/config/.env" 2>/dev/null | cut -d= -f2)
+        [ -n "$_v" ] && _hb_cur="$_v"
+    fi
+    if [ "$_hb_cur" = "0" ]; then echo -e "Status: ${RED}NONAKTIF${NC}"; else echo -e "Status: ${GREEN}AKTIF (default)${NC}"; fi
     echo "1. Aktifkan"; echo "2. Nonaktifkan"; echo -e "${RED}0. Kembali${NC}"
     read -p "Pilih (0-2): " k || return
     case $k in
         1)
+            if [ "$_hb_cur" = "1" ]; then
+                echo -e "${YELLOW}Heartbeat WS sudah AKTIF. Tidak perlu restart.${NC}"
+                pause; return
+            fi
+            read -p "Yakin ubah & restart natssh-ws? koneksi terputus 2-3 detik (y/N): " _hb
+            if [[ ! "$_hb" =~ ^[Yy]$ ]]; then echo -e "${YELLOW}Dibatalkan.${NC}"; pause; return; fi
+            _bak_val="$_hb_cur"
             if [ -f "${DIR}/config/.env" ]; then
                 if grep -q "^NATSSH_TCP_HEARTBEAT=" "${DIR}/config/.env"; then
                     sed -i 's/^NATSSH_TCP_HEARTBEAT=.*/NATSSH_TCP_HEARTBEAT=1/' "${DIR}/config/.env"
@@ -2309,8 +2462,31 @@ conf_heartbeat() {
             muat_env
             systemctl daemon-reload
             systemctl restart natssh-ws.service
-            echo -e "${GREEN}Heartbeat WS AKTIF.${NC}" ;;
+            sleep 1
+            if systemctl is-active --quiet natssh-ws; then
+                echo -e "${GREEN}Heartbeat WS AKTIF.${NC}"
+            else
+                echo -e "${RED}Gagal restart natssh-ws! Kembalikan nilai lama.${NC}"
+                if [ -f "${DIR}/config/.env" ]; then
+                    if grep -q "^NATSSH_TCP_HEARTBEAT=" "${DIR}/config/.env"; then
+                        sed -i "s/^NATSSH_TCP_HEARTBEAT=.*/NATSSH_TCP_HEARTBEAT=$_bak_val/" "${DIR}/config/.env"
+                    else
+                        echo "NATSSH_TCP_HEARTBEAT=$_bak_val" >> "${DIR}/config/.env"
+                    fi
+                fi
+                muat_env
+                systemctl daemon-reload
+                systemctl restart natssh-ws.service
+            fi
+            ;;
         2)
+            if [ "$_hb_cur" = "0" ]; then
+                echo -e "${YELLOW}Heartbeat WS sudah NONAKTIF. Tidak perlu restart.${NC}"
+                pause; return
+            fi
+            read -p "Yakin ubah & restart natssh-ws? koneksi terputus 2-3 detik (y/N): " _hb
+            if [[ ! "$_hb" =~ ^[Yy]$ ]]; then echo -e "${YELLOW}Dibatalkan.${NC}"; pause; return; fi
+            _bak_val="$_hb_cur"
             if [ -f "${DIR}/config/.env" ]; then
                 if grep -q "^NATSSH_TCP_HEARTBEAT=" "${DIR}/config/.env"; then
                     sed -i 's/^NATSSH_TCP_HEARTBEAT=.*/NATSSH_TCP_HEARTBEAT=0/' "${DIR}/config/.env"
@@ -2323,7 +2499,23 @@ conf_heartbeat() {
             muat_env
             systemctl daemon-reload
             systemctl restart natssh-ws.service
-            echo -e "${YELLOW}Heartbeat WS NONAKTIF.${NC}" ;;
+            sleep 1
+            if systemctl is-active --quiet natssh-ws; then
+                echo -e "${YELLOW}Heartbeat WS NONAKTIF.${NC}"
+            else
+                echo -e "${RED}Gagal restart natssh-ws! Kembalikan nilai lama.${NC}"
+                if [ -f "${DIR}/config/.env" ]; then
+                    if grep -q "^NATSSH_TCP_HEARTBEAT=" "${DIR}/config/.env"; then
+                        sed -i "s/^NATSSH_TCP_HEARTBEAT=.*/NATSSH_TCP_HEARTBEAT=$_bak_val/" "${DIR}/config/.env"
+                    else
+                        echo "NATSSH_TCP_HEARTBEAT=$_bak_val" >> "${DIR}/config/.env"
+                    fi
+                fi
+                muat_env
+                systemctl daemon-reload
+                systemctl restart natssh-ws.service
+            fi
+            ;;
         0) return ;;
         *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
     esac
@@ -2331,6 +2523,11 @@ conf_heartbeat() {
 }
 
 conf_nginx_port() {
+    if ! command -v nginx >/dev/null 2>&1; then
+        echo -e "${RED}nginx belum terpasang. Pasang dulu: apt-get install -y nginx libnginx-mod-stream${NC}"
+        pause
+        return
+    fi
     conf_file="/etc/nginx/sites-available/natssh-ws"
     if [ -f "${DIR}/config/.env" ] && grep -q "^NGINX_REVERSE_PORT=" "${DIR}/config/.env"; then
         cur=$(grep "^NGINX_REVERSE_PORT=" "${DIR}/config/.env" | cut -d= -f2)
@@ -2375,6 +2572,19 @@ conf_nginx_port() {
         echo "NGINX_REVERSE_PORT=$new_port" > "${DIR}/config/.env"
     fi
     muat_env
+    if ! nginx -t >/dev/null 2>&1; then
+        echo -e "${RED}Config nginx invalid! Kembalikan ke port lama.${NC}"
+        sed -i "s/listen [0-9]* ssl;/listen $cur ssl;/" "$conf_file"
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^NGINX_REVERSE_PORT=" "${DIR}/config/.env"; then
+                sed -i "s/^NGINX_REVERSE_PORT=.*/NGINX_REVERSE_PORT=$cur/" "${DIR}/config/.env"
+            fi
+        fi
+        muat_env
+        nginx -t >/dev/null 2>&1 && systemctl restart nginx
+        pause
+        return
+    fi
     systemctl restart nginx
     sleep 1
     systemctl is-active --quiet nginx && \
@@ -2432,29 +2642,58 @@ conf_port_direct() {
         echo "NATSSH_SSH_DIRECT_PORT=$new_port" > "${DIR}/config/.env"
     fi
     muat_env
+    stconf="/etc/nginx/stream.conf"
+    # Update stream proxy_pass SEBELUM restart service
+    if [ -f "$stconf" ]; then
+        sed -i "s|proxy_pass 127.0.0.1:[0-9]*;|proxy_pass 127.0.0.1:$new_port;|" "$stconf"
+        if ! nginx -t >/dev/null 2>&1; then
+            echo -e "${RED}Config nginx invalid! Kembalikan ke port lama.${NC}"
+            sed -i "s|proxy_pass 127.0.0.1:[0-9]*;|proxy_pass 127.0.0.1:$cur_port;|" "$stconf"
+            sed -i "s/^NATSSH_SSH_DIRECT_PORT=.*/NATSSH_SSH_DIRECT_PORT=$cur_port/" "${DIR}/config/.env"
+            muat_env
+            pause
+            return
+        fi
+    fi
     echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
     read -p "Yakin restart? Koneksi aktif akan terputus (y/N): " cfr
     if [[ ! "$cfr" =~ ^[Yy]$ ]]; then
-        echo -e "${YELLOW}Dibatalkan.${NC}"
+        echo -e "${YELLOW}Dibatalkan. Kembalikan port ke $cur_port.${NC}"
+        sed -i "s/^NATSSH_SSH_DIRECT_PORT=.*/NATSSH_SSH_DIRECT_PORT=$cur_port/" "${DIR}/config/.env"
+        if [ -f "$stconf" ]; then
+            sed -i "s|proxy_pass 127.0.0.1:[0-9]*;|proxy_pass 127.0.0.1:$cur_port;|" "$stconf"
+            nginx -t >/dev/null 2>&1 && systemctl reload nginx
+        fi
+        muat_env
         pause
         return
     fi
+    systemctl daemon-reload 2>/dev/null
     systemctl restart natssh-ws
-    sleep 1
+    for _i in $(seq 1 10); do
+        systemctl is-active --quiet natssh-ws && break
+        sleep 1
+    done
     if systemctl is-active --quiet natssh-ws; then
         echo -e "${GREEN}SUKSES! SSH Direct kini di port $new_port.${NC}"
-        # Update nginx stream proxy_pass ke port direct baru
-        stconf="/etc/nginx/stream.conf"
         if [ -f "$stconf" ]; then
-            sed -i "s|proxy_pass 127.0.0.1:[0-9]*;|proxy_pass 127.0.0.1:$new_port;|" "$stconf"
-            if nginx -t >/dev/null 2>&1 && systemctl restart nginx; then
-                echo -e "${GREEN}Nginx Stream diupdate forward ke port $new_port.${NC}"
+            if systemctl reload nginx; then
+                echo -e "${GREEN}Nginx Stream di-reload (proxy $new_port).${NC}"
             else
-                echo -e "${RED}Nginx gagal restart! Cek: journalctl -u nginx -n 20${NC}"
+                echo -e "${RED}Nginx gagal reload! Cek: journalctl -u nginx -n 20${NC}"
             fi
         fi
     else
         echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+        echo -e "${YELLOW}Kembalikan port ke $cur_port...${NC}"
+        sed -i "s/^NATSSH_SSH_DIRECT_PORT=.*/NATSSH_SSH_DIRECT_PORT=$cur_port/" "${DIR}/config/.env"
+        if [ -f "$stconf" ]; then
+            sed -i "s|proxy_pass 127.0.0.1:[0-9]*;|proxy_pass 127.0.0.1:$cur_port;|" "$stconf"
+            nginx -t >/dev/null 2>&1 && systemctl reload nginx
+        fi
+        muat_env
+        systemctl daemon-reload 2>/dev/null
+        systemctl restart natssh-ws
     fi
     pause
 }
@@ -2467,13 +2706,15 @@ conf_toggle_ssh_direct() {
         return
     fi
     if grep -q "^NATSSH_SSH_DIRECT_ENABLED=1" "${DIR}/config/.env" 2>/dev/null; then
+        cur_val=1
         new_val=0
         pesan="NONAKTIF"
     else
+        cur_val=0
         new_val=1
         pesan="AKTIF"
     fi
-    echo -e "SSH Direct saat ini: $([ "$new_val" = "1" ] && echo -e "${RED}NONAKTIF${NC}" || echo -e "${GREEN}AKTIF${NC}")"
+    echo -e "SSH Direct saat ini: $([ "$cur_val" = "1" ] && echo -e "${GREEN}AKTIF${NC}" || echo -e "${RED}NONAKTIF${NC}")"
     echo -e "${YELLOW}Akan diubah menjadi: ${GREEN}${pesan}${NC}"
     echo -e "${RED}PERINGATAN: Semua koneksi aktif akan terputus!${NC}"
     read -p "Yakin toggle SSH Direct? Koneksi aktif akan terputus (y/N): " cfr
@@ -2492,18 +2733,36 @@ conf_toggle_ssh_direct() {
         echo "NATSSH_SSH_DIRECT_ENABLED=$new_val" > "${DIR}/config/.env"
     fi
     muat_env
-    echo -e "${YELLOW}Restart natssh-ws — koneksi aktif terputus 2-3 detik...${NC}"
+    systemctl daemon-reload 2>/dev/null
     systemctl restart natssh-ws
-    sleep 1
+    for _i in $(seq 1 10); do
+        systemctl is-active --quiet natssh-ws && break
+        sleep 1
+    done
     if systemctl is-active --quiet natssh-ws; then
         echo -e "${GREEN}SUKSES! SSH Direct kini ${pesan}.${NC}"
     else
-        echo -e "${RED}Service gagal start! Cek: journalctl -u natssh-ws -n 20${NC}"
+        echo -e "${RED}Service gagal start! Kembalikan nilai lama.${NC}"
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^NATSSH_SSH_DIRECT_ENABLED=" "${DIR}/config/.env"; then
+                sed -i "s/^NATSSH_SSH_DIRECT_ENABLED=[01]/NATSSH_SSH_DIRECT_ENABLED=$cur_val/" "${DIR}/config/.env"
+            else
+                echo "NATSSH_SSH_DIRECT_ENABLED=$cur_val" >> "${DIR}/config/.env"
+            fi
+        fi
+        muat_env
+        systemctl daemon-reload 2>/dev/null
+        systemctl restart natssh-ws
     fi
     pause
 }
 
 conf_nginx_stream_port() {
+    if ! command -v nginx >/dev/null 2>&1; then
+        echo -e "${RED}nginx belum terpasang. Pasang dulu: apt-get install -y nginx libnginx-mod-stream${NC}"
+        pause
+        return
+    fi
     conf_file="/etc/nginx/stream.conf"
     if [ -f "${DIR}/config/.env" ] && grep -q "^NGINX_STREAM_PORT=" "${DIR}/config/.env"; then
         cur=$(grep "^NGINX_STREAM_PORT=" "${DIR}/config/.env" | cut -d= -f2)
@@ -2548,6 +2807,19 @@ conf_nginx_stream_port() {
         echo "NGINX_STREAM_PORT=$new_port" > "${DIR}/config/.env"
     fi
     muat_env
+    if ! nginx -t >/dev/null 2>&1; then
+        echo -e "${RED}Config nginx invalid! Kembalikan ke port lama.${NC}"
+        sed -i "s/listen [0-9]*;/listen $cur;/" "$conf_file"
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^NGINX_STREAM_PORT=" "${DIR}/config/.env"; then
+                sed -i "s/^NGINX_STREAM_PORT=.*/NGINX_STREAM_PORT=$cur/" "${DIR}/config/.env"
+            fi
+        fi
+        muat_env
+        nginx -t >/dev/null 2>&1 && systemctl restart nginx
+        pause
+        return
+    fi
     systemctl restart nginx
     sleep 1
     systemctl is-active --quiet nginx && \

@@ -19,6 +19,7 @@ import pwd
 
 LOG = "/root/natssh/logs/autokill.log"
 LOCK_FILE = "/root/natssh/logs/reap.lock"
+CAND_FILE = "/root/natssh/logs/reap_candidates.txt"
 
 
 def ensure_log_dir():
@@ -97,6 +98,18 @@ def main():
             if m:
                 live.add(m.group(1))
 
+        # Baca kandidat dari run sebelumnya (grace period 2 menit)
+        cand = {}
+        try:
+            with open(CAND_FILE) as f:
+                for ln in f:
+                    parts = ln.split()
+                    if len(parts) >= 3 and parts[1].isdigit():
+                        cand[int(parts[1])] = (int(parts[0]), parts[2])
+        except OSError:
+            pass
+        new_cand = {}
+
         # 2) sisi sshd: pasangan loopback yg port bridgenya tak hidup
         reaped = 0
         pids_seen = set()
@@ -122,7 +135,29 @@ def main():
                     continue  # bukan akun jualan
             except KeyError:
                 continue
-            if kill_hantu(pid, user_out, "soket bridge mati"):
+
+            # Grace period: jangan bunuh pada run pertama; tandai kandidat
+            now_ts = time.time()
+            if pid not in cand:
+                new_cand[pid] = (int(now_ts), user_out)
+                with open(LOG, "a") as f:
+                    f.write(time.strftime("%Y-%m-%d %H:%M:%S") +
+                            f" - REAP: kandidat grace, user={user_out} pid={pid} (soket bridge mati, tunggu 2m)\n")
+                continue
+            cand_ts, _ = cand[pid]
+            if now_ts - cand_ts < 120:
+                new_cand[pid] = (cand_ts, user_out)
+                with open(LOG, "a") as f:
+                    f.write(time.strftime("%Y-%m-%d %H:%M:%S") +
+                            f" - REAP: masih grace ({int(now_ts - cand_ts)}s), user={user_out} pid={pid}\n")
+                continue
+            # Double-check: jika masih ada koneksi TCP ESTABLISHED untuk pid ini, lewati
+            if has_active_connection(pid):
+                with open(LOG, "a") as f:
+                    f.write(time.strftime("%Y-%m-%d %H:%M:%S") +
+                            f" - REAP: lewati (masih ada koneksi TCP), user={user_out} pid={pid}\n")
+                continue
+            if kill_hantu(pid, user_out, "soket bridge mati (grace habis)"):
                 reaped += 1
 
         # 3) proses sshd jualan TANPA pasangan TCP sama sekali (socket sudah lenyap) = hantu total
@@ -140,11 +175,35 @@ def main():
                 # Cek apakah masih ada koneksi aktif pada port 22 untuk PID ini
                 if has_active_connection(pid):
                     continue
-                if kill_hantu(pid, p.pw_name, "tanpa TCP (socket lenyap)"):
+                # Grace period untuk hantu total juga
+                now_ts = time.time()
+                if pid not in cand:
+                    new_cand[pid] = (int(now_ts), p.pw_name)
+                    with open(LOG, "a") as f:
+                        f.write(time.strftime("%Y-%m-%d %H:%M:%S") +
+                                f" - REAP: kandidat grace (tanpa TCP), user={p.pw_name} pid={pid} (tunggu 2m)\n")
+                    continue
+                cand_ts, _ = cand[pid]
+                if now_ts - cand_ts < 120:
+                    new_cand[pid] = (cand_ts, p.pw_name)
+                    with open(LOG, "a") as f:
+                        f.write(time.strftime("%Y-%m-%d %H:%M:%S") +
+                                f" - REAP: masih grace ({int(now_ts - cand_ts)}s), user={p.pw_name} pid={pid}\n")
+                    continue
+                if kill_hantu(pid, p.pw_name, "tanpa TCP (socket lenyap, grace habis)"):
                     reaped += 1
+
+        # Simpan kandidat untuk run berikutnya
+        try:
+            with open(CAND_FILE, "w") as f:
+                for pid, (ts, user) in new_cand.items():
+                    f.write(f"{int(ts)} {pid} {user}\n")
+        except OSError:
+            pass
+
         with open(LOG, "a") as f:
             f.write(time.strftime("%Y-%m-%d %H:%M:%S") +
-                    f" - REAP: selesai, {reaped} sesi dibunuh\n")
+                    f" - REAP: selesai, {reaped} sesi dibunuh (kandidat tertunda: {len(new_cand)})\n")
         return 0
     finally:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)

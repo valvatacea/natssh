@@ -50,6 +50,25 @@ rm -f /etc/nginx/ssl/natssh.pem /etc/nginx/ssl/natssh_key.pem /etc/nginx/ssl/nat
 systemctl daemon-reload
 echo -e "${GREEN}Service nginx berhasil dihapus.${NC}"
 
+# Bersihkan sisa config natssh di nginx (jika ada)
+rm -f /etc/nginx/conf.d/cdn-label.conf
+rm -f /etc/nginx/ssl/natssh.pem /etc/nginx/ssl/natssh_key.pem /etc/nginx/ssl/natssh_fullchain.pem /etc/nginx/ssl/natssh.crt /etc/nginx/ssl/natssh.key
+rm -f /etc/nginx/stream.conf
+sed -i '/include \/etc\/nginx\/stream\.conf;/d' /etc/nginx/nginx.conf 2>/dev/null || true
+if systemctl is-active --quiet nginx 2>/dev/null; then
+    nginx -t 2>/dev/null && systemctl reload nginx 2>/dev/null || true
+fi
+
+read -p "Hapus juga package nginx (purge) dari sistem? (y/N): " purge_nginx
+if [[ "$purge_nginx" =~ ^[Yy]$ ]]; then
+    apt-get purge -y nginx nginx-common libnginx-mod-stream 2>/dev/null
+    apt-get autoremove -y 2>/dev/null
+    rm -rf /etc/nginx
+    echo -e "${GREEN}Package nginx dihapus.${NC}"
+else
+    echo -e "${YELLOW}Package nginx dipertahankan.${NC}"
+fi
+
 echo -e "\\n[*] Membersihkan konfigurasi Nginx Stream (SSH Direct)..."
 rm -f /etc/nginx/stream.conf
 sed -i '/include \/etc\/nginx\/stream\.conf;/d' /etc/nginx/nginx.conf
@@ -58,8 +77,14 @@ echo -e "${GREEN}Konfigurasi Nginx Stream dibersihkan.${NC}"
 
 echo -e "\n[*] Membersihkan crontab..."
 crontab_l=$(crontab -l 2>/dev/null)
-crontab_new=$(echo "$crontab_l" | grep -v "unsuspend.sh" | grep -v "autobackup.sh" | grep -v "apply_speed.sh" | grep -v "generate_cdn_geo.sh" | grep -v "systemctl.*restart.*natssh-ws" | grep -v "systemctl.*restart.*natssh-udpgw" | grep -v "systemctl.*restart.*nginx" | grep -v "sess_audit" | grep -v "autokill.sh" | grep -v "acme.sh --cron")
-echo "$crontab_new" | crontab - 2>/dev/null || true
+crontab_tmp=$(mktemp)
+echo "$crontab_l" | grep -v "unsuspend.sh" | grep -v "autobackup.sh" | grep -v "apply_speed.sh" | grep -v "generate_cdn_geo.sh" | grep -v "systemctl.*restart.*natssh-ws" | grep -v "systemctl.*restart.*natssh-udpgw" | grep -v "systemctl.*restart.*nginx" | grep -v "sess_audit" | grep -v "autokill.sh" | grep -v "acme.sh --cron" > "$crontab_tmp" || true
+if [ -s "$crontab_tmp" ]; then
+    crontab "$crontab_tmp"
+else
+    crontab -r 2>/dev/null || true
+fi
+rm -f "$crontab_tmp"
 
 echo -e "\n[*] Merestore sshd_config dari backup (rollback)..."
 if [ -f /etc/ssh/sshd_config.natssh_backup ]; then
@@ -102,7 +127,8 @@ if [[ "$hapus_file" =~ ^[Yy]$ ]]; then
     else
         echo -e "${YELLOW}Data dipertahankan.${NC}"
     fi
-    echo -e "${GREEN}File skrip berhasil dihapus dari direktori natssh.${NC}"
+    rmdir "$DIR" 2>/dev/null || true
+echo -e "${GREEN}File skrip berhasil dihapus dari direktori natssh.${NC}"
 else
     echo -e "${YELLOW}File skrip tetap dipertahankan.${NC}"
 fi

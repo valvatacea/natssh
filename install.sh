@@ -96,6 +96,8 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+DIR=$(pwd)
+
 # ── Idempotensi: jangan install ulang tanpa konfirmasi ──
 if [ -f "$DIR/config/.env" ] || [ -f /etc/systemd/system/natssh-ws.service ]; then
     echo -e "${YELLOW}Peringatan: natssh sudah terinstal di $DIR${NC}"
@@ -146,7 +148,6 @@ if ss -tln | grep -q ":${direct_port} "; then
     echo -e "${RED}Port ${direct_port} sudah dipakai proses lain!${NC}"; exit 1
 fi
 
-DIR=$(pwd)
 echo -e "\n[*] Direktori instalasi: $DIR"
 
 mkdir -p "$DIR/config"
@@ -259,6 +260,27 @@ else
 fi
 ## Fase 4: Generate cdn_geo.conf (selesai)
 
+# Simpan semua konfigurasi natssh ke .env SEBELUM start service
+mkdir -p "$DIR/config"
+env_set "NATSSH_WS_PORT" "$ws_port"
+env_set "NATSSH_MAX_TOTAL" "150"
+env_set "NATSSH_SSH_DIRECT_ENABLED" "1"
+env_set "NATSSH_SSH_DIRECT_PORT" "$direct_port"
+env_set "NATSSH_PROXY_PROTOCOL" "1"
+env_set "NATSSH_TCP_HEARTBEAT" "1"
+env_set "NATSSH_IDLE_TIMEOUT" "300"
+env_set "NATSSH_MAX_CONN_AGE" "3600"
+env_set "NATSSH_SSH_PORT" "22"
+env_set "MAX_LOGIN" "$max_login"
+env_set "NATSSH_MAX_PER_IP" "15"
+env_set "IFACE" "eth0"
+env_set "MODE" "cdn-split"
+env_set "SUSPEND_MINUTES" "15"
+env_set "UP_CF" "100mbit"
+env_set "DOWN_CF" "100mbit"
+env_set "UP_CFRONT" "100mbit"
+env_set "DOWN_CFRONT" "100mbit"
+
 echo -e "\n[*] Mengatur Service Systemd untuk WebSocket Proxy (ws.py)..."
 cat > /etc/systemd/system/natssh-ws.service <<EOF
 [Unit]
@@ -283,20 +305,6 @@ systemctl start natssh-ws.service
 echo -e "${GREEN}Service natssh-ws berhasil dibuat dan dijalankan!${NC}"
 ## Fase 5: Service Systemd & .env Configuration (selesai)
 
-# Simpan semua konfigurasi natssh ke .env
-env_set "NATSSH_WS_PORT" "$ws_port"
-env_set "NATSSH_MAX_TOTAL" "150"
-env_set "NATSSH_SSH_DIRECT_ENABLED" "1"
-env_set "NATSSH_SSH_DIRECT_PORT" "$direct_port"
-env_set "NATSSH_PROXY_PROTOCOL" "1"
-env_set "NATSSH_TCP_HEARTBEAT" "1"
-env_set "NATSSH_IDLE_TIMEOUT" "300"
-env_set "NATSSH_MAX_CONN_AGE" "3600"
-env_set "NATSSH_SSH_PORT" "22"
-env_set "MAX_LOGIN" "$max_login"
-env_set "NATSSH_MAX_PER_IP" "15"
-env_set "IFACE" "eth0"
-env_set "MODE" "cdn-split"
 ## Fase 6: badvpn-udpgw & Nginx Install (selesai)
 
 udpgw_ports="7100 7200 7300 7400 7500"
