@@ -82,6 +82,8 @@ akun_baru() {
                 template=$(cat "$card_template")
                 template=${template//\{domain\}/$host}
                 template=${template//\{domain_cf\}/$hostcf}
+                template=${template//\{dnstt_ns\}/${DNSTT_NS}}
+                template=${template//\{dnstt_pubkey\}/${DNSTT_PUBKEY}}
                 template=${template//\{cf_ports\}/$cf_ports}
                 template=${template//\{cf_front_ports\}/$cf_front_ports}
                 template=${template//\{udpgw_ports\}/${udpgw_ports:-7300}}
@@ -108,6 +110,8 @@ akun_baru() {
                 echo "================ DETAIL AKUN ================"
                 echo "Domain    : $host"
                 [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
+                [ -n "${DNSTT_NS}" ] && echo "DNSTT NS  : ${DNSTT_NS}"
+                [ -n "${DNSTT_PUBKEY}" ] && echo "DNSTT Key : ${DNSTT_PUBKEY}"
                 # Hide IP jika HIDE_IP = 1 (dari .env)
                 if [ "${HIDE_IP}" != "1" ]; then
                     echo "IP        : $ipaddr"
@@ -2965,6 +2969,66 @@ conf_domain_cf_edit() {
 }
 
 
+conf_dnstt_ns_edit() {
+    local cur=${DNSTT_NS}
+    echo -e "DNSTT NS saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
+    read -p "DNSTT NS baru (contoh: t.domain.com, kosong = hapus, 0 = batal): " h
+    [ "$h" = "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if [ -z "$h" ]; then
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^DNSTT_NS=" "${DIR}/config/.env"; then
+                sed -i "/^DNSTT_NS=/d" "${DIR}/config/.env"
+            fi
+        fi
+        muat_env
+        echo -e "${GREEN}DNSTT NS dihapus — baris 'DNSTT NS' tak tampil di kartu.${NC}"
+    elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}$ ]]; then
+        echo -e "${RED}Gagal: format NS salah (contoh: t.domain.com)!${NC}"
+    else
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^DNSTT_NS=" "${DIR}/config/.env"; then
+                sed -i "s|^DNSTT_NS=.*|DNSTT_NS=$h|" "${DIR}/config/.env"
+            else
+                echo "DNSTT_NS=$h" >> "${DIR}/config/.env"
+            fi
+        else
+            echo "DNSTT_NS=$h" > "${DIR}/config/.env"
+        fi
+        muat_env
+        echo -e "${GREEN}DNSTT NS tersimpan: $h — muncul di baris 'DNSTT NS' kartu akun.${NC}"
+    fi
+}
+
+conf_dnstt_pubkey_edit() {
+    local cur=${DNSTT_PUBKEY}
+    echo -e "DNSTT PubKey saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
+    read -p "DNSTT PubKey hex (64 char, kosong = hapus, 0 = batal): " h
+    [ "$h" = "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if [ -z "$h" ]; then
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^DNSTT_PUBKEY=" "${DIR}/config/.env"; then
+                sed -i "/^DNSTT_PUBKEY=/d" "${DIR}/config/.env"
+            fi
+        fi
+        muat_env
+        echo -e "${GREEN}DNSTT PubKey dihapus — baris 'DNSTT PubKey' tak tampil di kartu.${NC}"
+    elif ! [[ "$h" =~ ^[0-9a-fA-F]{64}$ ]]; then
+        echo -e "${RED}Gagal: PubKey harus hex 64 karakter!${NC}"
+    else
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^DNSTT_PUBKEY=" "${DIR}/config/.env"; then
+                sed -i "s|^DNSTT_PUBKEY=.*|DNSTT_PUBKEY=$h|" "${DIR}/config/.env"
+            else
+                echo "DNSTT_PUBKEY=$h" >> "${DIR}/config/.env"
+            fi
+        else
+            echo "DNSTT_PUBKEY=$h" > "${DIR}/config/.env"
+        fi
+        muat_env
+        echo -e "${GREEN}DNSTT PubKey tersimpan — muncul di baris 'DNSTT PubKey' kartu akun.${NC}"
+    fi
+}
+
 # Ekstraksi root domain menggunakan Public Suffix List (unduh dari publicsuffix.org)
 extract_root_domain() {
     local domain="$1"
@@ -3226,18 +3290,24 @@ terbitkan_ulang_sertifikat() {
 }
 
 conf_domain() {
-    # satu pintu domain: Cloudflare (biasa) + CloudFront — dua-duanya ke kartu akun
+    # satu pintu domain: Cloudflare (biasa) + CloudFront + DNSTT — ke kartu akun
     while true; do
-        local cur curcf
+        local cur curcf curns curpk
         cur=${DOMAIN}
         curcf=${DOMAIN_CF}
+        curns=${DNSTT_NS}
+        curpk=${DNSTT_PUBKEY}
         echo -e "1. Domain (Cloudflare) : ${GREEN}${cur:-OTOMATIS (IP publik)}${NC}"
         echo -e "2. Domain CloudFront   : ${GREEN}${curcf:-BELUM DIATUR}${NC}"
+        echo -e "3. DNSTT NS            : ${GREEN}${curns:-BELUM DIATUR}${NC}"
+        echo -e "4. DNSTT PubKey        : ${GREEN}${curpk:-BELUM DIATUR}${NC}"
         echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-2): " p || exit 0
+        read -p "Pilih (0-4): " p || exit 0
         case $p in
             1) conf_domain_edit ;;
             2) conf_domain_cf_edit ;;
+            3) conf_dnstt_ns_edit ;;
+            4) conf_dnstt_pubkey_edit ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac

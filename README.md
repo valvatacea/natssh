@@ -221,6 +221,29 @@ Jika VPS Anda masih menggunakan Stunnel4 sebagai terminator TLS:
 4. Restart Nginx dan `natssh-ws`
 5. Verifikasi dengan `curl` (harus balas HTTP 101)
 
+## DNSTT Server (Opsional)
+
+DNSTT adalah SSH over DNS (SlowDNS). Installer natssh menyediakan skrip terpisah `install_dnstt.sh` yang dapat dipanggil saat instalasi atau dijalankan manual.
+
+### Penambahan NS
+1. Login ke panel DNS provider.
+2. Buat record:
+   - `A`  : `tns.domainanda.com -> IP VPS`
+   - `NS` : `t.domainanda.com -> tns.domainanda.com`
+3. Jalankan installer DNSTT atau buka menu natssh → Konfigurasi Sistem → Domain/Host → DNSTT NS.
+4. Masukkan NS, contoh: `t.domainanda.com`.
+5. Nilai disimpan ke `config/.env` sebagai `DNSTT_NS`.
+6. DNSTT PubKey (hex 64 karakter) disimpan ke `config/.env` sebagai `DNSTT_PUBKEY`.
+7. Restart service:
+   - `systemctl restart natssh-dnstt`
+8. Gunakan di client:
+   - `dnstt-client -udp 1.1.1.1:53 -pubkey-file server.pub <DNSTT_NS> 127.0.0.1:8000`
+
+Catatan:
+- Installer tidak dapat membuat DNS record otomatis.
+- Jika `DNSTT_NS` atau `DNSTT_PUBKEY` kosong, baris DNSTT tidak ditampilkan di kartu akun.
+- Port 53 harus tersedia atau redirect UDP 53 → 5300 berhasil dibuat.
+
 ## 📄 Lisensi
 
 Distribusikan di bawah lisensi MIT. Lihat file `LICENSE` untuk detail.

@@ -326,6 +326,13 @@ cd - >/dev/null
 if ! command -v badvpn-udpgw >/dev/null 2>&1; then
     echo -e "${RED}Gagal build/install badvpn-udpgw.${NC}"; exit 1
 fi
+
+# Bersihkan source/build sementara dan tools build setelah sukses.
+# git dipertahankan karena dipakai oleh fitur lain (mis. update Hermes).
+rm -rf /tmp/badvpn-build
+apt-get purge -y build-essential cmake >/dev/null 2>&1
+apt-get autoremove -y >/dev/null 2>&1
+echo -e "${GREEN}Build tools badvpn dibersihkan.${NC}"
 ## Fase 7: badvpn-udpgw Selesai (selesai)
 
 echo -e "\n[*] Mengatur template Service Systemd untuk badvpn-udpgw..."
@@ -689,6 +696,24 @@ exec $DIR/menu.sh \$@
 EOF
 chmod +x /usr/local/bin/natssh
 echo -e "${GREEN}Perintah 'natssh' telah dibuat. Ketik 'natssh' untuk membuka menu.${NC}"
+
+# Tandai natssh sukses agar hook DNSTT tidak memicu rollback .env
+INSTALL_SUKSES=1
+rm -f "$DIR/config/.env.bak"
+
+echo -e "\n[*] DNSTT server (opsional)..."
+if [ ! -f "$DIR/install_dnstt.sh" ]; then
+    wget -qO "$DIR/install_dnstt.sh" https://raw.githubusercontent.com/valvatacea/natssh/main/install_dnstt.sh
+    [ -s "$DIR/install_dnstt.sh" ] && chmod +x "$DIR/install_dnstt.sh"
+fi
+read -p "Install DNSTT server juga? (y/N): " install_dnstt
+if [[ "$install_dnstt" =~ ^[Yy]$ ]]; then
+    if [ -x "$DIR/install_dnstt.sh" ]; then
+        bash "$DIR/install_dnstt.sh" "$ssl_domain"
+    else
+        echo -e "${RED}Gagal menyiapkan install_dnstt.sh.${NC}"
+    fi
+fi
 
 echo -e "\n${CYAN}================================================${NC}"
 echo -e "${GREEN} INSTALASI SELESAI!                             ${NC}"
