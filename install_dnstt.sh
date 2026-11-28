@@ -188,6 +188,49 @@ if [ -z "$ns" ]; then
     rm -f /etc/systemd/system/natssh-dnstt.service
     systemctl daemon-reload >/dev/null 2>&1 || true
 else
+    echo -e "\\n[*] Membuat config Nginx SNI untuk Xray..."
+    mkdir -p /etc/nginx/stream.d
+    if [ ! -f /etc/nginx/stream.conf ]; then
+        cat > /etc/nginx/stream.conf <<EOF
+stream {
+    include /etc/nginx/stream.d/*.conf;
+}
+EOF
+    fi
+
+    read -p "VMess SNI domain (kosong skip): " vmess_domain
+    read -p "VMess port [10001]: " vmess_port
+    vmess_port=${vmess_port:-10001}
+    read -p "VLESS SNI domain (kosong skip): " vless_domain
+    read -p "VLESS port [10002]: " vless_port
+    vless_port=${vless_port:-10002}
+    read -p "Trojan SNI domain (kosong skip): " trojan_domain
+    read -p "Trojan port [10003]: " trojan_port
+    trojan_port=${trojan_port:-10003}
+
+    {
+        echo "map \$ssl_preread_server_name \$dnstt_backend {"
+        [ -n "$vmess_domain" ] && echo "    ${vmess_domain}   127.0.0.1:${vmess_port};"
+        [ -n "$vless_domain" ] && echo "    ${vless_domain}   127.0.0.1:${vless_port};"
+        [ -n "$trojan_domain" ] && echo "    ${trojan_domain}  127.0.0.1:${trojan_port};"
+        echo "    default            127.0.0.1:22;"
+        echo "}"
+        echo ""
+        echo "server {"
+        echo "    listen 127.0.0.1:9000;"
+        echo "    proxy_pass \$dnstt_backend;"
+        echo "    ssl_preread on;"
+        echo "}"
+    } > /etc/nginx/stream.d/dnstt.conf
+
+    if ! nginx -t >/dev/null 2>&1; then
+        echo -e "${RED}Config nginx invalid. Hapus dnstt.conf.${NC}"
+        rm -f /etc/nginx/stream.d/dnstt.conf
+    else
+        systemctl restart nginx >/dev/null 2>&1 || true
+        echo -e "${GREEN}Config Nginx SNI DNSTT dibuat.${NC}"
+    fi
+
     echo -e "\\n[*] Membuat service systemd DNSTT..."
     cat > /etc/systemd/system/natssh-dnstt.service <<EOF
 [Unit]
@@ -198,7 +241,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=${DIR}/dnstt
-ExecStart=/usr/local/bin/dnstt-server -udp :5300 -privkey-file ${DIR}/dnstt/server.key ${ns} 127.0.0.1:22
+ExecStart=/usr/local/bin/dnstt-server -udp :5300 -privkey-file ${DIR}/dnstt/server.key ${ns} 127.0.0.1:9000
 Restart=always
 RestartSec=3
 
