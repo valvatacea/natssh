@@ -2849,42 +2849,43 @@ menu_conf() {
         echo -e "${CYAN}  -- Layanan --${NC}"
         printf "  %-3s %-46s\n" "3." "Kontrol SSH WS"
         printf "  %-3s %-46s\n" "4." "Kontrol SSH Direct"
-        printf "  %-3s %-46s\n" "5." "Kontrol UDPGW"
-        printf "  %-3s %-46s\n" "6." "Kontrol Nginx"
+        printf "  %-3s %-46s\n" "5." "Kontrol DNSTT"
+        printf "  %-3s %-46s\n" "6." "Kontrol UDPGW"
+        printf "  %-3s %-46s\n" "7." "Kontrol Nginx"
         echo -e "${CYAN}  -- Batas --${NC}"
-        printf "  %-3s %-46s\n" "7." "Login per Akun"
-        printf "  %-3s %-46s\n" "8." "Koneksi Serentak"
-        printf "  %-3s %-46s\n" "9." "Koneksi per IP"
-        printf "  %-3s %-46s\n" "10." "Limit Speed"
+        printf "  %-3s %-46s\n" "8." "Login per Akun"
+        printf "  %-3s %-46s\n" "9." "Koneksi Serentak"
+        printf "  %-3s %-46s\n" "10." "Koneksi per IP"
+        printf "  %-3s %-46s\n" "11." "Limit Speed"
         echo -e "${CYAN}  -- Lainnya --${NC}"
-        printf "  %-3s %-46s\n" "11." "Penjadwalan"
-        printf "  %-3s %-46s\n" "12." "Banner Pelanggan"
-        printf "  %-3s %-46s\n" "13." "Durasi Suspend"
-        printf "  %-3s %-46s\n" "14." "Test Ping"
-        printf "  %-3s %-46s\n" "15." "Kontrol DNSTT"
+        printf "  %-3s %-46s\n" "12." "Penjadwalan"
+        printf "  %-3s %-46s\n" "13." "Banner Pelanggan"
+        printf "  %-3s %-46s\n" "14." "Durasi Suspend"
+        printf "  %-3s %-46s\n" "15." "Test Ping"
         read -p "Pilih (0-15): " p || exit 0
         case $p in
             1) conf_domain ;;
             2) conf_ip ;;
             3) conf_service ;;
             4) conf_service_direct ;;
-            5) conf_udpgw_service ;;
-            6) conf_nginx_service ;;
-            7) conf_maxlogin ;;
-            8) conf_maxtotal ;;
-            9) conf_maxperip ;;
-            10) conf_speed ;;
-            11) conf_restart_schedule ;;
-            12) conf_banner ;;
-            13) conf_suspend_minutes ;;
-            14) conf_test_ping ;;
-            15) conf_dnstt_control ;;
+            5) conf_dnstt_control ;;
+            6) conf_udpgw_service ;;
+            7) conf_nginx_service ;;
+            8) conf_maxlogin ;;
+            9) conf_maxtotal ;;
+            10) conf_maxperip ;;
+            11) conf_speed ;;
+            12) conf_restart_schedule ;;
+            13) conf_banner ;;
+            14) conf_suspend_minutes ;;
+            15) conf_test_ping ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
         [ "$p" != "0" ] && [ "$p" != "1" ] && [ "$p" != "2" ] && [ "$p" != "3" ] && [ "$p" != "4" ] && [ "$p" != "5" ] && [ "$p" != "6" ] && [ "$p" != "7" ] && [ "$p" != "8" ] && [ "$p" != "9" ] && [ "$p" != "10" ] && [ "$p" != "11" ] && [ "$p" != "12" ] && pause
     done
 }
+
 
 #!/bin/bash
 # NATSSH Menu v4.0 — utama 4 kategori + submenu
