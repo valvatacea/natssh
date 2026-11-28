@@ -82,6 +82,7 @@ akun_baru() {
                 template=$(cat "$card_template")
                 template=${template//\{domain\}/$host}
                 template=${template//\{domain_cf\}/$hostcf}
+                template=${template//\{dnstt_domain\}/${DNSTT_DOMAIN}}
                 template=${template//\{dnstt_ns\}/${DNSTT_NS}}
                 template=${template//\{dnstt_pubkey\}/${DNSTT_PUBKEY}}
                 template=${template//\{cf_ports\}/$cf_ports}
@@ -110,6 +111,7 @@ akun_baru() {
                 echo "================ DETAIL AKUN ================"
                 echo "Domain    : $host"
                 [ -n "$hostcf" ] && echo "Domain CF : $hostcf"
+                [ -n "${DNSTT_DOMAIN}" ] && echo "DNSTT Dom : ${DNSTT_DOMAIN}"
                 [ -n "${DNSTT_NS}" ] && echo "DNSTT NS  : ${DNSTT_NS}"
                 [ -n "${DNSTT_PUBKEY}" ] && echo "DNSTT Key : ${DNSTT_PUBKEY}"
                 # Hide IP jika HIDE_IP = 1 (dari .env)
@@ -1665,7 +1667,7 @@ conf_restart_schedule() {
     echo -e "${YELLOW}--- PENJADWALAN ---${NC}"
     echo ""
     # Tampilkan daftar cron restart aktif per layanan
-    for svc in natssh-ws natssh-udpgw nginx; do
+    for svc in natssh-ws natssh-udpgw nginx natssh-dnstt; do
         line=$(crontab -l 2>/dev/null | grep "systemctl.*restart.*${svc}" | head -1)
         if [ -n "$line" ]; then
             echo -e "  ${CYAN}${svc}${NC}: ${GREEN}AKTIF${NC} | ${line}"
@@ -1698,8 +1700,9 @@ conf_restart_schedule() {
     echo "4. apply_speed.sh (Refresh IP + limit speed)"
     echo "5. generate_cdn_geo.sh (Generate cdn_geo.conf)"
     echo "6. Atur Jadwal Reboot"
+    echo "7. natssh-dnstt (DNSTT Server)"
     echo -e "${RED}0. Batal${NC}"
-    read -p "Pilih (0-6): " p
+    read -p "Pilih (0-7): " p
     case $p in
         1) toggle_service_cron "natssh-ws" "/usr/bin/systemctl restart natssh-ws" "WebSocket" ;;
         2) toggle_service_cron "natssh-udpgw" "/usr/bin/systemctl restart 'natssh-udpgw@*'" "UDP Gateway" ;;
@@ -1707,6 +1710,7 @@ conf_restart_schedule() {
         4) toggle_script_cron "apply_speed" "/root/natssh/apply_speed.sh" "Apply Speed Limit" ;;
         5) toggle_script_cron "generate_cdn_geo" "/root/natssh/generate_cdn_geo.sh" "Generate CDN Geo" ;;
         6) toggle_reboot_cron ;;
+        7) toggle_service_cron "natssh-dnstt" "/usr/bin/systemctl restart natssh-dnstt" "DNSTT Server" ;;
         0) echo -e "${YELLOW}Dibatalkan.${NC};;
         *) echo -e "${RED}Pilihan tidak valid!${NC};;
     esac
@@ -2857,7 +2861,8 @@ menu_conf() {
         printf "  %-3s %-46s\n" "12." "Banner Pelanggan"
         printf "  %-3s %-46s\n" "13." "Durasi Suspend"
         printf "  %-3s %-46s\n" "14." "Test Ping"
-        read -p "Pilih (0-14): " p || exit 0
+        printf "  %-3s %-46s\n" "15." "Kontrol DNSTT"
+        read -p "Pilih (0-15): " p || exit 0
         case $p in
             1) conf_domain ;;
             2) conf_ip ;;
@@ -2873,6 +2878,7 @@ menu_conf() {
             12) conf_banner ;;
             13) conf_suspend_minutes ;;
             14) conf_test_ping ;;
+            15) conf_dnstt_control ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
@@ -2969,10 +2975,44 @@ conf_domain_cf_edit() {
 }
 
 
+conf_dnstt_domain_edit() {
+    # DNSTT Domain di kartu akun; DNSTT_DOMAIN di .env — target DNS record A
+    local cur=${DNSTT_DOMAIN}
+    echo -e "DNSTT Domain saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
+    read -p "DNSTT Domain baru (kosong = hapus, 0 = batal): " h
+    [ "$h" = "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
+    if [ -z "$h" ]; then
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^DNSTT_DOMAIN=" "${DIR}/config/.env"; then
+                sed -i "/^DNSTT_DOMAIN=/d" "${DIR}/config/.env"
+            fi
+        fi
+        muat_env
+        echo -e "${GREEN}DNSTT Domain dihapus — baris 'DNSTT Domain' tak tampil di kartu.${NC}"
+        echo -e "${YELLOW}Update DNS record A ke domain baru jika diperlukan.${NC}"
+    elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}$ ]]; then
+        echo -e "${RED}Gagal: format domain salah!${NC}"
+    else
+        if [ -f "${DIR}/config/.env" ]; then
+            if grep -q "^DNSTT_DOMAIN=" "${DIR}/config/.env"; then
+                sed -i "s|^DNSTT_DOMAIN=.*|DNSTT_DOMAIN=$h|" "${DIR}/config/.env"
+            else
+                echo "DNSTT_DOMAIN=$h" >> "${DIR}/config/.env"
+            fi
+        else
+            echo "DNSTT_DOMAIN=$h" > "${DIR}/config/.env"
+        fi
+        muat_env
+        echo -e "${GREEN}DNSTT Domain tersimpan: $h${NC}"
+        echo -e "${YELLOW}Buat/update DNS record A: $h -> IP VPS.${NC}"
+    fi
+}
+
 conf_dnstt_ns_edit() {
+    # DNSTT NS di kartu akun; DNSTT_NS di .env — wajib untuk service
     local cur=${DNSTT_NS}
-    echo -e "DNSTT NS saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
-    read -p "DNSTT NS baru (contoh: t.domain.com, kosong = hapus, 0 = batal): " h
+    echo -e "DNSTT NS saat ini: ${YELLOW}${cur:-BELUM DIATUR}${NC}"
+    read -p "DNSTT NS baru (kosong = hapus/nonaktifkan service, 0 = batal): " h
     [ "$h" = "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
     if [ -z "$h" ]; then
         if [ -f "${DIR}/config/.env" ]; then
@@ -2981,9 +3021,14 @@ conf_dnstt_ns_edit() {
             fi
         fi
         muat_env
-        echo -e "${GREEN}DNSTT NS dihapus — baris 'DNSTT NS' tak tampil di kartu.${NC}"
+        systemctl stop natssh-dnstt >/dev/null 2>&1 || true
+        systemctl disable natssh-dnstt >/dev/null 2>&1 || true
+        rm -f /etc/systemd/system/natssh-dnstt.service
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        echo -e "${YELLOW}DNSTT NS dihapus. Service natssh-dnstt dinonaktifkan.${NC}"
+        echo -e "${RED}Peringatan: DNSTT tidak akan berjalan tanpa NS.${NC}"
     elif ! [[ "$h" =~ ^[a-zA-Z0-9.-]{3,100}$ ]]; then
-        echo -e "${RED}Gagal: format NS salah (contoh: t.domain.com)!${NC}"
+        echo -e "${RED}Gagal: format NS salah!${NC}"
     else
         if [ -f "${DIR}/config/.env" ]; then
             if grep -q "^DNSTT_NS=" "${DIR}/config/.env"; then
@@ -2995,38 +3040,136 @@ conf_dnstt_ns_edit() {
             echo "DNSTT_NS=$h" > "${DIR}/config/.env"
         fi
         muat_env
-        echo -e "${GREEN}DNSTT NS tersimpan: $h — muncul di baris 'DNSTT NS' kartu akun.${NC}"
+        if [ -x /usr/local/bin/dnstt-server ] && [ -s "${DIR}/dnstt/server.key" ]; then
+            cat > /etc/systemd/system/natssh-dnstt.service <<EOF
+[Unit]
+Description=NATSSH DNSTT Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${DIR}/dnstt
+ExecStart=/usr/local/bin/dnstt-server -udp :5300 -privkey-file ${DIR}/dnstt/server.key ${DNSTT_NS} 127.0.0.1:22
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+            systemctl daemon-reload
+            systemctl enable --now natssh-dnstt.service >/dev/null 2>&1
+            sleep 1
+            if systemctl is-active --quiet natssh-dnstt.service; then
+                echo -e "${GREEN}DNSTT NS tersimpan dan service aktif: $h${NC}"
+            else
+                echo -e "${RED}Service gagal start. Cek: journalctl -u natssh-dnstt -n 20${NC}"
+            fi
+        else
+            echo -e "${YELLOW}DNSTT binary/key belum ada. NS disimpan; install DNSTT dulu.${NC}"
+        fi
     fi
 }
 
-conf_dnstt_pubkey_edit() {
-    local cur=${DNSTT_PUBKEY}
-    echo -e "DNSTT PubKey saat ini: ${YELLOW}${cur:-BELUM DIATUR (baris tak tampil di kartu)}${NC}"
-    read -p "DNSTT PubKey hex (64 char, kosong = hapus, 0 = batal): " h
-    [ "$h" = "0" ] && { echo -e "${YELLOW}Dibatalkan.${NC}"; return; }
-    if [ -z "$h" ]; then
-        if [ -f "${DIR}/config/.env" ]; then
-            if grep -q "^DNSTT_PUBKEY=" "${DIR}/config/.env"; then
-                sed -i "/^DNSTT_PUBKEY=/d" "${DIR}/config/.env"
-            fi
-        fi
-        muat_env
-        echo -e "${GREEN}DNSTT PubKey dihapus — baris 'DNSTT PubKey' tak tampil di kartu.${NC}"
-    elif ! [[ "$h" =~ ^[0-9a-fA-F]{64}$ ]]; then
-        echo -e "${RED}Gagal: PubKey harus hex 64 karakter!${NC}"
-    else
-        if [ -f "${DIR}/config/.env" ]; then
-            if grep -q "^DNSTT_PUBKEY=" "${DIR}/config/.env"; then
-                sed -i "s|^DNSTT_PUBKEY=.*|DNSTT_PUBKEY=$h|" "${DIR}/config/.env"
-            else
-                echo "DNSTT_PUBKEY=$h" >> "${DIR}/config/.env"
-            fi
-        else
-            echo "DNSTT_PUBKEY=$h" > "${DIR}/config/.env"
-        fi
-        muat_env
-        echo -e "${GREEN}DNSTT PubKey tersimpan — muncul di baris 'DNSTT PubKey' kartu akun.${NC}"
+conf_dnstt_keypair_regenerate() {
+    # Regenerate keypair DNSTT, bukan edit pubkey bebas
+    if [ ! -x /usr/local/bin/dnstt-server ]; then
+        echo -e "${RED}Binary DNSTT belum terpasang.${NC}"
+        return 1
     fi
+    mkdir -p "${DIR}/dnstt"
+    rm -f "${DIR}/dnstt/server.key" "${DIR}/dnstt/server.pub"
+    /usr/local/bin/dnstt-server -gen-key -privkey-file "${DIR}/dnstt/server.key" -pubkey-file "${DIR}/dnstt/server.pub" >/dev/null 2>&1
+    if [ ! -s "${DIR}/dnstt/server.key" ] || [ ! -s "${DIR}/dnstt/server.pub" ]; then
+        echo -e "${RED}Gagal generate keypair DNSTT.${NC}"
+        return 1
+    fi
+    local pubkey
+    pubkey=$(tr -d '[:space:]' < "${DIR}/dnstt/server.pub")
+    if [ -f "${DIR}/config/.env" ]; then
+        if grep -q "^DNSTT_PUBKEY=" "${DIR}/config/.env"; then
+            sed -i "s|^DNSTT_PUBKEY=.*|DNSTT_PUBKEY=$pubkey|" "${DIR}/config/.env"
+        else
+            echo "DNSTT_PUBKEY=$pubkey" >> "${DIR}/config/.env"
+        fi
+    else
+        echo "DNSTT_PUBKEY=$pubkey" > "${DIR}/config/.env"
+    fi
+    muat_env
+    echo -e "${GREEN}Keypair DNSTT dibuat ulang.${NC}"
+    echo -e "PubKey: ${YELLOW}${pubkey}${NC}"
+    if [ -n "${DNSTT_NS:-}" ]; then
+        systemctl restart natssh-dnstt >/dev/null 2>&1 || true
+        echo -e "${GREEN}Service natssh-dnstt direstart.${NC}"
+    else
+        echo -e "${YELLOW}NS kosong, service tidak dijalankan.${NC}"
+    fi
+}
+
+conf_dnstt_control() {
+    # Kontrol service DNSTT: status, start, stop, restart
+    while true; do
+        muat_env
+        clear
+        garis
+        echo -e "${YELLOW}   KONTROL DNSTT${NC}"
+        garis
+        local st
+        st=$(systemctl is-active natssh-dnstt 2>/dev/null || echo "inactive")
+        echo -e "Status Service : ${GREEN}${st}${NC}"
+        echo -e "Port UDP       : ${YELLOW}5300${NC} (redirect dari 53)"
+        echo -e "DNSTT NS       : ${YELLOW}${DNSTT_NS:-BELUM DIATUR}${NC}"
+        echo -e "DNSTT Domain   : ${YELLOW}${DNSTT_DOMAIN:-BELUM DIATUR}${NC}"
+        echo -e "DNSTT PubKey   : ${YELLOW}${DNSTT_PUBKEY:-BELUM DIATUR}${NC}"
+        garis
+        printf "  %-3s %-46s\n" "1." "Start DNSTT"
+        printf "  %-3s %-46s\n" "2." "Stop DNSTT"
+        printf "  %-3s %-46s\n" "3." "Restart DNSTT"
+        printf "  %-3s %-46s\n" "4." "Refresh Status"
+        echo -e "${RED}0. Kembali${NC}"
+        read -p "Pilih (0-4): " p || exit 0
+        case $p in
+            1)
+                if [ -z "${DNSTT_NS:-}" ]; then
+                    echo -e "${RED}DNSTT NS belum diatur. Isi lewat menu Domain/Host dulu.${NC}"
+                elif [ ! -f /etc/systemd/system/natssh-dnstt.service ]; then
+                    echo -e "${RED}Service natssh-dnstt belum ada. Isi NS lewat menu dulu.${NC}"
+                else
+                    systemctl start natssh-dnstt >/dev/null 2>&1
+                    sleep 1
+                    if systemctl is-active --quiet natssh-dnstt; then
+                        echo -e "${GREEN}DNSTT started.${NC}"
+                    else
+                        echo -e "${RED}Gagal start. Cek: journalctl -u natssh-dnstt -n 20${NC}"
+                    fi
+                fi
+                pause
+                ;;
+            2)
+                systemctl stop natssh-dnstt >/dev/null 2>&1 || true
+                echo -e "${YELLOW}DNSTT stopped.${NC}"
+                pause
+                ;;
+            3)
+                if [ -z "${DNSTT_NS:-}" ]; then
+                    echo -e "${RED}DNSTT NS belum diatur.${NC}"
+                else
+                    systemctl restart natssh-dnstt >/dev/null 2>&1
+                    sleep 1
+                    if systemctl is-active --quiet natssh-dnstt; then
+                        echo -e "${GREEN}DNSTT restarted.${NC}"
+                    else
+                        echo -e "${RED}Gagal restart. Cek: journalctl -u natssh-dnstt -n 20${NC}"
+                    fi
+                fi
+                pause
+                ;;
+            4)
+                ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}"; pause ;;
+        esac
+    done
 }
 
 # Ekstraksi root domain menggunakan Public Suffix List (unduh dari publicsuffix.org)
@@ -3292,22 +3435,25 @@ terbitkan_ulang_sertifikat() {
 conf_domain() {
     # satu pintu domain: Cloudflare (biasa) + CloudFront + DNSTT — ke kartu akun
     while true; do
-        local cur curcf curns curpk
+        local cur curcf curdn curns curpk
         cur=${DOMAIN}
         curcf=${DOMAIN_CF}
+        curdn=${DNSTT_DOMAIN}
         curns=${DNSTT_NS}
         curpk=${DNSTT_PUBKEY}
         echo -e "1. Domain (Cloudflare) : ${GREEN}${cur:-OTOMATIS (IP publik)}${NC}"
         echo -e "2. Domain CloudFront   : ${GREEN}${curcf:-BELUM DIATUR}${NC}"
-        echo -e "3. DNSTT NS            : ${GREEN}${curns:-BELUM DIATUR}${NC}"
-        echo -e "4. DNSTT PubKey        : ${GREEN}${curpk:-BELUM DIATUR}${NC}"
+        echo -e "3. DNSTT Domain        : ${GREEN}${curdn:-BELUM DIATUR}${NC}"
+        echo -e "4. DNSTT NS            : ${GREEN}${curns:-BELUM DIATUR}${NC}"
+        echo -e "5. DNSTT PubKey (regen): ${GREEN}${curpk:-BELUM DIATUR}${NC}"
         echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-4): " p || exit 0
+        read -p "Pilih (0-5): " p || exit 0
         case $p in
             1) conf_domain_edit ;;
             2) conf_domain_cf_edit ;;
-            3) conf_dnstt_ns_edit ;;
-            4) conf_dnstt_pubkey_edit ;;
+            3) conf_dnstt_domain_edit ;;
+            4) conf_dnstt_ns_edit ;;
+            5) conf_dnstt_keypair_regenerate ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac

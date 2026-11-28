@@ -38,6 +38,31 @@ fi
 
 muat_env
 
+# Idempotensi: jangan reinstall tanpa konfirmasi
+if [ -f /etc/systemd/system/natssh-dnstt.service ] || [ -n "${DNSTT_NS:-}" ] || [ -n "${DNSTT_PUBKEY:-}" ] || [ -n "${DNSTT_DOMAIN:-}" ]; then
+    echo -e "${YELLOW}Peringatan: DNSTT sudah terinstal.${NC}"
+    read -p "Lanjutkan reinstall? Config dan keypair akan ditimpa. (y/N): " reinstall_confirm
+    if [[ ! "$reinstall_confirm" =~ ^[Yy]$ ]]; then
+        echo -e "${RED}Instalasi dibatalkan.${NC}"
+        exit 0
+    fi
+fi
+
+# Backup .env untuk rollback jika gagal
+ENV_BACKUP=0
+if [ -f "$ENV_FILE" ]; then
+    cp "$ENV_FILE" "${ENV_FILE}.dnstt.bak"
+    ENV_BACKUP=1
+fi
+_rollback_env_dnstt() {
+    if [ "$?" -ne 0 ] && [ "$ENV_BACKUP" -eq 1 ] && [ -f "${ENV_FILE}.dnstt.bak" ]; then
+        cp "${ENV_FILE}.dnstt.bak" "$ENV_FILE"
+        rm -f "${ENV_FILE}.dnstt.bak"
+        echo -e "${RED}Rollback: .env dikembalikan ke versi sebelumnya.${NC}"
+    fi
+}
+trap '_rollback_env_dnstt' EXIT
+
 domain="${1:-}"
 if [ -z "$domain" ]; then
     if [ -n "${DOMAIN:-}" ]; then
@@ -52,23 +77,26 @@ if [ -z "$domain" ]; then
     exit 1
 fi
 
-default_ns="t.${domain}"
-read -p "Masukkan DNSTT NS (kosongkan untuk ${default_ns}): " ns
-ns=${ns:-$default_ns}
+dnstt_domain="$domain"
+env_set "DNSTT_DOMAIN" "$dnstt_domain"
+
+read -p "Masukkan DNSTT NS (wajib, kosong = edit nanti di menu.sh): " ns
 ns=$(echo "$ns" | xargs)
-if [ -z "$ns" ]; then
-    echo -e "${RED}DNSTT NS wajib diisi.${NC}"
-    exit 1
-fi
-if ! [[ "$ns" =~ ^[a-zA-Z0-9.-]{3,100}$ ]]; then
+if [ -n "$ns" ] && ! [[ "$ns" =~ ^[a-zA-Z0-9.-]{3,100}$ ]]; then
     echo -e "${RED}Format NS salah.${NC}"
     exit 1
 fi
 
-echo -e "\\n[*] DNSTT NS: ${GREEN}${ns}${NC}"
-echo -e "${YELLOW}Pastikan DNS record sudah dibuat:${NC}"
-echo -e "  A  : tns.${domain} -> IP VPS"
-echo -e "  NS : ${ns} -> tns.${domain}"
+echo -e "\\n[*] DNSTT Domain: ${GREEN}${dnstt_domain}${NC}"
+if [ -z "$ns" ]; then
+    echo -e "${YELLOW}Peringatan: NS kosong. DNSTT tidak akan berjalan sampai NS diisi.${NC}"
+    echo -e "${YELLOW}Isi NS lewat menu.sh atau jalankan ulang installer.${NC}"
+else
+    echo -e "[*] DNSTT NS: ${GREEN}${ns}${NC}"
+    echo -e "${YELLOW}Pastikan DNS record sudah dibuat:${NC}"
+    echo -e "  A  : ${dnstt_domain} -> IP VPS"
+    echo -e "  NS : ${ns} -> ${dnstt_domain}"
+fi
 
 # Cek port 53
 if ss -tuln 2>/dev/null | grep -q ':53 '; then
@@ -117,7 +145,7 @@ fi
 
 echo -e "\\n[*] Mengunduh dan build DNSTT..."
 rm -rf /tmp/dnstt-build
-if ! git clone --depth 1 https://www.bamsoftware.com/git/dnstt.git /tmp/dnstt-build >/dev/null 2>&1; then
+if ! git clone https://www.bamsoftware.com/git/dnstt.git /tmp/dnstt-build >/dev/null 2>&1; then
     echo -e "${RED}Gagal clone DNSTT.${NC}"
     exit 1
 fi
@@ -151,10 +179,17 @@ fi
 
 env_set "DNSTT_NS" "$ns"
 env_set "DNSTT_PUBKEY" "$pubkey"
-echo -e "${GREEN}DNSTT NS dan PubKey disimpan ke .env${NC}"
+echo -e "${GREEN}DNSTT Domain, NS, dan PubKey disimpan ke .env${NC}"
 
-echo -e "\\n[*] Membuat service systemd DNSTT..."
-cat > /etc/systemd/system/natssh-dnstt.service <<EOF
+if [ -z "$ns" ]; then
+    echo -e "${YELLOW}Service natssh-dnstt tidak dibuat karena NS kosong.${NC}"
+    systemctl stop natssh-dnstt >/dev/null 2>&1 || true
+    systemctl disable natssh-dnstt >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/natssh-dnstt.service
+    systemctl daemon-reload >/dev/null 2>&1 || true
+else
+    echo -e "\\n[*] Membuat service systemd DNSTT..."
+    cat > /etc/systemd/system/natssh-dnstt.service <<EOF
 [Unit]
 Description=NATSSH DNSTT Server
 After=network.target
@@ -170,14 +205,15 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl daemon-reload
-systemctl enable --now natssh-dnstt.service >/dev/null 2>&1
-sleep 1
-if systemctl is-active --quiet natssh-dnstt.service; then
-    echo -e "${GREEN}Service natssh-dnstt aktif.${NC}"
-else
-    echo -e "${RED}Service natssh-dnstt gagal start. Cek: journalctl -u natssh-dnstt -n 20${NC}"
-    exit 1
+    systemctl daemon-reload
+    systemctl enable --now natssh-dnstt.service >/dev/null 2>&1
+    sleep 1
+    if systemctl is-active --quiet natssh-dnstt.service; then
+        echo -e "${GREEN}Service natssh-dnstt aktif.${NC}"
+    else
+        echo -e "${RED}Service natssh-dnstt gagal start. Cek: journalctl -u natssh-dnstt -n 20${NC}"
+        exit 1
+    fi
 fi
 
 # Bersihkan build
@@ -186,6 +222,12 @@ if [ "$INSTALLED_GO" = "1" ]; then
     rm -rf /usr/local/go
     echo -e "${GREEN}Go yang diinstall installer dihapus (build sukses).${NC}"
 fi
+# Tandai sukses agar rollback tidak aktif
+if [ "$ENV_BACKUP" -eq 1 ]; then
+    rm -f "${ENV_FILE}.dnstt.bak"
+fi
+trap - EXIT
+
 # Pertahankan git untuk fitur lain.
 
 echo -e "\\n${CYAN}================================================${NC}"
@@ -195,4 +237,4 @@ echo -e "NS      : ${YELLOW}${ns}${NC}"
 echo -e "PubKey  : ${YELLOW}${pubkey}${NC}"
 echo -e "Service : ${YELLOW}natssh-dnstt${NC}"
 echo -e "Client  : dnstt-client -udp 1.1.1.1:53 -pubkey-file server.pub ${ns} 127.0.0.1:8000"
-echo -e "${YELLOW}Jangan lupa buat DNS record NS: ${ns} -> tns.${domain}${NC}"
+echo -e "${YELLOW}Jangan lupa buat DNS record: A ${dnstt_domain} -> IP VPS; NS ${ns} -> ${dnstt_domain}${NC}"
