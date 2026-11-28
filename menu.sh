@@ -3059,7 +3059,8 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
             systemctl daemon-reload
-            systemctl enable --now natssh-dnstt.service >/dev/null 2>&1
+            systemctl enable natssh-dnstt.service >/dev/null 2>&1
+            systemctl restart natssh-dnstt.service >/dev/null 2>&1
             sleep 1
             if systemctl is-active --quiet natssh-dnstt.service; then
                 echo -e "${GREEN}DNSTT NS tersimpan dan service aktif: $h${NC}"
