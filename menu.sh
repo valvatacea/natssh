@@ -2771,7 +2771,11 @@ conf_nginx_stream_port() {
         pause
         return
     fi
-    conf_file="/etc/nginx/stream.conf"
+    if [ -f "/etc/nginx/stream.d/ssh_direct.conf" ]; then
+        conf_file="/etc/nginx/stream.d/ssh_direct.conf"
+    else
+        conf_file="/etc/nginx/stream.conf"
+    fi
     if [ -f "${DIR}/config/.env" ] && grep -q "^NGINX_STREAM_PORT=" "${DIR}/config/.env"; then
         cur=$(grep "^NGINX_STREAM_PORT=" "${DIR}/config/.env" | cut -d= -f2)
     elif [ -f "$conf_file" ]; then
@@ -2862,7 +2866,8 @@ menu_conf() {
         printf "  %-3s %-46s\n" "13." "Banner Pelanggan"
         printf "  %-3s %-46s\n" "14." "Durasi Suspend"
         printf "  %-3s %-46s\n" "15." "Test Ping"
-        read -p "Pilih (0-15): " p || exit 0
+        printf "  %-3s %-46s\n" "16." "Konfigurasi DNSTT Nginx (SNI)"
+        read -p "Pilih (0-16): " p || exit 0
         case $p in
             1) conf_domain ;;
             2) conf_ip ;;
@@ -2879,6 +2884,7 @@ menu_conf() {
             13) conf_banner ;;
             14) conf_suspend_minutes ;;
             15) conf_test_ping ;;
+            16) conf_dnstt_nginx ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
@@ -3117,7 +3123,8 @@ conf_dnstt_control() {
         echo -e "${YELLOW}   KONTROL DNSTT${NC}"
         garis
         local st
-        st=$(systemctl is-active natssh-dnstt 2>/dev/null || echo "inactive")
+        st=$(systemctl is-active natssh-dnstt 2>/dev/null)
+        [ -z "$st" ] && st="inactive"
         echo -e "Status Service : ${GREEN}${st}${NC}"
         echo -e "Port UDP       : ${YELLOW}5300${NC} (redirect dari 53)"
         echo -e "DNSTT NS       : ${YELLOW}${DNSTT_NS:-BELUM DIATUR}${NC}"
@@ -3432,6 +3439,97 @@ terbitkan_ulang_sertifikat() {
     echo -e "${GREEN}Sertifikat SSL berhasil diperbarui untuk ${root_domain}.${NC}"
     echo -e "${GREEN}Nginx akan di-reload otomatis oleh acme.sh reloadcmd.${NC}"
     return 0
+}
+
+conf_dnstt_nginx() {
+    # Kelola route SNI/port Xray di /etc/nginx/stream.d/dnstt.conf
+    local conf_dir="/etc/nginx/stream.d"
+    local conf_file="${conf_dir}/dnstt.conf"
+    local backup="${conf_file}.bak"
+    mkdir -p "$conf_dir"
+    while true; do
+        muat_env
+        clear
+        garis
+        echo -e "${YELLOW}   KONFIGURASI DNSTT NGINX (SNI)${NC}"
+        garis
+        if [ -f "$conf_file" ]; then
+            echo -e "${CYAN}Config saat ini:${NC}"
+            cat "$conf_file"
+        else
+            echo -e "${YELLOW}dnstt.conf belum ada.${NC}"
+        fi
+        garis
+        echo "1. Ubah route VMess/VLESS/Trojan (domain + port)"
+        echo "2. Test config + restart nginx"
+        echo "3. Lihat config"
+        echo -e "${RED}0. Kembali${NC}"
+        read -p "Pilih (0-3): " p || exit 0
+        case $p in
+            1)
+                local vmess_domain vless_domain trojan_domain
+                local vmess_port vless_port trojan_port
+                read -p "VMess SNI domain (kosong = hapus): " vmess_domain
+                read -p "VMess port [10001]: " vmess_port
+                vmess_port=${vmess_port:-10001}
+                read -p "VLESS SNI domain (kosong = hapus): " vless_domain
+                read -p "VLESS port [10002]: " vless_port
+                vless_port=${vless_port:-10002}
+                read -p "Trojan SNI domain (kosong = hapus): " trojan_domain
+                read -p "Trojan port [10003]: " trojan_port
+                trojan_port=${trojan_port:-10003}
+
+                # validasi port
+                for pp in "$vmess_port" "$vless_port" "$trojan_port"; do
+                    if [ -n "$pp" ] && ! [[ "$pp" =~ ^[0-9]+$ ]]; then
+                        echo -e "${RED}Port harus angka.${NC}"; pause; continue 2
+                    fi
+                done
+
+                [ -f "$conf_file" ] && cp "$conf_file" "$backup"
+
+                {
+                    echo "map \$ssl_preread_server_name \$dnstt_backend {"
+                    [ -n "$vmess_domain" ] && echo "    ${vmess_domain}   127.0.0.1:${vmess_port};"
+                    [ -n "$vless_domain" ] && echo "    ${vless_domain}   127.0.0.1:${vless_port};"
+                    [ -n "$trojan_domain" ] && echo "    ${trojan_domain}  127.0.0.1:${trojan_port};"
+                    echo "    default            127.0.0.1:22;"
+                    echo "}"
+                    echo ""
+                    echo "server {"
+                    echo "    listen 127.0.0.1:9000;"
+                    echo "    proxy_pass \$dnstt_backend;"
+                    echo "    ssl_preread on;"
+                    echo "}"
+                } > "$conf_file"
+
+                if nginx -t >/dev/null 2>&1; then
+                    systemctl restart nginx >/dev/null 2>&1
+                    echo -e "${GREEN}Config DNSTT Nginx valid dan nginx direstart.${NC}"
+                else
+                    echo -e "${RED}Config invalid. Rollback.${NC}"
+                    [ -f "$backup" ] && cp "$backup" "$conf_file"
+                    nginx -t >/dev/null 2>&1 && systemctl restart nginx >/dev/null 2>&1
+                fi
+                pause
+                ;;
+            2)
+                if nginx -t; then
+                    systemctl restart nginx
+                    echo -e "${GREEN}Nginx direstart.${NC}"
+                else
+                    echo -e "${RED}Config nginx invalid.${NC}"
+                fi
+                pause
+                ;;
+            3)
+                [ -f "$conf_file" ] && cat "$conf_file" || echo "Belum ada config"
+                pause
+                ;;
+            0) return ;;
+            *) echo -e "${RED}Pilihan tidak valid!${NC}"; pause ;;
+        esac
+    done
 }
 
 conf_domain() {

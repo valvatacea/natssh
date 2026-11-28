@@ -557,17 +557,21 @@ if ss -tln | grep -q ":${stream_port} "; then
     echo -e "${YELLOW}Port ${stream_port} sudah dipakai. Mencoba reuse (idempotent).${NC}"
 fi
 
+mkdir -p /etc/nginx/stream.d
 if ! grep -q 'include /etc/nginx/stream.conf' /etc/nginx/nginx.conf; then
     sed -i '/^http {/i include /etc/nginx/stream.conf;' /etc/nginx/nginx.conf
 fi
+cat > /etc/nginx/stream.d/ssh_direct.conf <<EOF
+server {
+    listen ${stream_port};
+    proxy_pass 127.0.0.1:${direct_port};
+    proxy_protocol on;
+    proxy_timeout 300s;
+}
+EOF
 cat > /etc/nginx/stream.conf <<EOF
 stream {
-    server {
-        listen ${stream_port};
-        proxy_pass 127.0.0.1:${direct_port};
-        proxy_protocol on;
-        proxy_timeout 300s;
-    }
+    include /etc/nginx/stream.d/*.conf;
 }
 EOF
 nginx -t && systemctl restart nginx
