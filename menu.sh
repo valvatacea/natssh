@@ -2866,8 +2866,7 @@ menu_conf() {
         printf "  %-3s %-46s\n" "13." "Banner Pelanggan"
         printf "  %-3s %-46s\n" "14." "Durasi Suspend"
         printf "  %-3s %-46s\n" "15." "Test Ping"
-        printf "  %-3s %-46s\n" "16." "Konfigurasi DNSTT Nginx (SNI)"
-        read -p "Pilih (0-16): " p || exit 0
+        read -p "Pilih (0-15): " p || exit 0
         case $p in
             1) conf_domain ;;
             2) conf_ip ;;
@@ -2884,7 +2883,6 @@ menu_conf() {
             13) conf_banner ;;
             14) conf_suspend_minutes ;;
             15) conf_test_ping ;;
-            16) conf_dnstt_nginx ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}" ;;
         esac
@@ -3135,8 +3133,9 @@ conf_dnstt_control() {
         printf "  %-3s %-46s\n" "2." "Stop DNSTT"
         printf "  %-3s %-46s\n" "3." "Restart DNSTT"
         printf "  %-3s %-46s\n" "4." "Refresh Status"
+        printf "  %-3s %-46s\n" "5." "DNSTT Nginx (SNI)"
         echo -e "${RED}0. Kembali${NC}"
-        read -p "Pilih (0-4): " p || exit 0
+        read -p "Pilih (0-5): " p || exit 0
         case $p in
             1)
                 if [ -z "${DNSTT_NS:-}" ]; then
@@ -3175,6 +3174,7 @@ conf_dnstt_control() {
                 ;;
             4)
                 ;;
+            5) conf_dnstt_nginx ;;
             0) return ;;
             *) echo -e "${RED}Pilihan tidak valid!${NC}"; pause ;;
         esac
